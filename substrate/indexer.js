@@ -7353,7 +7353,6 @@ module.exports = class Indexer extends AssetManager {
                 let [dTxns, dReceipts] = await statusesPromise
                 //console.log(`[${blockNumber}] dReceipts`, JSON.stringify(dReceipts))
 
-
                 //let dTxns = await ethTool.processTranssctions(evmBlock.transactions, contractABIs, contractABISignatures)
                 let processTransasctionTS = (new Date().getTime() - processTransasctionStartTS) / 1000
                 this.timeStat.processTransasctionTS += processTransasctionTS
@@ -8478,55 +8477,70 @@ module.exports = class Indexer extends AssetManager {
                     ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                 ])
                 let [dTxns, dReceipts] = await statusesPromise
+                let rawBlock = JSON.parse(JSON.stringify(block))
+                let evmTrace = false
+                let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(block, dTxns, dReceipts, evmTrace, chainID)
+                //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
 
-                for (let i = 0; i < block.transactions.length; i++) {
-                    let tx = block.transactions[i];
+                for (let i = 0; i < evmFullBlock.transactions.length; i++) {
+                    let rawTx = rawBlock.transactions[i];
+                    let tx = evmFullBlock.transactions[i];
+                    //console.log(`rawTx`, rawTx)
+                    //console.log(`tx`, tx)
                     let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
                     let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
+                    let txhash = tx.transactionHash
                     tx.raw = tx.input; // ???
                     tx.decodedLogs = logs; // fuse here
                     let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+                    //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
                     let t = {
                         chain_id: chainID,
                         id: chain.id,
-                        hash: tx.hash,
+                        hash: (tx.transactionHash != undefined)? tx.transactionHash: rawTx.hash,
                         nonce: tx.nonce,
                         transaction_index: tx.transactionIndex,
                         from_address: tx.from,
                         to_address: tx.to,
-                        value: tx.value,
-                        gas: tx.gas,
-                        gas_price: tx.gasPrice,
+                        value: rawTx.value,
+                        gas: rawTx.gas,
+                        gas_price: rawTx.gasPrice,
                         input: tx.input,
                         receipt_cumulative_gas_used: receipt && receipt.cumulativeGasUsed ? receipt.cumulativeGasUsed : null,
                         receipt_gas_used: receipt && receipt.gasUsed ? receipt.gasUsed : null,
                         receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
-                        receipt_root: null, // TODO
+                        receipt_root: null, // irrelevant
                         receipt_status: receipt && receipt.status ? 1 : 0,
                         block_timestamp: block.timestamp,
                         block_number: tx.blockNumber,
-                        block_hash: tx.blockHash
+                        block_hash: tx.blockHash,
+                        decoded: false,
+                        method_id: null,
+                        signature: null,
+                        params: null
                     }
                     if (decodedInput) {
-                        t.decoded = (decodedInput.decodedStatus == 'success');
-                        if (t.decoded) {
-                            t.method_id = decodedInput.methodID;
-                            t.signature = decodedInput.signature;
-                            t.params = decodedInput.params;
+                        t.decoded = (decodedInput.decodeStatus == 'success');
+                        t.method_id = decodedInput.methodID;
+                        t.signature = decodedInput.signature;
+                        if (t.decoded){
+                            t.params = JSON.stringify(decodedInput.params);
                         }
                     }
-                    rows_transactions.push({
-                        insertId: `${tx.hash}`,
+                    let bqEvmTransaction = {
+                        insertId: `${tx.transactionHash}`,
                         json: t
-                    });
+                    }
+                    console.log(`bq+`, bqEvmTransaction)
+                    rows_transactions.push(bqEvmTransaction);
                     if (logs) {
                         for (let j = 0; j < logs.length; j++) {
                             let l = logs[j]
-                            rows_logs.push({
+                            let ll = {
                                 chain_id: chainID,
                                 id: chain.id,
                                 log_index: l.logIndex,
-                                transaction_hash: tx.hash,
+                                transaction_hash: (tx.transactionHash != undefined)? tx.transactionHash: rawTx.hash,
                                 transaction_index: i,
                                 address: l.address,
                                 data: l.data,
@@ -8536,7 +8550,13 @@ module.exports = class Indexer extends AssetManager {
                                 block_hash: block.hash,
                                 signature: l.signature ? l.signature : null, // TODO: check
                                 events: l.events ? l.events : null // TODO: check
-                            });
+                            }
+                            let bqEvmLog = {
+                                insertId: `${tx.transactionHash}${l.logIndex}`,
+                                json: ll
+                            }
+                            console.log(`bqEvmLog`, bqEvmLog)
+                            rows_logs.push(bqEvmLog);
                         }
                     }
                     // NOTE: we do not write out hashes yet (development)
@@ -8550,7 +8570,7 @@ module.exports = class Indexer extends AssetManager {
         // stream into blocks, transactions
         try {
             let dataset = "evm";
-            let tables = ["blocks", "transactions"]; // [ "contracts", "tokens", "token_transfers", "logs" ]
+            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "logs" ]
             for (const tbl of tables) {
                 let rows = null
                 switch (tbl) {
@@ -8560,6 +8580,10 @@ module.exports = class Indexer extends AssetManager {
                     case "transactions":
                         rows = rows_transactions;
                         console.log(`transactions`, rows_transactions)
+                        break;
+                    case "logs":
+                        rows = rows_logs;
+                        console.log(`log`, rows_logs)
                         break;
                 }
                 if (rows && rows.length > 0) {
