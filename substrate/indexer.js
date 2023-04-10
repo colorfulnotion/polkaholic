@@ -8417,6 +8417,7 @@ module.exports = class Indexer extends AssetManager {
         await this.assetManagerInit()
         let blockNumber = blkNum;
         let block = null;
+        let blockHash = null
         let tries = 0;
         do {
             try {
@@ -8457,6 +8458,7 @@ module.exports = class Indexer extends AssetManager {
                     transaction_count: numTransactions
                 }
             });
+            blockHash = block.hash
             if (numTransactions > 0) {
                 let evmReceipts = await ethTool.crawlEvmReceipts(web3, block);
                 console.log(`[#${block.number}] evmReceipts`, evmReceipts)
@@ -8534,7 +8536,7 @@ module.exports = class Indexer extends AssetManager {
         } catch (err) {
             console.log(err)
         }
-        console.log("block TRIAL", tries, "hash", result.hash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
+        console.log("block TRIAL", tries, "hash", blockHash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
         // stream into blocks, transactions
         try {
             let dataset = "evm";

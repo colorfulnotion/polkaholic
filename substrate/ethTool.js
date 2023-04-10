@@ -845,11 +845,13 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
         v: txn.v
     }
     try {
+        let validateRSV = false
         if (txn.r != undefined && txn.s != undefined) {
             //console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
             if (txn.r.length == 66 && txn.s.length == 66) {
                 return output // let's not validate irrelevant tx
-            } else {
+            } else if (validateRSV){
+                //r,s is problematic here - skip validation
                 console.log(`txn`, txn)
                 let derivedTx = decodeRLPTx(txn.raw)
                 if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTx.txHash}, raw=${txn.raw}`)
