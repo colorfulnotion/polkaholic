@@ -2160,7 +2160,8 @@ module.exports = class Crawler extends Indexer {
                         }
                     });
                     if (numTransactions > 0) {
-                        let evmReceipts = await ethTool.crawlEvmReceipts(web3, block);
+                        let isParallel = false
+                        let evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
                         console.log(`[#${block.number}] evmReceipts`, evmReceipts)
                         if (!evmReceipts) evmReceipts = [];
                         var statusesPromise = Promise.all([
