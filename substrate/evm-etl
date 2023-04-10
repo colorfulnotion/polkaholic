@@ -1,0 +1,65 @@
+#!/usr/bin/env node
+const {
+    Command
+} = require('commander');
+var EVMETL = require("./evmetl");
+
+function myParseInt(value, dummyPrevious) {
+    const parsedValue = parseInt(value, 10);
+    if (isNaN(parsedValue)) {
+        throw new commander.InvalidArgumentError('Not a number.');
+    }
+    return parsedValue;
+}
+
+async function main() {
+    let cli_version = '0.1.0'
+    const program = new Command();
+    program
+        .name('evm-etl')
+        .description('Manage polkaholic export to BigQuery substrate-etl project')
+        .version(`${cli_version}`);
+
+    program.command('crawlabi')
+        .description(`Get ABI for contract from external API (Etherscan, ...) based on chainID`)
+        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt, 1)
+        .option('-p, --project <project>', 'Project Name (e.g. wormhole)', "")
+        .option('-n, --contractName <contractName>', 'Contract Name (e.g. Endpoint)', "")
+        .argument('<address>', 'Contract Address')
+        .action(async (address, opt) => {
+            let chainID = opt.chainID != null ? opt.chainID : 1;
+            let project = opt.project ? opt.project : null;
+            let contractName = opt.contractName ? opt.contractName : null;
+	    let evmetl = new EVMETL();
+	    await evmetl.crawlABI(address, chainID, project, contractName);
+	    process.exit(0);
+        });
+
+    program.command('loadabi')
+        .description(`Get ABI for contract`)
+        .argument('<abistr>', 'Contract Address')
+        .action(async (abistr, opt) => {
+	    let evmetl = new EVMETL();
+	    await evmetl.loadABI(abistr);
+	    process.exit(0);
+        });
+
+    program.command('reloadabi')
+        .description(`Reload ABIs`)
+        .action(async (abistr, opt) => {
+	    let evmetl = new EVMETL();
+	    await evmetl.reloadABI();
+	    process.exit(0);
+        });
+    
+    await program.parseAsync(process.argv);
+}
+
+main()
+    .then(() => {
+        // do not process.exit(0) here
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

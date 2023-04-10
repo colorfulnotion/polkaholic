@@ -87,50 +87,128 @@ function dechex(number) {
     return parseInt(number, 10).toString(16)
 }
 
-
-// etherscan
-const apiToken = "";
-
-// create table method ( methodID varchar(64), abi blob, signature blob, numContracts int default 0, primary key (methodID))
-// create table address ( address varchar(67), abiRaw mediumblob, numTransactions int default 0, primary key (address) )
-// CREATE TABLE IF NOT EXISTS contractabi ( name VARCHAR(256), fingerprintID VARCHAR(96) PRIMARY KEY not null, signatureID VARCHAR(70) not null, signatureRaw blob, signature blob, abi blob, abiType VARCHAR(16), numContracts int(11) default 0, topicLength int(11) default 0 );
-
-/*{
-  fingerprint: 'transfer(address,uint256)',
-  fingerprintID: '0xa9059cbb',
-  signatureID: '0xa9059cbb',
-  topicLength: 0,
-  signatureRaw: 'transfer(address,uint256)',
-  signature: 'transfer(address dst, uint256 wad)',
-  name: 'Transfer',
-  abi: '[{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]',
-  abiType: 'function'
-}
-...
-{
-  fingerprint: 'Transfer(index_topic_1 address,index_topic_2 address,uint256)',
-  fingerprintID: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef-3-0xc3a8eb6d',
-  signatureID: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
-  topicLength: 3,
-  signatureRaw: 'Transfer(address,address,uint256)',
-  signature: 'Transfer(index_topic_1 address src, index_topic_2 address dst, uint256 wad)',
-  name: 'Transfer',
-  abi: '[{"anonymous":false,"inputs":[{"indexed":true,"name":"src","type":"address"},{"indexed":true,"name":"dst","type":"address"},{"indexed":false,"name":"wad","type":"uint256"}],"name":"Transfer","type":"event"}]',
-  abiType: 'event'
-}
-*/
-module.exports = class ABIManager extends PolkaholicDB {
-
+module.exports = class EVMETL extends PolkaholicDB {
     methodMap = {};
 
+    async crawlABI(address, chainID = 1, project = null, contractName = null) {
+	let cmd = null;
+	console.log("CRAWLABI", address, chainID, project, contractName);
+	switch ( chainID ) {
+	case 1:
+	    cmd = `curl -k -s -X GET 'https://api.etherscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["ethereum"]}'`;
+	    break;
+	case 10:
+	    cmd = `curl -k -s -X GET 'https://api-optimistic.etherscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["optimism"]}'`;
+	    break;
+	case 2004:
+	    cmd = `curl -k -s -X GET 'https://api-moonbeam.moonscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["moonbeam"]}'`;
+	    break;
+	case 137:
+	    cmd = `curl -k -s -X GET 'https://api.polygonscan.com/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["polygon"]}'`;
+	    break;
+	case 42161:
+	    cmd = `curl -k -s -X GET 'https://api.arbiscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["arbitrum"]}'`;
+	    break;
+	case 43114:
+	    cmd = `curl -k -s -X GET 'api.avascan.info/v2/network/mainnet/evm/${chainID}/etherscan?module=contract&action=getabi&address=${address}'`;
+	    break;
+	}
+	if ( cmd == null ) {
+	    console.log("No api available for chainID", chainID);
+	    return(false);
+	}
+	const {
+            stdout,
+            stderr
+        } = await exec(cmd, {
+            maxBuffer: 1024 * 64000
+        });
+	var j = JSON.parse(stdout);
+	console.log(j);
+	let assetType = 'Contract';
+	let abiRaw = j.result;
+	if (abiRaw.length > 3 && abiRaw.substr(0, 3) == "Con") {
+	    abiRaw = null;
+	} else {
+	    var contractABI = JSON.parse(abiRaw);
+	    const prepareData = (e) => `${e.name}(${e.inputs.map((e) => e.type)})`;
+	    const prepareData2 = (e) => `${e.name}(${e.inputs.map((e) => e.type + " " + e.name)})`;
+	    const encodeSelector = (f) => web3.utils.sha3(f).slice(0, 10);
+	    let methodsig = contractABI
+		.filter((e) => e.type === "function")
+		.flatMap(
+		    (e) => `${encodeSelector(prepareData(e))}|${prepareData2(e)}`
+		);
+	    // TODO: use the methodsig to categorize the assetType (ERC20/721/.. vs Router/ERC20LP)
+	} 
+	let flds = [];
+	let vals = ["assetType"];
+	let replace = ["assetType"];
+	let fldstr = "";
+	if ( project ) {
+	    vals.push('project');
+	    flds.push(`${mysql.escape(project)}`);
+	    replace.push("project");
+	}
+	if ( contractName ) {
+	    vals.push('contractName');
+	    flds.push(`${mysql.escape(contractName)}`);
+	    replace.push("contractName");
+	}
+	if ( abiRaw ) {
+	    vals.push('abiRaw');
+	    flds.push(`${mysql.escape(JSON.stringify(j))}`);
+	    replace.push("abiRaw");
+	    await this.loadABI(j.result)
+	}
+	if ( flds.length > 0 ) {
+	    fldstr = "," + flds.join(",");
+	}
+	let data = `('${chainID}', '${address.toLowerCase()}', '${assetType}' ${fldstr})`
+	await this.upsertSQL({
+	    "table": "asset",
+	    "keys": ["chainID", "asset"],
+	    "vals": vals,
+	    "data": [data],
+	    "replace": replace
+	}, true);
+    }
+
+    async getTokenInfo(address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", chainID = 1) {
+	const util = require("util");
+	const exec = util.promisify(require("child_process").exec);
+	
+	const url = "https://api.etherscan.io/api?module=token&action=tokeninfo&contractaddress=${address}&apikey=CMKYIM5MEM2IH7CTTADGFKW47P3SMKDF6D";
+	const cmd = "curl -k -s -X GET '" + url + "'";
+	
+	const { stdout, stderr } = await exec(cmd);
+	if (stderr) {
+	    console.log("ERR!!" + stderr);
+	}
+	var j = JSON.parse(stdout);
+	if (j.status == 0) {
+	    console.log(j.result);
+	    if (j.result == "Token info not found") {
+		return true;
+	    } else if (j.result == "Maximum rate limit reached") {
+		return false;
+	    }
+	} else if (j.result && j.result.length > 0) {
+	    try {
+		var [r] = j.result;
+		var sql = `insert into asset ( asset, chainID, assetType, assetName )`;
+		// TODO:
+		return true;
+	    } catch (e) {
+		return false;
+	    }
+	}
+	return false;
+    }
+    
     //mint(address poolToken, uint256 amount, address to, uint256 deadline)
     async computeMethods() {
-        var pool = mysql.createPool(this.connConfig);
-        // now get a Promise wrapped instance of that pool
-        const promisePool = pool.promise();
-        // query database using promises
-        var [contracts, _] = await promisePool.query("SELECT abiRaw from address where abiRaw is Not Null and abiRaw != 'Contract source code not verified' and length(abiRaw) > 20 limit 5000");
-        promisePool.end()
+        var [contracts, _] = await this.poolREADONLY.query("SELECT abiRaw from address where abiRaw is Not Null and abiRaw != 'Contract source code not verified' and length(abiRaw) > 20 limit 5000");
         var sigs = {};
         var numContractsTally = {};
         for (const c of contracts) {
@@ -159,7 +237,7 @@ module.exports = class ABIManager extends PolkaholicDB {
         await this.update_batchedSQL(true);
     }
 
-    async reload_abi() {
+    async reloadABI() {
         let sql = `select abiType, name, signatureID, abi from contractabi where abi like '%component%';`
         //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
         var res = await this.poolREADONLY.query(sql);
@@ -171,14 +249,38 @@ module.exports = class ABIManager extends PolkaholicDB {
                 let signatureID = r.signatureID
                 let abiABIStr = r.abi.toString('utf8')
                 console.log(`[#${i}] [${abiType}] [${signatureID}] ${name}`, abiABIStr)
-                await this.load_abi(abiABIStr)
+                await this.loadABI(abiABIStr)
             }
         } else {
             return false
         }
     }
 
-    async load_abi(contractABIStr) {
+/*{
+  fingerprint: 'transfer(address,uint256)',
+  fingerprintID: '0xa9059cbb',
+  signatureID: '0xa9059cbb',
+  topicLength: 0,
+  signatureRaw: 'transfer(address,uint256)',
+  signature: 'transfer(address dst, uint256 wad)',
+  name: 'Transfer',
+  abi: '[{"constant":false,"inputs":[{"name":"dst","type":"address"},{"name":"wad","type":"uint256"}],"name":"transfer","outputs":[{"name":"","type":"bool"}],"payable":false,"stateMutability":"nonpayable","type":"function"}]',
+  abiType: 'function'
+}
+...
+{
+  fingerprint: 'Transfer(index_topic_1 address,index_topic_2 address,uint256)',
+  fingerprintID: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef-3-0xc3a8eb6d',
+  signatureID: '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef',
+  topicLength: 3,
+  signatureRaw: 'Transfer(address,address,uint256)',
+  signature: 'Transfer(index_topic_1 address src, index_topic_2 address dst, uint256 wad)',
+  name: 'Transfer',
+  abi: '[{"anonymous":false,"inputs":[{"indexed":true,"name":"src","type":"address"},{"indexed":true,"name":"dst","type":"address"},{"indexed":false,"name":"wad","type":"uint256"}],"name":"Transfer","type":"event"}]',
+  abiType: 'event'
+}
+*/
+    async loadABI(contractABIStr) {
         var sigs = {};
         var numContractsTally = {};
         var output = ethTool.parseAbiSignature(contractABIStr)
@@ -201,13 +303,7 @@ module.exports = class ABIManager extends PolkaholicDB {
             console.log(`[${data.name}] ${row}`)
         }
         console.log(abiRows.length + " records");
-        await this.dump_contract_abis(abiRows)
-        await this.update_batchedSQL(true);
-    }
-
-    async dump_contract_abis(abiRows) {
-        let i = 0;
-        for (i = 0; i < abiRows.length; i += 2000) {
+        for (let i = 0; i < abiRows.length; i += 2000) {
             let j = i + 10000;
             if (j > abiRows.length) j = abiRows.length;
             let sql = "insert into contractabi (fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength, audited) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength), audited = values(audited)";
@@ -215,5 +311,6 @@ module.exports = class ABIManager extends PolkaholicDB {
             this.batchedSQL.push(sql)
         }
         console.log(`dump_contract_abi len=${abiRows.length}`);
+        await this.update_batchedSQL(true);
     }
 }
