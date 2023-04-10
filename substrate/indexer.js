@@ -6777,13 +6777,12 @@ module.exports = class Indexer extends AssetManager {
                         signer_ss58: ext.signer ? ext.signer : null,
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
-		    if ( this.suppress_call(id, call.section, call.method) ) {
-		    } else {
-			calls.push({
+                    if (this.suppress_call(id, call.section, call.method)) {} else {
+                        calls.push({
                             insertId: `${relayChain}-${paraID}-${ext.extrinsicID}-${call.id}`,
                             json: bqExtrinsicCall
-			})
-		    }
+                        })
+                    }
                 }
             }
         }
@@ -8051,44 +8050,44 @@ module.exports = class Indexer extends AssetManager {
                         console.log("YYY", a2)
                     }
                 }
-		if ( this.suppress_trace(id, a2.p, a2.s) ) {
-		    
-		} else {
+                if (this.suppress_trace(id, a2.p, a2.s)) {
+
+                } else {
                     let t = {
-			relay_chain: relayChain,
-			para_id: paraID,
-			id: id,
-			chain_name: chainName,
-			block_number: blockNumber,
-			block_hash: blockHash,
-			ts: blockTS,
-			trace_id: `${blockNumber}-${idx}`,
-			k: a2.k,
-			v: a2.v,
-			section: a2.p,
-			storage: a2.s
+                        relay_chain: relayChain,
+                        para_id: paraID,
+                        id: id,
+                        chain_name: chainName,
+                        block_number: blockNumber,
+                        block_hash: blockHash,
+                        ts: blockTS,
+                        trace_id: `${blockNumber}-${idx}`,
+                        k: a2.k,
+                        v: a2.v,
+                        section: a2.p,
+                        storage: a2.s
                     };
                     if (a2.pk_extra) t.pk_extra = a2.pk_extra;
                     if (a2.pv) t.pv = a2.pv;
                     if (a2.accountID) {
-			t.address_ss58 = a2.accountID;
-			t.address_pubkey = paraTool.getPubKey(a2.accountID);
+                        t.address_ss58 = a2.accountID;
+                        t.address_pubkey = paraTool.getPubKey(a2.accountID);
                     }
                     if (a2.asset) {
-			t.asset = a2.asset;
+                        t.asset = a2.asset;
                     }
                     if (c) {
-			for (const f of Object.keys(c)) {
+                        for (const f of Object.keys(c)) {
                             if (t[f] == undefined) {
-				t[f] = c[f];
+                                t[f] = c[f];
                             }
-			}
+                        }
                     }
                     traces.push({
-			insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-			json: t
+                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                        json: t
                     });
-		}
+                }
             }
             //temp local list blacklist for easier debugging
             if (pallet_section == '...') {
@@ -8394,6 +8393,175 @@ module.exports = class Indexer extends AssetManager {
         let transactionsInternal = ethTool.processEVMTrace(rRow['evmTrace'], rRow['evmBlock'].transactions);
         //console.log(evmTrace.length, JSON.stringify(evmTrace, null, 4));
         console.log(transactionsInternal);
+    }
+
+    async index_block_evm(chainID, blkNum) {
+        let chain = await this.getChain(chainID);
+
+        const Web3 = require('web3')
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
+            return (false);
+        }
+        const web3 = new Web3(chain.WSEndpoint);
+        this.web3Api = web3;
+        this.contractABIs = await this.getContractABI();
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        await this.assetManagerInit()
+        let blockNumber = blkNum;
+        let block = null;
+        let tries = 0;
+        do {
+            try {
+                block = await ethTool.crawlEvmBlock(web3, blockNumber);
+                tries++;
+            } catch (err) {
+                // console.log("crawlEVM", result, err);
+            }
+        } while (!block && tries < 10)
+        let numTransactions = block && block.transactions ? block.transactions.length : 0;
+        console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+        let rows_blocks = [];
+        let rows_transactions = [];
+        let rows_logs = [];
+        try {
+            rows_blocks.push({
+                insertId: `${block.hash}`,
+                json: {
+                    chain_id: chainID,
+                    id: chain.id,
+                    timestamp: block.timestamp,
+                    number: block.number,
+                    hash: block.hash,
+                    parent_hash: block.parentHash,
+                    nonce: block.nonce,
+                    sha3_uncles: block.sha3Uncles,
+                    logs_bloom: block.logsBloom,
+                    transactions_root: block.transactionsRoot,
+                    state_root: block.stateRoot,
+                    receipts_root: block.receiptsRoot,
+                    miner: block.miner,
+                    difficulty: block.difficulty,
+                    total_difficulty: block.totalDifficulty,
+                    size: block.size,
+                    extra_data: block.extraData,
+                    gas_limit: block.gasLimit,
+                    gas_used: block.gasUsed,
+                    transaction_count: numTransactions
+                }
+            });
+            if (numTransactions > 0) {
+                let evmReceipts = await ethTool.crawlEvmReceipts(web3, block);
+                console.log(`[#${block.number}] evmReceipts`, evmReceipts)
+                if (!evmReceipts) evmReceipts = [];
+                var statusesPromise = Promise.all([
+                    ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                    ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                ])
+                let [dTxns, dReceipts] = await statusesPromise
+
+                for (let i = 0; i < block.transactions.length; i++) {
+                    let tx = block.transactions[i];
+                    let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
+                    let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
+                    tx.raw = tx.input; // ???
+                    tx.decodedLogs = logs; // fuse here
+                    let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+                    let t = {
+                        chain_id: chainID,
+                        id: chain.id,
+                        hash: tx.hash,
+                        nonce: tx.nonce,
+                        transaction_index: tx.transactionIndex,
+                        from_address: tx.from,
+                        to_address: tx.to,
+                        value: tx.value,
+                        gas: tx.gas,
+                        gas_price: tx.gasPrice,
+                        input: tx.input,
+                        receipt_cumulative_gas_used: receipt && receipt.cumulativeGasUsed ? receipt.cumulativeGasUsed : null,
+                        receipt_gas_used: receipt && receipt.gasUsed ? receipt.gasUsed : null,
+                        receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
+                        receipt_root: null, // TODO
+                        receipt_status: receipt && receipt.status ? 1 : 0,
+                        block_timestamp: block.timestamp,
+                        block_number: tx.blockNumber,
+                        block_hash: tx.blockHash
+                    }
+                    if (decodedInput) {
+                        t.decoded = (decodedInput.decodedStatus == 'success');
+                        if (t.decoded) {
+                            t.method_id = decodedInput.methodID;
+                            t.signature = decodedInput.signature;
+                            t.params = decodedInput.params;
+                        }
+                    }
+                    rows_transactions.push({
+                        insertId: `${tx.hash}`,
+                        json: t
+                    });
+                    if (logs) {
+                        for (let j = 0; j < logs.length; j++) {
+                            let l = logs[j]
+                            rows_logs.push({
+                                chain_id: chainID,
+                                id: chain.id,
+                                log_index: l.logIndex,
+                                transaction_hash: tx.hash,
+                                transaction_index: i,
+                                address: l.address,
+                                data: l.data,
+                                topics: l.topics,
+                                block_timestamp: block.timestamp,
+                                block_number: block.number,
+                                block_hash: block.hash,
+                                signature: l.signature ? l.signature : null, // TODO: check
+                                events: l.events ? l.events : null // TODO: check
+                            });
+                        }
+                    }
+                    // NOTE: we do not write out hashes yet (development)
+                    this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
+                }
+            }
+        } catch (err) {
+            console.log(err)
+        }
+        console.log("block TRIAL", tries, "hash", result.hash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
+        // stream into blocks, transactions
+        try {
+            let dataset = "evm";
+            let tables = ["blocks", "transactions"]; // [ "contracts", "tokens", "token_transfers", "logs" ]
+            for (const tbl of tables) {
+                let rows = null
+                switch (tbl) {
+                    case "blocks":
+                        rows = rows_blocks;
+                        break;
+                    case "transactions":
+                        rows = rows_transactions;
+                        break;
+                }
+                if (rows && rows.length > 0) {
+                    await bigquery
+                        .dataset(dataset)
+                        .table(tbl)
+                        .insert(rows, {
+                            raw: true
+                        });
+                    console.log("WRITE", dataset, tbl, rows.length)
+                }
+            }
+        } catch (err) {
+            console.log("err", JSON.stringify(err)); // TODO: logger
+        }
     }
 
     // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row

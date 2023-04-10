@@ -850,6 +850,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             if (txn.r.length == 66 && txn.s.length == 66) {
                 return output // let's not validate irrelevant tx
             } else {
+                console.log(`txn`, txn)
                 let derivedTx = decodeRLPTx(txn.raw)
                 if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTx.txHash}, raw=${txn.raw}`)
                 if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66) {

@@ -146,11 +146,9 @@ async function main() {
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
             let blockchainID = chain.chainID
-            console.log(`blockchainID=${blockchainID}**`)
             let evmChainIDList = [1,10,56,137,42161, 43114]
             if (evmChainIDList.includes(blockchainID)) {
-                console.log(`is EVM chainID=${chainID}`)
-                crawler.crawlEVM(chainID);
+                await crawler.index_block_evm(chainID, blockNumber);
             }else{
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();
