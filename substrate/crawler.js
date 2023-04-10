@@ -2134,32 +2134,7 @@ module.exports = class Crawler extends Indexer {
                 let rows_transactions = [];
                 let rows_logs = [];
                 try {
-                    rows_blocks.push({
-                        insertId: `${block.hash}`,
-                        json: {
-                            chain_id: chainID,
-                            id: chain.id,
-                            timestamp: block.timestamp,
-                            number: block.number,
-                            hash: block.hash,
-                            parent_hash: block.parentHash,
-                            nonce: block.nonce,
-                            sha3_uncles: block.sha3Uncles,
-                            logs_bloom: block.logsBloom,
-                            transactions_root: block.transactionsRoot,
-                            state_root: block.stateRoot,
-                            receipts_root: block.receiptsRoot,
-                            miner: block.miner,
-                            difficulty: block.difficulty,
-                            total_difficulty: block.totalDifficulty,
-                            size: block.size,
-                            extra_data: block.extraData,
-                            gas_limit: block.gasLimit,
-                            gas_used: block.gasUsed,
-                            transaction_count: numTransactions
-                        }
-                    });
-                    if (numTransactions > 0) {
+                    if (numTransactions >= 0) {
                         let isParallel = true
                         let log_tries = 0
                         let evmReceipts = false
@@ -2179,101 +2154,11 @@ module.exports = class Crawler extends Indexer {
                             ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                         ])
                         let [dTxns, dReceipts] = await statusesPromise
-
-                        for (let i = 0; i < block.transactions.length; i++) {
-                            let tx = block.transactions[i];
-                            let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
-                            let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
-                            tx.raw = tx.input; // ???
-                            tx.decodedLogs = logs; // fuse here
-                            let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
-                            let t = {
-                                chain_id: chainID,
-                                id: chain.id,
-                                hash: tx.hash,
-                                nonce: tx.nonce,
-                                transaction_index: tx.transactionIndex,
-                                from_address: tx.from,
-                                to_address: tx.to,
-                                value: tx.value,
-                                gas: tx.gas,
-                                gas_price: tx.gasPrice,
-                                input: tx.input,
-                                receipt_cumulative_gas_used: receipt && receipt.cumulativeGasUsed ? receipt.cumulativeGasUsed : null,
-                                receipt_gas_used: receipt && receipt.gasUsed ? receipt.gasUsed : null,
-                                receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
-                                receipt_root: null, // TODO
-                                receipt_status: receipt && receipt.status ? 1 : 0,
-                                block_timestamp: block.timestamp,
-                                block_number: tx.blockNumber,
-                                block_hash: tx.blockHash
-                            }
-                            if (decodedInput) {
-                                t.decoded = (decodedInput.decodedStatus == 'success');
-                                if (t.decoded) {
-                                    t.method_id = decodedInput.methodID;
-                                    t.signature = decodedInput.signature;
-                                    t.params = decodedInput.params;
-                                }
-                            }
-                            rows_transactions.push({
-                                insertId: `${tx.hash}`,
-                                json: t
-                            });
-                            if (logs) {
-                                for (let j = 0; j < logs.length; j++) {
-                                    let l = logs[j]
-                                    rows_logs.push({
-                                        chain_id: chainID,
-                                        id: chain.id,
-                                        log_index: l.logIndex,
-                                        transaction_hash: tx.hash,
-                                        transaction_index: i,
-                                        address: l.address,
-                                        data: l.data,
-                                        topics: l.topics,
-                                        block_timestamp: block.timestamp,
-                                        block_number: block.number,
-                                        block_hash: block.hash,
-                                        signature: l.signature ? l.signature : null, // TODO: check
-                                        events: l.events ? l.events : null // TODO: check
-                                    });
-                                }
-                            }
-                            // NOTE: we do not write out hashes yet (development)
-                            this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
-                        }
+                        let evmTrace = false
+                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID)
                     }
                 } catch (err) {
                     console.log(err)
-                }
-                console.log("block TRIAL", block_tries, "hash", result.hash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
-                // stream into blocks, transactions
-                try {
-                    let dataset = "evm";
-                    let tables = ["blocks", "transactions"]; // [ "contracts", "tokens", "token_transfers", "logs" ]
-                    for (const tbl of tables) {
-                        let rows = null
-                        switch (tbl) {
-                            case "blocks":
-                                rows = rows_blocks;
-                                break;
-                            case "transactions":
-                                rows = rows_transactions;
-                                break;
-                        }
-                        if (rows && rows.length > 0) {
-                            await bigquery
-                                .dataset(dataset)
-                                .table(tbl)
-                                .insert(rows, {
-                                    raw: true
-                                });
-                            console.log("WRITE", dataset, tbl, rows.length)
-                        }
-                    }
-                } catch (err) {
-                    console.log("err", JSON.stringify(err)); // TODO: logger
                 }
             } else {
                 console.error(error);
