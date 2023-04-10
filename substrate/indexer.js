@@ -8418,15 +8418,15 @@ module.exports = class Indexer extends AssetManager {
         let blockNumber = blkNum;
         let block = null;
         let blockHash = null
-        let tries = 0;
+        let block_tries = 0;
         do {
             try {
                 block = await ethTool.crawlEvmBlock(web3, blockNumber);
-                tries++;
+                block_tries++;
             } catch (err) {
                 // console.log("crawlEVM", result, err);
             }
-        } while (!block && tries < 10)
+        } while (!block && block_tries < 10)
         let numTransactions = block && block.transactions ? block.transactions.length : 0;
         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
         let rows_blocks = [];
@@ -8460,9 +8460,18 @@ module.exports = class Indexer extends AssetManager {
             });
             blockHash = block.hash
             if (numTransactions > 0) {
-                let isParallel = false
-                let evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                console.log(`[#${block.number}] evmReceipts`, evmReceipts)
+                let log_tries = 0
+                let evmReceipts = false
+                do {
+                    try {
+                        let isParallel = true
+                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                        log_tries++;
+                    } catch (err) {
+                        console.log(`crawlEVM Failed ${log_tries}`, err);
+                    }
+                } while (!evmReceipts && log_tries < 10)
+                console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                 if (!evmReceipts) evmReceipts = [];
                 var statusesPromise = Promise.all([
                     ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
@@ -8537,7 +8546,7 @@ module.exports = class Indexer extends AssetManager {
         } catch (err) {
             console.log(err)
         }
-        console.log("block TRIAL", tries, "hash", blockHash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
+        console.log("block TRIAL", block_tries, "hash", blockHash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
         // stream into blocks, transactions
         try {
             let dataset = "evm";
@@ -8550,6 +8559,7 @@ module.exports = class Indexer extends AssetManager {
                         break;
                     case "transactions":
                         rows = rows_transactions;
+                        console.log(`transactions`, rows_transactions)
                         break;
                 }
                 if (rows && rows.length > 0) {

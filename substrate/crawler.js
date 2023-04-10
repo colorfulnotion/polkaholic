@@ -2119,15 +2119,15 @@ module.exports = class Crawler extends Indexer {
             if (!error) {
                 let blockNumber = result.number;
                 let block = null;
-                let tries = 0;
+                let block_tries = 0;
                 do {
                     try {
                         block = await web3.eth.getBlock(result.hash, true);
-                        tries++;
+                        block_tries++;
                     } catch (err) {
                         // console.log("crawlEVM", result, err);
                     }
-                } while (!block && tries < 10)
+                } while (!block && block_tries < 10)
                 let numTransactions = block && block.transactions ? block.transactions.length : 0;
                 console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                 let rows_blocks = [];
@@ -2160,10 +2160,20 @@ module.exports = class Crawler extends Indexer {
                         }
                     });
                     if (numTransactions > 0) {
-                        let isParallel = false
-                        let evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                        console.log(`[#${block.number}] evmReceipts`, evmReceipts)
+                        let isParallel = true
+                        let log_tries = 0
+                        let evmReceipts = false
+                        do {
+                            try {
+                                evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                                console.log(`[#${block.number}] evmReceipts trial${log_tries}`,)
+                                log_tries++;
+                            } catch (err) {
+                                console.log(`crawlEVM Failed ${log_tries}`, err);
+                            }
+                        } while (!evmReceipts && log_tries < 10)
                         if (!evmReceipts) evmReceipts = [];
+                        console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                         var statusesPromise = Promise.all([
                             ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
                             ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
@@ -2237,7 +2247,7 @@ module.exports = class Crawler extends Indexer {
                 } catch (err) {
                     console.log(err)
                 }
-                console.log("block TRIAL", tries, "hash", result.hash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
+                console.log("block TRIAL", block_tries, "hash", result.hash, "height", blockNumber, "#TX", rows_transactions.length, rows_blocks.length);
                 // stream into blocks, transactions
                 try {
                     let dataset = "evm";
