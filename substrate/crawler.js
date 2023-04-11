@@ -2141,7 +2141,7 @@ module.exports = class Crawler extends Indexer {
                         do {
                             try {
                                 evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                                console.log(`[#${block.number}] evmReceipts trial${log_tries}`,)
+                                console.log(`[#${block.number}] evmReceipts trial${log_tries}`, )
                                 log_tries++;
                             } catch (err) {
                                 console.log(`crawlEVM Failed ${log_tries}`, err);

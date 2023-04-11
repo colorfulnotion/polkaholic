@@ -8394,7 +8394,7 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
-    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID){
+    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID) {
         const {
             BigQuery
         } = require('@google-cloud/bigquery');
@@ -8403,7 +8403,7 @@ module.exports = class Indexer extends AssetManager {
             keyFilename: this.BQ_SUBSTRATEETL_KEY
         })
         let chain = await this.getChain(chainID);
-        let contractABIs = (this.contractABIs)? this.contractABIs: await this.getContractABI();
+        let contractABIs = (this.contractABIs) ? this.contractABIs : await this.getContractABI();
         let rows_blocks = [];
         let rows_transactions = [];
         let rows_logs = [];
@@ -8454,7 +8454,7 @@ module.exports = class Indexer extends AssetManager {
             let t = {
                 chain_id: chainID,
                 id: chain.id,
-                hash: (tx.transactionHash != undefined)? tx.transactionHash: rawTx.hash,
+                hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                 nonce: tx.nonce,
                 transaction_index: tx.transactionIndex,
                 from_address: tx.from,
@@ -8480,7 +8480,7 @@ module.exports = class Indexer extends AssetManager {
                 t.decoded = (decodedInput.decodeStatus == 'success');
                 t.method_id = decodedInput.methodID;
                 t.signature = decodedInput.signature;
-                if (t.decoded){
+                if (t.decoded) {
                     t.params = JSON.stringify(decodedInput.params);
                 }
             }
@@ -8497,7 +8497,7 @@ module.exports = class Indexer extends AssetManager {
                         chain_id: chainID,
                         id: chain.id,
                         log_index: l.logIndex,
-                        transaction_hash: (tx.transactionHash != undefined)? tx.transactionHash: rawTx.hash,
+                        transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                         transaction_index: i,
                         address: l.address,
                         data: l.data,

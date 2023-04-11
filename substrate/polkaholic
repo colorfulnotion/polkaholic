@@ -146,10 +146,10 @@ async function main() {
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
             let blockchainID = chain.chainID
-            let evmChainIDList = [1,10,56,137,42161, 43114]
+            let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
             if (evmChainIDList.includes(blockchainID)) {
                 await crawler.index_block_evm(chainID, blockNumber);
-            }else{
+            } else {
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();
                 await crawler.setupChainAndAPI(chainID);
