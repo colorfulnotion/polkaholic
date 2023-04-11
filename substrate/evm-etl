@@ -44,11 +44,11 @@ async function main() {
 	    process.exit(0);
         });
 
-    program.command('reloadabi')
+    program.command('abianalytics')
         .description(`Reload ABIs`)
         .action(async (abistr, opt) => {
 	    let evmetl = new EVMETL();
-	    await evmetl.reloadABI();
+	    await evmetl.abiAnalytics();
 	    process.exit(0);
         });
     

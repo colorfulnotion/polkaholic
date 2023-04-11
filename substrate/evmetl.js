@@ -283,23 +283,33 @@ module.exports = class EVMETL extends PolkaholicDB {
         await this.update_batchedSQL(true);
     }
 
-    async reloadABI() {
-        let sql = `select abiType, name, signatureID, abi from contractabi where abi like '%component%';`
-        //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
+    async abiAnalytics() {
+        let sql = `select CONVERT(abi using utf8) as abi from contractabi`
         var res = await this.poolREADONLY.query(sql);
-        if (res.length > 0) {
-            for (let i = 0; i < res.length; i++) {
-                let r = res[i]
-                let abiType = r.abiType
-                let name = r.name
-                let signatureID = r.signatureID
-                let abiABIStr = r.abi.toString('utf8')
-                console.log(`[#${i}] [${abiType}] [${signatureID}] ${name}`, abiABIStr)
-                await this.loadABI(abiABIStr)
-            }
-        } else {
-            return false
+	let e_typeCnt = {};
+	let f_typeCnt = {};
+        for (const r of res) {
+	    let abi = JSON.parse(r.abi);
+	    for ( const a of abi ) {
+		if ( a.type == "event" ) {
+		    for (const i of a.inputs) {
+			if ( e_typeCnt[i.type] == undefined ) {
+			    e_typeCnt[i.type] = 0;
+			} 
+			e_typeCnt[i.type]++;
+		    }
+		} else if ( a.type == "function" ) {
+		    for (const i of a.inputs) {
+			if ( f_typeCnt[i.type] == undefined ) {
+			    f_typeCnt[i.type] = 0;
+			} 
+			f_typeCnt[i.type]++;
+		    }
+		}
+	    }
         }
+	console.log("events - signature types", e_typeCnt);
+	console.log("function - signature types", f_typeCnt);
     }
 
 /*{
