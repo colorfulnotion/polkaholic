@@ -1264,7 +1264,6 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
         if (decodedData != null) {
             //success case with {name: 'swapExactTokensForTokens', params: []}
             decodedData.decodeStatus = 'success'
-            console.log(`decode_txn_input`, decodedData)
             decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
             return decodedData
         } else {
@@ -1300,6 +1299,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
 }
 
 function recursive_params(decodedData, contractABIs, contractABISignatures){
+    let isRecursive = false
     if (Array.isArray(decodedData.params)){
         for (let i = 0; i < decodedData.params.length; i++){
             let p = decodedData.params[i]
@@ -1320,12 +1320,16 @@ function recursive_params(decodedData, contractABIs, contractABISignatures){
                         }
                     }
                     if (decodeSuccesscnt){
+                        isRecursive = true
                         decodedData.params[i] = p
                     }
                 }
             }
 
         }
+    }
+    if (isRecursive){
+        console.log(`recursive_params`, decodedData)
     }
     return decodedData
 }
