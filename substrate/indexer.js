@@ -8503,7 +8503,7 @@ module.exports = class Indexer extends AssetManager {
         let schema = schemaInfo.schema
         let decodedParams = JSON.parse(evmTx.params)
         let rec = {
-            contract_address: evmTx.address,
+            contract_address: evmTx.to_address,
             call_tx_hash: evmTx.transaction_hash,
             //evt_index: evmLog.log_index,
             call_block_time: evmTx.block_timestamp,
@@ -8614,7 +8614,7 @@ module.exports = class Indexer extends AssetManager {
                         console.log(`New schemaInfo`, schemaInfo, `call`, evmTx.params)
                     }
                     let bqCall = this.generateCallBqRec(schemaInfo, evmTx)
-                    console.log(`Auto generated bqCall ${schemaInfo.tblName}`, evmTx)
+                    console.log(`Auto generated bqCall ${schemaInfo.tblName}`, bqCall)
                 }
             }
             let bqEvmTransaction = {
