@@ -125,13 +125,13 @@ module.exports = class PolkaholicDB {
                     this.BQ_SUBSTRATEETL_KEY = dbconfig.bq.substrateetlKey;
                 }
             }
-	    
+
             if (dbconfig.externalapis != undefined) {
                 if (dbconfig.externalapis) {
                     this.EXTERNAL_APIKEYS = dbconfig.externalapis;
                 }
             }
-	    
+
             this.pool = mysql.createPool(this.convert_dbconfig(dbconfig.client));
             // Ping WRITABLE database to check for common exception errors.
             this.pool.getConnection((err, connection) => {

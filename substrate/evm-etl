@@ -44,6 +44,21 @@ async function main() {
 	    process.exit(0);
         });
 
+    program.command('setupevm')
+        .description("Setup or update BigQuery tables for EVM Chain. Use -u to update tbl schema")
+        .usage("-c 137")
+        .option('-c, --chainID <chainID>', 'ChainID', null)
+        .option('-u, --update', `update schema mode`, false)
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            let chainID = opt.chainID
+            let isUpdate = (opt.update) ? true : false
+            let isAll = (opt.all) ? true : false
+            if (chainID != undefined) chainID = myParseInt(chainID)
+            await substrateetl.setup_chain_evm(chainID, isUpdate);
+            process.exit(0);
+        })
+    
     program.command('abianalytics')
         .description(`Reload ABIs`)
         .action(async (abistr, opt) => {
@@ -52,6 +67,14 @@ async function main() {
 	    process.exit(0);
         });
     
+    program.command('callevents')
+        .description(`Generate schemas for calls+events`)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+	    await evmetl.setupCallEvents();
+            process.exit(0);
+        });
+
     await program.parseAsync(process.argv);
 }
 

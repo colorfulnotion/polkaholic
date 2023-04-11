@@ -850,7 +850,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             //console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
             if (txn.r.length == 66 && txn.s.length == 66) {
                 return output // let's not validate irrelevant tx
-            } else if (validateRSV){
+            } else if (validateRSV) {
                 //r,s is problematic here - skip validation
                 console.log(`txn`, txn)
                 let derivedTx = decodeRLPTx(txn.raw)
@@ -1815,7 +1815,7 @@ async function crawl_evm_receipts(web3Api, blk, isParallel = true) {
     let txns = blk.transactions
     let receipt = []
     //console.log(`crawl_evm_receipts START (len=${txns.length})`)
-    if (isParallel){
+    if (isParallel) {
         let receiptAsync = await txns.map(async (txn) => {
             try {
                 let txHash = txn.hash
@@ -1829,15 +1829,15 @@ async function crawl_evm_receipts(web3Api, blk, isParallel = true) {
         });
         // this will fail unless we get back all receipt from a block
         receipt = await Promise.all(receiptAsync);
-    }else{
-        for (const txn of txns){
+    } else {
+        for (const txn of txns) {
             try {
                 let txHash = txn.hash
                 let tIndex = txn.transactionIndex
                 let res = await web3Api.eth.getTransactionReceipt(txHash)
                 //console.log(`${tIndex} ${txHash}`)
                 receipt.push(res)
-            } catch (e){
+            } catch (e) {
                 console.log(`crawl_evm_receipts getTransactionReceipt err`, e)
             }
         }
