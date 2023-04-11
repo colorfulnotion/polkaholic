@@ -156,9 +156,29 @@ module.exports = class EVMETL extends PolkaholicDB {
 	    replace.push("contractName");
 	}
 	if ( abiRaw ) {
+	    let abi = JSON.parse(j.result);
+	    if ( this.is_proxy_abi(abi) ) {
+		let proxyAddress = await this.fetch_proxyAddress(address, abi, chainID)
+		if ( proxyAddress && proxyAddress != "0x0000000000000000000000000000000000000000" ) {
+		    let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
+		    if ( proxyABI ) {
+			console.log("proxyABI", proxyABI);
+			j = proxyABI;
+			vals.push('proxyAddress');
+			flds.push(`${mysql.escape(proxyAddress)}`);
+			replace.push("proxyAddress");
+
+			vals.push('proxyAddressLastUpdateDT');
+			flds.push(`Now()`);
+			replace.push("proxyAddressLastUpdateDT");
+		    }
+		}
+	    }
+
 	    vals.push('abiRaw');
 	    flds.push(`${mysql.escape(JSON.stringify(j))}`);
 	    replace.push("abiRaw");
+
 	    await this.loadABI(j.result)
 	}
 	if ( flds.length > 0 ) {
@@ -172,8 +192,34 @@ module.exports = class EVMETL extends PolkaholicDB {
 	    "data": [data],
 	    "replace": replace
 	}, true);
+	return j;
     }
 
+    async fetch_proxyAddress(address, abi, chainID) {
+	let ethers = require("ethers");
+	try {
+	    let chain = await this.getChain(chainID);
+	    const provider = new ethers.providers.JsonRpcProvider(chain.RPCBackfill);
+	    const signer = new ethers.Wallet("0x3a59a6348c33937f34716cd37dbb41f24d305e2b1a10c01690b6073ff8a28e12", provider) // dummy
+	    const contract = new ethers.Contract(address, abi, signer);
+	    const implementation = await contract.implementation()
+	    return implementation;
+	} catch (err) {
+	    console.log(err);
+	}
+	return null
+    }
+    
+    
+    is_proxy_abi(abi) {
+	for ( const a of abi ) {
+	    if ( a.name == "implementation" && a.stateMutability == 'view' ) {
+		return(true);
+	    }
+	}
+	return(false);
+    }
+    
     async getTokenInfo(address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", chainID = 1) {
 	const util = require("util");
 	const exec = util.promisify(require("child_process").exec);
