@@ -1033,11 +1033,23 @@ function build_txn_input_stub(methodSignature = 'callBridgeCall(address token, u
     return parseMethodInputs(inputs, nested);
 }
 
-function build_schema_from_signature(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
+function build_schema_info_from_sig(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
     const startIndex = methodSignature.indexOf('(') + 1;
     const endIndex = methodSignature.lastIndexOf(')');
     const inputs = methodSignature.slice(startIndex, endIndex);
-    return parseMethodInputs(inputs, nested, fingerprintID);
+    let schema = parseMethodInputs(inputs, nested, fingerprintID);
+    let schemaType = (fingerprintID && fingerprintID.length == 10)? 'call': 'evt'
+    let sectionName = methodSignature.substr(0, methodSignature.indexOf('('))
+    let contractName = 'ContractName_TODO'
+    let schemaInfo = {
+        fingerprintID: fingerprintID,
+        schemaType: schemaType,
+        sectionName: sectionName,
+        contractName: contractName,
+        tblName: `${schemaType}_${sectionName}`,
+        schema: schema
+    }
+    return schemaInfo
 }
 
 function convertBigNumberStruct(val) {
@@ -1788,8 +1800,16 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let eventABIStr = foundApi.abi
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
-
-        console.log(`decodedRes.events`, decodedRes.events)
+        let decodedEvents = decodedRes.events
+        for (let i = 0; i < decodedEvents.length; i++){
+            let dEvent = decodedEvents[i]
+            if ((dEvent.type.includes('uint') && dEvent.type.includes('int')) && dEvent.value.substr(0,2) == '0x'){
+                dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+                //console.log(`new dEvent.value`, dEvent.value)
+            }
+            decodedRes.events[i] = dEvent
+        }
+        //console.log(`decodedRes.events`, decodedRes.events)
         return decodedRes
     }
     //console.log(`[#${log.blockNumber}-${log.transactionIndex}] decode_log: topic not found ${topic0} (topicLen ${topicLen})`)
@@ -2342,5 +2362,5 @@ module.exports = {
     getABIByAssetType: function(assetType) {
         return getABIByAssetType(assetType);
     },
-    buildSchemaFromSig: build_schema_from_signature,
+    buildSchemaInfoFromSig: build_schema_info_from_sig,
 };

@@ -78,6 +78,7 @@ module.exports = class Indexer extends AssetManager {
     xcmmsgSentAtUnknownMap = {};
     xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
     evmcontractMap = {};
+    evmSchemaMap = {}; //by fingerprintID
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -8461,10 +8462,41 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
-    async setup_evm_method_event_schema(signature='PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)') {
+
+    async setupEvmCallEventSchemaInfo(signature, fingerprintID) {
         //TODO
-        let schema = ethTool.buildSchemaFromSig(signature)
-        return schema
+        let isUnknownSchema = false
+        let schemaInfo = false
+        if (this.evmSchemaMap[fingerprintID] == undefined) {
+            schemaInfo = ethTool.buildSchemaInfoFromSig(signature, fingerprintID)
+            //TODO: type conversion
+            this.evmSchemaMap[fingerprintID] = schemaInfo
+            isUnknownSchema = true
+        }else{
+            schemaInfo = this.evmSchemaMap[fingerprintID]
+        }
+        return [schemaInfo, isUnknownSchema]
+    }
+
+    generateEventBqRec(schemaInfo, evmLog){
+        let schema = schemaInfo.schema
+        let decodedEvents = JSON.parse(evmLog.events)
+        let rec = {
+            contract_address: evmLog.address,
+            evt_tx_hash: evmLog.transaction_hash,
+            evt_index: evmLog.log_index,
+            evt_block_time: evmLog.block_timestamp,
+            evt_block_number: evmLog.block_number,
+        }
+        let flds = Object.keys(schema)
+        for (const dEvent of decodedEvents){
+            rec[dEvent.name] =  dEvent.value
+        }
+        let bqRec = {
+            insertId: `${schemaInfo.schemaType}_${schemaInfo.sectionName}_${evmLog.transaction_hash}_${evmLog.log_index}`,
+            json: rec
+        }
+        return bqRec
     }
 
     async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID){
@@ -8568,7 +8600,7 @@ module.exports = class Indexer extends AssetManager {
                     let l = logs[j]
                     let eSig = l.signature ? l.signature : null
                     let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
-                    let ll = {
+                    let evmLog = {
                         chain_id: chainID,
                         id: chain.id,
                         log_index: l.logIndex,
@@ -8584,12 +8616,16 @@ module.exports = class Indexer extends AssetManager {
                         events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
                     }
                     if (eSig){
-                        let schema = await this.setup_evm_method_event_schema(eSig, eFingerprintID)
-                        console.log(`schema`, schema)
+                        let [schemaInfo, isUnknownSchema] = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID)
+                        if (isUnknownSchema){
+                            console.log(`New schemaInfo`, schemaInfo, `event`, evmLog.events)
+                        }
+                        let bqLog = this.generateEventBqRec(schemaInfo, evmLog)
+                        console.log(`auto generated bqLog`, bqLog)
                     }
                     let bqEvmLog = {
-                        insertId: `${tx.transactionHash}${l.logIndex}`,
-                        json: ll
+                        insertId: `${tx.transactionHash}_${l.logIndex}`,
+                        json: evmLog
                     }
                     console.log(`bqEvmLog`, bqEvmLog)
                     rows_logs.push(bqEvmLog);
