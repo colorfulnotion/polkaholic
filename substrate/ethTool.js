@@ -715,6 +715,133 @@ async function sendSignedRLPTx(web3Api, rlpTx) {
     return isError
 }
 
+function decodedTxnInputRaw(txInput='0x13ead5620000000000000000000000005283d291dbcf85356a21ba090e6db59121208b44000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000049456c01b13e8b05bf22f1a', contractABIs, contractABISignatures){
+    //etherscan is marking native case as "Transfer"
+    let contractcreationAddress = false
+    let methodID = '0x';
+    let decodedTxnInput = {};
+
+    if (!contractcreationAddress) {
+        if (txInput.length >= 10) {
+            methodID = txInput.slice(0, 10)
+        } else if (txInput >= '0x') {
+            // TODO: check weird case
+            // console.log(`check txhash ${txn.hash}`)
+            methodID = txInput
+        }
+    }
+
+    if (methodID != '0x') {
+        let foundApi = fetchABI(methodID, contractABIs, contractABISignatures)
+        if (foundApi) {
+            let methodSignature = foundApi.signature
+            //console.log(`${methodID} -> ${methodSignature}`)
+            let methodABIStr = foundApi.abi
+            let cachedDecoder = foundApi.decoder
+            let cachedEtherjsDecoder = foundApi.etherjsDecoder
+            let decodedInput = decode_txn_input_raw(txInput, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
+            if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
+                decodedTxnInput.decodeStatus = decodedInput.name
+                decodedTxnInput.methodID = methodID
+                decodedTxnInput.txInput = txInput
+            } else {
+                //sucessfully decoded, dropping txInput
+                decodedTxnInput.decodeStatus = 'success'
+                decodedTxnInput.methodID = methodID
+                decodedTxnInput.signature = methodSignature
+                decodedTxnInput.params = decodedInput.params
+            }
+        } else {
+            //methodID not found
+            decodedTxnInput.decodeStatus = 'unknown'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.txInput = txInput
+        }
+    } else {
+        //native transfer case or contract creation
+        if (contractcreationAddress) {
+            //contract creation
+            decodedTxnInput.decodeStatus = 'contractCreation'
+            decodedTxnInput.contractAddress = contractcreationAddress
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `contractCreation`
+        } else {
+            //native transfer
+            decodedTxnInput.decodeStatus = 'success'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `nativeTransfer`
+            decodedTxnInput.params = []
+        }
+    }
+    return decodedTxnInput
+}
+
+function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder, etherjsDecoder) {
+    //const abiDecoder = require('abi-decoder');
+    //abiDecoder.addABI(methodABIStr)
+    //abiDecoder.addABI(JSON.parse(methodABIStr));
+    try {
+        let methodID = txInput.slice(0, 10)
+        let decodedData = abiDecoder.decodeMethod(txInput);
+        if (decodedData != null) {
+            //success case with {name: 'swapExactTokensForTokens', params: []}
+            decodedData.decodeStatus = 'success'
+            return decodedData
+        } else {
+            //decode null
+            //console.log(`decodeErr input=${txn.input}`)
+            console.log(`abi-decoder failed. Use etherJS methodID=${methodID}\n methodSignature=${methodSignature}`)
+            abiDecoder.discardNonDecodedLogs()
+            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder)
+            if (isSuccess) {
+                decodedData = {}
+                decodedData.params = decodedDataEtherJS
+                decodedData.decodeStatus = 'success'
+                //console.log(`** decodedData`, decodedData)
+                return decodedData
+            }
+        }
+        let decodeNull = {
+            decodeStatus: 'null'
+        }
+        return decodeNull
+    } catch (e) {
+        //error decoding inputs
+        console.log(`decodeErr methodSignature=${methodSignature}`)
+        console.log(`decodeErr`, e)
+        let decodeErr = {
+            decodeStatus: 'error'
+        }
+        return decodeErr
+    }
+}
+
+function decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder) {
+    try {
+        let methodID = txInput.slice(0, 10)
+        //console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
+        //var iface = new ethers.utils.Interface(methodABIStr)
+        var txn_input_stub = build_txn_input_stub(methodSignature)
+        var res = etherjsDecoder.decodeFunctionData(methodID, txInput)
+        let combinedTxnInputs = []
+        for (const t of txn_input_stub) {
+            let fld = t.name
+            let val = res[fld]
+            val = JSON.parse(JSON.stringify(val))
+            if (val != undefined) {
+                //console.log(`val!!`, val)
+                t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
+            }
+            combinedTxnInputs.push(t)
+        }
+        console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
+        return [combinedTxnInputs, true]
+    } catch (e) {
+        console.log(`decode_txn_input_etherjs err`, e)
+        return [false, false]
+    }
+}
+
 function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
     //etherscan is marking native case as "Transfer"
     let contractcreationAddress = false
@@ -740,7 +867,7 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
             let methodABIStr = foundApi.abi
             let cachedDecoder = foundApi.decoder
             let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder, contractABIs, contractABISignatures)
             if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
                 decodedTxnInput.decodeStatus = decodedInput.name
                 decodedTxnInput.methodID = methodID
@@ -803,7 +930,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             let methodABIStr = foundApi.abi
             let cachedDecoder = foundApi.decoder
             let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder, contractABIs, contractABISignatures)
             if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
                 decodedTxnInput.decodeStatus = decodedInput.name
                 decodedTxnInput.methodID = methodID
@@ -1125,7 +1252,7 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
 
 //'0x38ed1739'
 //decodeMethod
-function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherjsDecoder) {
+function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherjsDecoder, contractABIs, contractABISignatures) {
     //const abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
@@ -1137,6 +1264,8 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
         if (decodedData != null) {
             //success case with {name: 'swapExactTokensForTokens', params: []}
             decodedData.decodeStatus = 'success'
+            console.log(`decode_txn_input`, decodedData)
+            decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
             return decodedData
         } else {
             //decode null
@@ -1148,6 +1277,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
                 decodedData = {}
                 decodedData.params = decodedDataEtherJS
                 decodedData.decodeStatus = 'success'
+                decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
                 //console.log(`** decodedData`, decodedData)
                 return decodedData
             }
@@ -1167,6 +1297,37 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
         }
         return decodeErr
     }
+}
+
+function recursive_params(decodedData, contractABIs, contractABISignatures){
+    if (Array.isArray(decodedData.params)){
+        for (let i = 0; i < decodedData.params.length; i++){
+            let p = decodedData.params[i]
+            if (p.type == 'bytes[]' && Array.isArray(p.value)){
+                p.valueDecoded = []
+                let decodeSuccesscnt = 0
+                for (let t = 0; t < p.value.length; t++){
+                    let pVal = p.value[t]
+                    if (pVal.length >= 10){
+                        try {
+                            let decodedTxnInput = decodedTxnInputRaw(pVal, contractABIs, contractABISignatures)
+                            p.valueDecoded[t] = decodedTxnInput
+                            if (decodedTxnInput.decodeStatus == 'success'){
+                                decodeSuccesscnt++
+                            }
+                        } catch (e){
+                            console.log(`recursive_params err`, e)
+                        }
+                    }
+                    if (decodeSuccesscnt){
+                        decodedData.params[i] = p
+                    }
+                }
+            }
+
+        }
+    }
+    return decodedData
 }
 
 //return function signature like transferFrom(address sender, address recipient, uint256 amount) from abi

@@ -8499,6 +8499,28 @@ module.exports = class Indexer extends AssetManager {
         return bqRec
     }
 
+    generateCallBqRec(schemaInfo, evmTx){
+        let schema = schemaInfo.schema
+        let decodedParams = JSON.parse(evmTx.params)
+        let rec = {
+            contract_address: evmTx.address,
+            call_tx_hash: evmTx.transaction_hash,
+            //evt_index: evmLog.log_index,
+            call_block_time: evmTx.block_timestamp,
+            call_block_number: evmTx.block_number,
+        }
+        let flds = Object.keys(schema)
+        for (const dParam of decodedParams){
+            rec[dParam.name] =  dParam.value
+        }
+        let bqRec = {
+            insertId: `${schemaInfo.schemaType}_${schemaInfo.sectionName}_${evmTx.transaction_hash}_${evmTx}`,
+            json: rec
+        }
+        return bqRec
+    }
+
+
     async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID){
         const {
             BigQuery
@@ -8556,7 +8578,7 @@ module.exports = class Indexer extends AssetManager {
             tx.decodedLogs = logs; // fuse here
             let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
             //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
-            let t = {
+            let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
                 hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
@@ -8582,16 +8604,22 @@ module.exports = class Indexer extends AssetManager {
                 params: null
             }
             if (decodedInput) {
-                t.decoded = (decodedInput.decodeStatus == 'success');
-                t.method_id = decodedInput.methodID;
-                t.signature = decodedInput.signature;
-                if (t.decoded) {
-                    t.params = JSON.stringify(decodedInput.params);
+                evmTx.decoded = (decodedInput.decodeStatus == 'success');
+                evmTx.method_id = decodedInput.methodID;
+                evmTx.signature = decodedInput.signature;
+                if (evmTx.decoded){
+                    evmTx.params = JSON.stringify(decodedInput.params);
+                    let [schemaInfo, isUnknownSchema] = await this.setupEvmCallEventSchemaInfo(evmTx.signature, evmTx.method_id)
+                    if (isUnknownSchema){
+                        console.log(`New schemaInfo`, schemaInfo, `call`, evmTx.params)
+                    }
+                    let bqCall = this.generateCallBqRec(schemaInfo, evmTx)
+                    console.log(`Auto generated bqCall ${schemaInfo.tblName}`, evmTx)
                 }
             }
             let bqEvmTransaction = {
                 insertId: `${tx.transactionHash}`,
-                json: t
+                json: evmTx
             }
             console.log(`bq+`, bqEvmTransaction)
             rows_transactions.push(bqEvmTransaction);
@@ -8620,8 +8648,8 @@ module.exports = class Indexer extends AssetManager {
                         if (isUnknownSchema){
                             console.log(`New schemaInfo`, schemaInfo, `event`, evmLog.events)
                         }
-                        let bqLog = this.generateEventBqRec(schemaInfo, evmLog)
-                        console.log(`auto generated bqLog`, bqLog)
+                        let bqEvent = this.generateEventBqRec(schemaInfo, evmLog)
+                        console.log(`Auto generated bqEvent ${schemaInfo.tblName}`, bqEvent)
                     }
                     let bqEvmLog = {
                         insertId: `${tx.transactionHash}_${l.logIndex}`,
