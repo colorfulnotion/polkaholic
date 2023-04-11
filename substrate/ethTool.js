@@ -963,8 +963,9 @@ function decodeRLPTx(raw = '') {
     return r
 }
 
-function parseMethodInputs(paramsString, nested) {
+function parseMethodInputs(paramsString, nested, fingerprintID = false) {
     const splitInputs = [];
+    let parseType = (fingerprintID && fingerprintID.length == 10)? 'func': 'event'
     let currentParam = '';
     let nestedLevel = 0;
     for (let i = 0; i < paramsString.length; i++) {
@@ -986,8 +987,20 @@ function parseMethodInputs(paramsString, nested) {
     }
     const paramsArray = splitInputs.map(param => {
         const separatorIndex = param.lastIndexOf(' ');
-        const type = param.slice(0, separatorIndex).trim();
         const name = param.slice(separatorIndex + 1).trim();
+        let type = param.slice(0, separatorIndex).trim();
+        let topicIndex = false
+        let hasTopicIndex = false
+        try {
+            if (parseType == 'event' && type.includes("index_topic_")){
+                let p = type.split(' ')
+                hasTopicIndex = true
+                topicIndex = parseInt(p[0].replace('index_topic_',''))
+                type = p[1]
+            }
+        } catch (e){
+            console.log(`parseMethodInputs event parsing err`, e)
+        }
         if (nested && type.includes('(')) {
             const nestedStartIndex = type.indexOf('(');
             const nestedEndIndex = type.lastIndexOf(')');
@@ -1000,10 +1013,14 @@ function parseMethodInputs(paramsString, nested) {
                 type: parseMethodInputs(nestedParamsString, nested)
             };
         } else {
-            return {
+            let t = {
                 name: name,
                 type: type,
-            };
+            }
+            if (hasTopicIndex){
+                t.topicIndex = topicIndex
+            }
+            return t
         }
     });
     return paramsArray;
@@ -1014,6 +1031,13 @@ function build_txn_input_stub(methodSignature = 'callBridgeCall(address token, u
     const endIndex = methodSignature.lastIndexOf(')');
     const inputs = methodSignature.slice(startIndex, endIndex);
     return parseMethodInputs(inputs, nested);
+}
+
+function build_schema_from_signature(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
+    const startIndex = methodSignature.indexOf('(') + 1;
+    const endIndex = methodSignature.lastIndexOf(')');
+    const inputs = methodSignature.slice(startIndex, endIndex);
+    return parseMethodInputs(inputs, nested, fingerprintID);
 }
 
 function convertBigNumberStruct(val) {
@@ -1650,7 +1674,7 @@ function categorizeTokenTransfers(dLog) {
 }
 
 //more expensive decode when cached decoder fails..
-function decode_event_fresh(log, eventAbIStr, eventSignature) {
+function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     var abiDecoder = require('abi-decoder');
     abiDecoder.addABI(eventAbIStr)
     try {
@@ -1664,6 +1688,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
+            fingerprintID: fingerprintID,
             events: decodedLog.events
         }
         return res
@@ -1680,7 +1705,8 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             transactionLogIndex: log.transactionLogIndex,
             logIndex: log.logIndex,
             data: log.data,
-            topics: log.topics
+            topics: log.topics,
+            fingerprintID: fingerprintID,
         }
         return unknown
     }
@@ -1688,7 +1714,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
 
 // for a transfer event the "address" is the contract address
 // minimum requirement topics, data, address + abi
-function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
+function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecoder) {
     //var abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(eventAbIStr)
     try {
@@ -1703,6 +1729,7 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
+            fingerprintID: fingerprintID,
             events: decodedLog.events
         }
         return res
@@ -1711,7 +1738,7 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
         let topic0 = log.topics[0]
         let topicLen = log.topics.length
         console.log(`fallback decode txHash=${log.transactionHash} transactionLogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
-        return decode_event_fresh(log, eventAbIStr, eventSignature)
+        return decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature)
     }
 }
 
@@ -1760,7 +1787,9 @@ function decode_log(log, contractABIs, contractABISignatures) {
         //console.log(`${topic0} -> ${eventSignature}`)
         let eventABIStr = foundApi.abi
         let cachedDecoder = foundApi.decoder
-        let decodedRes = decode_event(log, eventABIStr, eventSignature, cachedDecoder)
+        let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
+
+        console.log(`decodedRes.events`, decodedRes.events)
         return decodedRes
     }
     //console.log(`[#${log.blockNumber}-${log.transactionIndex}] decode_log: topic not found ${topic0} (topicLen ${topicLen})`)
@@ -1770,7 +1799,8 @@ function decode_log(log, contractABIs, contractABISignatures) {
         transactionLogIndex: log.transactionLogIndex,
         logIndex: log.logIndex,
         data: log.data,
-        topics: log.topics
+        topics: log.topics,
+        fingerprintID: fingerprintID,
     }
     return unknown
 }
@@ -2311,5 +2341,6 @@ module.exports = {
     },
     getABIByAssetType: function(assetType) {
         return getABIByAssetType(assetType);
-    }
+    },
+    buildSchemaFromSig: build_schema_from_signature,
 };

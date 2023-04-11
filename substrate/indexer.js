@@ -6590,12 +6590,12 @@ module.exports = class Indexer extends AssetManager {
                     row[`${a}_pub_key`] = paraTool.getPubKey(v.id);
                 } else if (tbl.columns[`${a}_float`]) {
                     row[a] = v;
-                    // TODO: 
+                    // TODO:
                     row[`${a}_usd`] = 0;
                     row[`${a}_float`] = 0;
                 } else if (tbl.columns[`${a}_symbol`]) {
                     row[a] = (typeof v == "object") ? JSON.stringify(v) : v;
-                    // TODO: 
+                    // TODO:
                     row[`${a}_symbol`] = "TODO";
                     row[`${a}_decimals`] = 0;
                 } else if (tbl.columns[a]) {
@@ -8461,8 +8461,20 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
-    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID) {
-        const bigquery = this.get_big_query();
+    async setup_evm_method_event_schema(signature='PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)') {
+        //TODO
+        let schema = ethTool.buildSchemaFromSig(signature)
+        return schema
+    }
+
+    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID){
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
         let chain = await this.getChain(chainID);
         let contractABIs = (this.contractABIs) ? this.contractABIs : await this.getContractABI();
         let rows_blocks = [];
@@ -8554,6 +8566,8 @@ module.exports = class Indexer extends AssetManager {
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
                     let l = logs[j]
+                    let eSig = l.signature ? l.signature : null
+                    let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
                     let ll = {
                         chain_id: chainID,
                         id: chain.id,
@@ -8566,8 +8580,12 @@ module.exports = class Indexer extends AssetManager {
                         block_timestamp: block.timestamp,
                         block_number: block.number,
                         block_hash: block.hash,
-                        signature: l.signature ? l.signature : null, // TODO: check
+                        signature: eSig,
                         events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
+                    }
+                    if (eSig){
+                        let schema = await this.setup_evm_method_event_schema(eSig, eFingerprintID)
+                        console.log(`schema`, schema)
                     }
                     let bqEvmLog = {
                         insertId: `${tx.transactionHash}${l.logIndex}`,
