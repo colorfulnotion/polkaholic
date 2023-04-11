@@ -845,11 +845,14 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
         v: txn.v
     }
     try {
+        let validateRSV = false
         if (txn.r != undefined && txn.s != undefined) {
             //console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
             if (txn.r.length == 66 && txn.s.length == 66) {
                 return output // let's not validate irrelevant tx
-            } else {
+            } else if (validateRSV){
+                //r,s is problematic here - skip validation
+                console.log(`txn`, txn)
                 let derivedTx = decodeRLPTx(txn.raw)
                 if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTx.txHash}, raw=${txn.raw}`)
                 if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66) {
@@ -1804,25 +1807,41 @@ async function crawl_evm_block(web3Api, bn) {
     return false
 }
 
-async function crawl_evm_receipts(web3Api, blk) {
+async function crawl_evm_receipts(web3Api, blk, isParallel = true) {
+    console.log(`crawl_evm_receipts [#${blk.number}] ${blk.hash}`)
     if (blk.transactions == undefined) {
         return false
     }
     let txns = blk.transactions
-    let receiptAsync = await txns.map(async (txn) => {
-        try {
-            let txHash = txn.hash
-            //let tIndex = txn.transactionIndex
-            //console.log(`${tIndex} ${txHash}`)
-            let res = web3Api.eth.getTransactionReceipt(txHash)
-            return res
-        } catch (err) {
-            console.log("ERR-index_blocks_period", err);
+    let receipt = []
+    //console.log(`crawl_evm_receipts START (len=${txns.length})`)
+    if (isParallel){
+        let receiptAsync = await txns.map(async (txn) => {
+            try {
+                let txHash = txn.hash
+                let tIndex = txn.transactionIndex
+                //console.log(`${tIndex} ${txHash}`)
+                let res = web3Api.eth.getTransactionReceipt(txHash)
+                return res
+            } catch (err) {
+                console.log("ERR-index_blocks_period", err);
+            }
+        });
+        // this will fail unless we get back all receipt from a block
+        receipt = await Promise.all(receiptAsync);
+    }else{
+        for (const txn of txns){
+            try {
+                let txHash = txn.hash
+                let tIndex = txn.transactionIndex
+                let res = await web3Api.eth.getTransactionReceipt(txHash)
+                //console.log(`${tIndex} ${txHash}`)
+                receipt.push(res)
+            } catch (e){
+                console.log(`crawl_evm_receipts getTransactionReceipt err`, e)
+            }
         }
-    });
-    // this will fail unless we get back all receipt from a block
-    let receipt = await Promise.all(receiptAsync);
-
+    }
     // this "null check" protects against bad data being stored in BT evmreceipts
     if (receipt.length > 0) {
         for (let i = 0; i < receipt.length; i++) {
@@ -1831,6 +1850,7 @@ async function crawl_evm_receipts(web3Api, blk) {
             }
         }
     }
+    //console.log(`crawl_evm_receipts DONE (len=${txns.length})`)
     return receipt
 }
 
@@ -2141,8 +2161,8 @@ module.exports = {
     crawlEvmLogs: async function(web3Api, bn) {
         return crawl_evm_logs(web3Api, bn)
     },
-    crawlEvmReceipts: async function(web3Api, blk) {
-        return crawl_evm_receipts(web3Api, blk)
+    crawlEvmReceipts: async function(web3Api, blk, isParallel = true) {
+        return crawl_evm_receipts(web3Api, blk, isParallel)
     },
     getERC20TokenInfo: async function(web3Api, contractAddress, bn) {
         return getERC20TokenInfo(web3Api, contractAddress, bn)
