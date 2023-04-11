@@ -5369,7 +5369,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 
     async setupCallEvents() {
         const bigquery = this.get_big_query();
-        // read the set of call + event tables 
+        // read the set of call + event tables
         const datasetId = `substrate_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};
         let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%' or table_name like 'evt_%' or table_name like 'storage_%'`);
