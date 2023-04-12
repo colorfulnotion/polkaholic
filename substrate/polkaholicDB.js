@@ -672,7 +672,7 @@ from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteri
     }
 
     async getChain(chainID, withSpecVersions = false) {
-        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpointArchive, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmChainID, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus,
+        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpointArchive, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmChainID, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus, etherscanAPIURL,
 numExtrinsics, numExtrinsics7d, numExtrinsics30d,
 numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
 numTransfers, numTransfers7d, numTransfers30d,

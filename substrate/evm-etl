@@ -75,6 +75,18 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('getStorageAt')
+        .description(`run getStorageAt`)
+	.argument('<address>', 'Address')
+        .argument('<storageSlot>', `Storage Slot`)
+	.option('-c, --chainID <chainID>', 'Address', 1)
+        .action(async (address, storageSlot, opt) => {
+            var evmetl = new EVMETL();
+	    let res = await evmetl.getStorageAt(storageSlot, address, opt.chainID);
+	    console.log(res);
+            process.exit(0);
+        });
+
     await program.parseAsync(process.argv);
 }
 
