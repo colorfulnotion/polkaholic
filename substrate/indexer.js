@@ -22,6 +22,11 @@ const fs = require('fs');
 const extrinsic_args_conversion_list = ['Compact<u128>', 'u128', 'i128']
 const event_conversion_list = ['Compact<u128>', 'u128']
 
+//TODO:
+const {
+    BigQuery
+} = require('@google-cloud/bigquery');
+
 module.exports = class Indexer extends AssetManager {
     debugLevel = paraTool.debugNoLog;
     writeData = true; // true = production level write, false = debug SKIPs
@@ -78,7 +83,9 @@ module.exports = class Indexer extends AssetManager {
     xcmmsgSentAtUnknownMap = {};
     xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
     evmcontractMap = {};
-    evmSchemaMap = {}; //by fingerprintID
+    evmSchemaMap = {}; //by tableId
+    evmFingerprintMap = {}; //by fingerprintID
+    evmUnknownFingerprintMap = {};
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -197,6 +204,29 @@ module.exports = class Indexer extends AssetManager {
 
     parentRelayCrawler = false;
     parentManager = false;
+
+    //TODO: REMOVE THIS
+    async execute_bqJob(sqlQuery, fn = false) {
+        // run bigquery job with suitable credentials
+        const bigqueryClient = new BigQuery();
+        const options = {
+            query: sqlQuery,
+            location: 'us-central1',
+        };
+
+        try {
+            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
+            const response = await bigqueryClient.createQueryJob(options);
+            const job = response[0];
+            const [rows] = await job.getQueryResults();
+            return rows;
+        } catch (err) {
+            console.log(err);
+            throw new Error(`An error has occurred.`, sqlQuery);
+        }
+        return [];
+    }
+
 
     setDebugLevel(debugLevel = paraTool.debugNoLog) {
         this.debugLevel = debugLevel
@@ -8462,26 +8492,59 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
+    async initEvmSchemaMap(datasetId = 'evm_dev'){
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
+        let evmSchemaMap = {}
+        let evmFingerprintMap = {}
+        for (const t of tablesRecs) {
+            let tableId = t.table_name
+            let fingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
+            if (evmSchemaMap[tableId] == undefined) {
+                evmSchemaMap[tableId] = {};
+            }
+            if (evmFingerprintMap[fingerprintID] == undefined) {
+                evmFingerprintMap[fingerprintID] = tableId;
+            }
+            evmSchemaMap[tableId][t.column_name] = t.data_type;
+            // TODO: get description for full ABI
+        }
+        this.evmSchemaMap = evmSchemaMap
+        this.evmFingerprintMap = evmFingerprintMap
+        console.log(`evmSchemaMap ${Object.keys(evmSchemaMap).length}`)
+        console.log(`evmFingerprintMap ${Object.keys(evmFingerprintMap).length}`)
+        console.log(`initEvmSchemaMap DONE`)
+    }
+
+    getTableIDFromFingerprintID(fingerprintID){
+        let tableID = false
+        if (this.evmFingerprintMap[fingerprintID] != undefined){
+            tableID = this.evmFingerprintMap[fingerprintID]
+        }
+        return tableID
+    }
 
     async setupEvmCallEventSchemaInfo(signature, fingerprintID, contractABIs, contractABISignatures) {
         //TODO
-        let isUnknownSchema = false
-        let schemaInfo = false
-        if (this.evmSchemaMap[fingerprintID] == undefined) {
-            schemaInfo = ethTool.buildSchemaInfoFromFingerPrintID(signature, fingerprintID, contractABIs, contractABISignatures)
-            //TODO: type conversion
-            this.evmSchemaMap[fingerprintID] = schemaInfo
-            isUnknownSchema = true
-        }else{
-            schemaInfo = this.evmSchemaMap[fingerprintID]
+        if (this.evmUnknownFingerprintMap[fingerprintID]){
+            return false
         }
-        return [schemaInfo, isUnknownSchema]
+        console.log(`signature=${signature}, fingerprintID=${fingerprintID}`)
+        let schemaInfo = ethTool.buildSchemaInfoFromFingerprintID(signature, fingerprintID, contractABIs, contractABISignatures)
+        if (schemaInfo){
+            let schema = schemaInfo.schema
+            let sch = schema.schema
+            let tableId = schema.tableId
+            // add to known mapping
+            this.evmSchemaMap[tableId] = sch
+            this.evmFingerprintMap[fingerprintID] = tableId
+        }else{
+            this.evmUnknownFingerprintMap[fingerprintID] = 1
+        }
+        return schemaInfo
     }
 
-    generateEventBqRec(schemaInfo, evmLog){
-        let schema = schemaInfo.schema
+    generateEventBqRec(tableId, evmLog){
         let decodedEvents = JSON.parse(evmLog.events)
-        let tableId = schema.tableId
         let rec = {
             chain_id: evmLog.id, //string
             evm_chain_id: evmLog.chain_id,//integer
@@ -8491,7 +8554,6 @@ module.exports = class Indexer extends AssetManager {
             evt_block_time: evmLog.block_timestamp,
             evt_block_number: evmLog.block_number,
         }
-        let flds = Object.keys(schema)
         for (const dEvent of decodedEvents){
             rec[dEvent.name] =  dEvent.value
         }
@@ -8502,10 +8564,8 @@ module.exports = class Indexer extends AssetManager {
         return bqRec
     }
 
-    generateCallBqRec(schemaInfo, evmTx){
-        let schema = schemaInfo.schema
+    generateCallBqRec(tableId, evmTx){
         let decodedParams = JSON.parse(evmTx.params)
-        let tableId = schema.tableId
         let rec = {
             chain_id: evmTx.id, //string
             evm_chain_id: evmTx.chain_id,//integer
@@ -8515,7 +8575,6 @@ module.exports = class Indexer extends AssetManager {
             call_block_time: evmTx.block_timestamp,
             call_block_number: evmTx.block_number,
         }
-        let flds = Object.keys(schema)
         for (const dParam of decodedParams){
             if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON'){
                 rec[dParam.name] =  JSON.stringify(dParam.value)
@@ -8587,6 +8646,10 @@ module.exports = class Indexer extends AssetManager {
             tx.decodedLogs = logs; // fuse here
             let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
             //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
+            let methodID = null
+            if (tx.to && tx.input.length >= 10){
+                methodID = tx.input.substr(0,10)
+            }
             let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
@@ -8608,23 +8671,36 @@ module.exports = class Indexer extends AssetManager {
                 block_number: tx.blockNumber,
                 block_hash: tx.blockHash,
                 decoded: false,
-                method_id: null,
+                method_id: methodID,
                 signature: null,
                 params: null
             }
             if (decodedInput) {
                 evmTx.decoded = (decodedInput.decodeStatus == 'success');
-                evmTx.method_id = decodedInput.methodID;
+                evmTx.method_id = methodID;
                 if (evmTx.decoded){
                     evmTx.signature = decodedInput.signature;
                     evmTx.params = JSON.stringify(decodedInput.params);
-                    let [schemaInfo, isUnknownSchema] = await this.setupEvmCallEventSchemaInfo(evmTx.signature, evmTx.method_id, contractABIs, contractABISignatures)
-                    if (isUnknownSchema && schemaInfo){
-                        console.log(`New call schemaInfo ${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
-                    }
-                    if (schemaInfo){
-                        let bqCall = this.generateCallBqRec(schemaInfo, evmTx)
-                        console.log(`Auto generated bqCall ${schemaInfo.schema.tableId}\n`, bqCall)
+                    // write specific call_ table
+                    // try to find tableID
+                    let tableID = this.getTableIDFromFingerprintID(methodID)
+                    if (tableID){
+                        let bqCall = this.generateCallBqRec(tableID, evmTx)
+                        console.log(`* Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
+                    }else{
+                        if (evmTx.signature == 'nativeTransfer'){
+                            console.log(`nativeTransfer`, evmTx)
+                        }
+                        let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
+                        console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
+                        if (schemaInfo){
+                            tableID = schemaInfo.schema.tableId
+                            let bqCall = this.generateCallBqRec(tableID, evmTx)
+                            console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
+                        }else{
+                            //shouldn't get here?
+                            console.log(`Unknown methodID ${methodID}\n`)
+                        }
                     }
                 }
             }
@@ -8654,24 +8730,34 @@ module.exports = class Indexer extends AssetManager {
                         signature: eSig,
                         events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
                     }
-                    if (eSig){
-                        let [schemaInfo, isUnknownSchema] = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
-                        if (isUnknownSchema && schemaInfo){
-                            console.log(`New event schemaInfo ${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
-                        }
-                        if (schemaInfo){
-                            let bqEvent = this.generateEventBqRec(schemaInfo, evmLog)
-                            console.log(`Auto generated bqEvent ${schemaInfo.schema.tableId}\n`, bqEvent)
-                        }else{
-
-                        }
-                    }
                     let bqEvmLog = {
                         insertId: `${tx.transactionHash}_${l.logIndex}`,
                         json: evmLog
                     }
                     console.log(`bqEvmLog`, bqEvmLog)
                     rows_logs.push(bqEvmLog);
+
+                    // write specific evt_ table
+                    if (eSig){
+                        // try to find tableID
+                        let tableID = this.getTableIDFromFingerprintID(eFingerprintID)
+                        if (tableID){
+                            let bqEvent = this.generateEventBqRec(tableID, evmLog)
+                            console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
+                        }else{
+                            //do the abi lookup
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                            if (schemaInfo){
+                                console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
+                                tableID = schemaInfo.schema.tableId
+                                let bqEvent = this.generateEventBqRec(tableID, evmLog)
+                                console.log(`Auto generated bqEvent  ${eFingerprintID}->${tableID}\n`, bqEvent)
+                            }else{
+                                //shouldn't get here?
+                                console.log(`Unknown eFingerprintID ${eFingerprintID}\n`, eSig)
+                            }
+                        }
+                    }
                 }
             }
             // NOTE: we do not write out hashes yet (development)
@@ -8717,6 +8803,7 @@ module.exports = class Indexer extends AssetManager {
         let chain = await this.getChain(chainID);
         const Web3 = require('web3')
         const bigquery = this.get_big_query();
+        await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }

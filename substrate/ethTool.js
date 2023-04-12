@@ -1160,7 +1160,7 @@ function build_txn_input_stub(methodSignature = 'callBridgeCall(address token, u
     return parseMethodInputs(inputs, nested);
 }
 
-function build_schema_info_from_sig(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
+function buildSchemaInfoFromSig(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
     const startIndex = methodSignature.indexOf('(') + 1;
     const endIndex = methodSignature.lastIndexOf(')');
     const inputs = methodSignature.slice(startIndex, endIndex);
@@ -1920,36 +1920,41 @@ function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecode
 }
 
 function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
-    let signatureID = fingerprintID.split('-')[0]
-    let matchedABI = contractABIs[fingerprintID]
-    let cachedFingerprintID = contractABISignatures[signatureID]
-    if (matchedABI != undefined) {
-        if (matchedABI.decoder == undefined) {
-            if (cachedFingerprintID != undefined && cachedFingerprintID != fingerprintID) {
+    try {
+        let signatureID = fingerprintID.split('-')[0]
+        let matchedABI = contractABIs[fingerprintID]
+        let cachedFingerprintID = contractABISignatures[signatureID]
+        if (matchedABI != undefined) {
+            if (matchedABI.decoder == undefined) {
+                if (cachedFingerprintID != undefined && cachedFingerprintID != fingerprintID) {
+                    //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
+                }
+                const abiDecoder = require('abi-decoder');
+                abiDecoder.addABI(matchedABI.abi)
+                matchedABI.decoder = abiDecoder
+                const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
+                matchedABI.etherjsDecoder = etherjsDecoder
+                contractABIs[fingerprintID] = matchedABI
+                contractABISignatures[signatureID] = fingerprintID
+                //console.log(`cache decoder -> ${fingerprintID}`)
+                //console.log(`cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
+            } else if (cachedFingerprintID != fingerprintID) {
                 //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
+                const abiDecoder = require('abi-decoder');
+                abiDecoder.addABI(matchedABI.abi)
+                matchedABI.decoder = abiDecoder
+                const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
+                matchedABI.etherjsDecoder = etherjsDecoder
+                contractABISignatures[signatureID] = fingerprintID
+                //console.log(`re-cache decoder -> ${fingerprintID}`)
+                //console.log(`re-cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
             }
-            const abiDecoder = require('abi-decoder');
-            abiDecoder.addABI(matchedABI.abi)
-            matchedABI.decoder = abiDecoder
-            const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
-            matchedABI.etherjsDecoder = etherjsDecoder
-            contractABIs[fingerprintID] = matchedABI
-            contractABISignatures[signatureID] = fingerprintID
-            //console.log(`cache decoder -> ${fingerprintID}`)
-            //console.log(`cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
-        } else if (cachedFingerprintID != fingerprintID) {
-            //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
-            const abiDecoder = require('abi-decoder');
-            abiDecoder.addABI(matchedABI.abi)
-            matchedABI.decoder = abiDecoder
-            const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
-            matchedABI.etherjsDecoder = etherjsDecoder
-            contractABISignatures[signatureID] = fingerprintID
-            //console.log(`re-cache decoder -> ${fingerprintID}`)
-            //console.log(`re-cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
+            return matchedABI
         }
-        return matchedABI
+    } catch (err){
+        console.log(`fetchABI fingerprintID=${fingerprintID}`, err)
     }
+
     return false
 }
 
@@ -2362,7 +2367,7 @@ function mapABITypeToBqType(typ) {
     }
 }
 
-function build_schema_info_from_fingerPrintID(methodSignature, fingerprintID, contractABIs, contractABISignatures) {
+function buildSchemaInfoFromFingerprintID(methodSignature, fingerprintID, contractABIs, contractABISignatures) {
     let schemaInfo = false
     let foundApi = fetchABI(fingerprintID, contractABIs, contractABISignatures)
     if (foundApi){
@@ -2521,6 +2526,19 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false){
             return false
         }
     }
+}
+
+function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3'){
+    let fingerprintID = false
+    if (tableID.substr(0,5) == 'call_'){
+        fingerprintID = tableID.split('_').pop()
+    }else if (tableID.substr(0,4) == 'evt_'){
+        let pieces = tableID.split('_')
+        let topicLen = pieces.pop()
+        let topic0 = pieces.pop()
+        fingerprintID = `${topic0}-${topicLen}`
+    }
+    return fingerprintID
 }
 
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
@@ -2722,9 +2740,10 @@ module.exports = {
     getABIByAssetType: function(assetType) {
         return getABIByAssetType(assetType);
     },
-    buildSchemaInfoFromSig: build_schema_info_from_sig,
-    buildSchemaInfoFromFingerPrintID: build_schema_info_from_fingerPrintID,
+    buildSchemaInfoFromSig: buildSchemaInfoFromSig,
+    buildSchemaInfoFromFingerprintID: buildSchemaInfoFromFingerprintID,
     mapABITypeToBqType: mapABITypeToBqType,
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
+    getFingerprintIDFromTableID: getFingerprintIDFromTableID,
 };

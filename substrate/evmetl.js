@@ -542,9 +542,9 @@ module.exports = class EVMETL extends PolkaholicDB {
         });
         // read the set of call + event tables
         let tables = {};
-        let knowntableIds = {}
         const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
-
+        /*
+        let knowntableIds = {}
         await this.getAlltables()
         let tableIdFn = 'schema/substrateetl/evm/callevenets.txt'
         let loadedTableIDs = await this.readTableIds(tableIdFn)
@@ -552,6 +552,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             knowntableIds[loadedTableID] = 1
         }
         console.log(`loaded evm`, loadedTableIDs)
+        */
 
         let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
         for (const t of tablesRecs) {

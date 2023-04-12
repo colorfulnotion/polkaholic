@@ -2100,6 +2100,7 @@ module.exports = class Crawler extends Indexer {
 
         const Web3 = require('web3')
         const bigquery = this.get_big_query();
+        await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
