@@ -8696,7 +8696,6 @@ module.exports = class Indexer extends AssetManager {
 
                         }else{
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
-                            console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
                             if (schemaInfo){
                                 tableID = schemaInfo.schema.tableId
                                 bqCall = this.generateCallBqRec(tableID, evmTx)
@@ -8712,6 +8711,10 @@ module.exports = class Indexer extends AssetManager {
                                 auto_evm_rows_map[tableID] = []
                             }
                             auto_evm_rows_map[tableID].push(bqCall)
+                        }
+                        if (isNewSchema && schemaInfo && tableID){
+                            console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
+                            auto_evm_schema_map[tableID] = schemaInfo
                         }
                     }
                 }
@@ -8762,7 +8765,6 @@ module.exports = class Indexer extends AssetManager {
                             //do the abi lookup
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
                             if (schemaInfo){
-                                console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
                                 isNewSchema = true
                                 tableID = schemaInfo.schema.tableId
                                 bqEvent = this.generateEventBqRec(tableID, evmLog)
@@ -8781,6 +8783,11 @@ module.exports = class Indexer extends AssetManager {
                                 auto_evm_rows_map[tableID] = []
                             }
                             auto_evm_rows_map[tableID].push(bqEvent)
+                        }
+
+                        if (isNewSchema && schemaInfo && tableID){
+                            console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
+                            auto_evm_schema_map[tableID] = schemaInfo
                         }
                     }
                 }
@@ -8815,30 +8822,52 @@ module.exports = class Indexer extends AssetManager {
                         .insert(rows, {
                             raw: true
                         });
-                    console.log("WRITE", dataset, tbl, rows.length)
+                    console.log(`WRITE ${dataset}:${tbl} len=${rows.length}`)
                 }
             }
         } catch (err) {
             console.log("err", JSON.stringify(err)); // TODO: logger
         }
 
+        // evm _call _evt datasetId
+        let evmDatasetID = "evm_dev";
+
+        // update schems
+        console.log(`new schemas`, Object.keys(auto_evm_schema_map))
+
+        for (const schemaTableId of Object.keys(auto_evm_schema_map)) {
+            let schemaInfo = auto_evm_schema_map[schemaTableId]
+            let schema = schemaInfo.schema
+            let sch = schema.schema
+            let timePartitioning = schema.timePartitioning
+            console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            try {
+                const [table] = await bigquery
+                    .dataset(evmDatasetID)
+                    .createTable(schemaTableId, {
+                        schema: sch,
+                        location: 'us-central1',
+                        timePartitioning: timePartitioning,
+                    });
+            } catch (err){
+                console.log(`${evmDatasetID}:${schemaTableId} Skip -`, err.toString())
+            }
+        }
+
         // stream into call_ ,  evt_ table
-        let tableIds = Object.keys(auto_evm_rows_map)
-        console.log(`tableIds`, tableIds)
-        let dataset = "evm_dev";
-        for (const tableId of tableIds) {
-            console.log(`tableId ${tableId}`)
+        console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
+        for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
-            console.log(`tableId ${tableId} row`, rows)
+            console.log(`${evmDatasetID}:${tableId} row`, rows)
             try {
                 if (rows && rows.length > 0) {
                     await bigquery
-                        .dataset(dataset)
+                        .dataset(evmDatasetID)
                         .table(tableId)
                         .insert(rows, {
                             raw: true
                         });
-                        console.log("WRITE", dataset, tableId, rows.length)
+                        console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
                 }
             } catch (err){
                 console.log(`tableId=${tableId}, err=`, err.toString()); // TODO: logger

@@ -1973,8 +1973,15 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let decodedEvents = decodedRes.events
         for (let i = 0; i < decodedEvents.length; i++){
             let dEvent = decodedEvents[i]
-            if ((dEvent.type.includes('uint') && dEvent.type.includes('int')) && dEvent.value.substr(0,2) == '0x'){
-                dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+            //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+            if ((dEvent.type.includes('int'))){
+                if (Array.isArray(dEvent.value)){
+                    for (let j = 0; j < dEvent.value; j++){
+                        dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
+                    }
+                } else if (dEvent.value.substr(0,2) == '0x') {
+                    dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+                }
                 //console.log(`new dEvent.value`, dEvent.value)
             }
             decodedRes.events[i] = dEvent
