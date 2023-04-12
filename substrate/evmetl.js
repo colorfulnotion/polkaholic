@@ -1,4 +1,5 @@
 const PolkaholicDB = require("./polkaholicDB");
+const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 var SqlString = require('sqlstring');
 const util = require('util');
@@ -455,43 +456,33 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0)
     }
 
-    map_abitype_to_bqtype(typ) {
-        switch (typ) {
-            case "address":
-                return "STRING";
-            case "uint256":
-                return "STRING";
-            case "string":
-                return "STRING";
-            case "bool":
-                return "BOOLEAN";
-            case "int8":
-            case "int16":
-            case "int24":
-            case "int32":
-            case "uint8":
-            case "uint16":
-            case "uint24":
-                return "INTEGER";
-            case "uint32":
-                return "INTEGER";
-            case "bytes":
-                return "STRING"; // HEX string
-                break;
-            case "bytes32":
-                return "STRING"; // HEX string
-                break;
-            case "tuple":
-                return "JSON";
-                break;
-            default:
-                return "JSON";
+    async execute_bqJob(sqlQuery, fn = false) {
+        // run bigquery job with suitable credentials
+        const bigqueryClient = new BigQuery();
+        const options = {
+            query: sqlQuery,
+            location: 'us-central1',
+        };
+
+        try {
+            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
+            const response = await bigqueryClient.createQueryJob(options);
+            const job = response[0];
+            const [rows] = await job.getQueryResults();
+            return rows;
+        } catch (err) {
+            console.log(err);
+            throw new Error(`An error has occurred.`, sqlQuery);
         }
+        return [];
     }
 
     async setupCallEvents() {
-        const bigquery = this.get_big_query();
-        // read the set of call + event tables 
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        });
+        // read the set of call + event tables
 
         const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};
@@ -600,7 +591,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                                     break;
                                 case "IERC721":
                                 case "IERC1155":
-                                    // TODO: add 
+                                    // TODO: add
                                     break;
                             }
                             let description = JSON.stringify(inp);
@@ -614,7 +605,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                             }
                             sch.push({
                                 "name": nm,
-                                "type": this.map_abitype_to_bqtype(inp.type),
+                                "type": ethTool.mapABITypeToBqType(inp.type),
                                 "description": description,
                                 "mode": "NULLABLE"
                             });

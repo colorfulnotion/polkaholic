@@ -2149,7 +2149,7 @@ module.exports = class Crawler extends Indexer {
                         ])
                         let [dTxns, dReceipts] = await statusesPromise
                         let evmTrace = false
-                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID)
+                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
                     }
                 } catch (err) {
                     console.log(err)
