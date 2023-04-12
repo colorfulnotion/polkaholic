@@ -140,7 +140,6 @@ function encode_xcminfofinalized(extrinsicHash, chainID, extrinsicID, xcmInfo, s
         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`create_xcminfo_finalized`, err)
         return false
     }
-    console.log(`hres!!`, JSON.stringify(hres))
     return (hres);
 }
 

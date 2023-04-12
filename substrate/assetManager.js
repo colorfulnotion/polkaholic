@@ -3124,7 +3124,7 @@ module.exports = class AssetManager extends PolkaholicDB {
             return (true);
         }
         if (id == "khala") {
-            if (method == "forceBatch" || call_section == "phalaMq" || call_section == "utility" || call_section == "proxy") {
+            if (method == "forceBatch" || section == "phalaMq" || section == "utility" || section == "proxy") {
                 return (true);
             }
         }

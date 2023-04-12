@@ -27,9 +27,6 @@ const {
 const {
     MultiLocation
 } = require('@polkadot/types/interfaces');
-const {
-    BigQuery
-} = require('@google-cloud/bigquery');
 
 const Ably = require('ably');
 const Query = require('./query');
@@ -360,7 +357,7 @@ module.exports = class XCMCleaner extends Query {
     }
     async execute_bqJob(sqlQuery, fn = false) {
         // run bigquery job with suitable credentials
-        const bigqueryClient = new BigQuery();
+        const bigqueryClient = this.get_big_query();
         const options = {
             query: sqlQuery,
             location: 'us-central1',

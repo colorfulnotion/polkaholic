@@ -1669,6 +1669,12 @@ module.exports = {
         let res = buf2hex(part1) + buf2hex(part2)
         return res
     },
+    snake_case_string: function(str) {
+        return str && str.match(
+                /[A-Z]{2,}(?=[A-Z][a-z]+[0-9]*|\b)|[A-Z]?[a-z]+[0-9]*|[A-Z]|[0-9]+/g)
+            .map(s => s.toLowerCase())
+            .join('_');
+    },
     firstCharLowerCase: function(inp) {
         if (inp.toUpperCase() == inp) { // if the whole thing is uppercase, then return all lowercase
             return inp.toLowerCase();
