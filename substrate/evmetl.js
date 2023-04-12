@@ -7,6 +7,9 @@ const exec = util.promisify(require('child_process').exec);
 
 const ethTool = require("./ethTool");
 
+const fs = require('fs');
+const readline = require('readline');
+
 // Function: mint(address poolToken,uint256 amount,address to,uint256 deadline)
 // MethodID: 0x3c173a4f
 // [0]:  000000000000000000000000e69c2c761931c4bf719cf5931af37c6a09889d06
@@ -402,6 +405,42 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
+    async getAlltables(detasetID=`evm_dev`, projectID = `substrate-etl`) {
+        let fullTableIDs = []
+        let bqCmd = `bq ls --max_results 1000000 --project_id=${projectID} --dataset_id="${detasetID}" --format=json | jq -r '.[].tableReference.tableId' > schema/substrateetl/evm/callevenets.txt`
+        let res = await exec(bqCmd)
+        try {
+            if (res.stdout && res.stderr == '') {
+                console.log(res.stdout)
+                /*
+                let tbls = JSON.parse(res.stdout)
+                for (const tbl of tbls) {
+                    let fullTableID = tbl.id
+                    fullTableIDs.push(fullTableID)
+                }
+                */
+                //console.log(`r`, r)
+            }
+        } catch (e) {
+            console.log(`getAlltables err`, e)
+        }
+        return fullTableIDs
+    }
+
+    async readTableIds(fn = 'schema/substrateetl/evm/callevenets.txt') {
+      const fileStream = fs.createReadStream(fn);
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      const lines = [];
+      for await (const line of rl) {
+        lines.push(line);
+      }
+      return lines;
+    }
+
     // sets up evm chain tables
     async setup_chain_evm(chainID = null, isUpdate = false, execute = false) {
         let projectID = `${this.project}`
@@ -502,10 +541,19 @@ module.exports = class EVMETL extends PolkaholicDB {
             keyFilename: this.BQ_SUBSTRATEETL_KEY
         });
         // read the set of call + event tables
-
-        const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'event%'`);
+        let knowntableIds = {}
+        const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
+
+        await this.getAlltables()
+        let tableIdFn = 'schema/substrateetl/evm/callevenets.txt'
+        let loadedTableIDs = await this.readTableIds(tableIdFn)
+        for (const loadedTableID of loadedTableIDs){
+            knowntableIds[loadedTableID] = 1
+        }
+        console.log(`loaded evm`, loadedTableIDs)
+
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
                 tables[t.table_name] = {};
@@ -516,19 +564,24 @@ module.exports = class EVMETL extends PolkaholicDB {
 
         let sql = `select name, fingerprintID, CONVERT(signature using utf8) as signature, CONVERT(signatureRaw using utf8) as signatureRaw, CONVERT(abi using utf8) as abi from contractabi limit 100000;`
         var res = await this.poolREADONLY.query(sql);
-        for (const r of res) {
+        for (let i = 0; i < res.length; i++) {
+            let r = res[i]
             let abiStruct = JSON.parse(r.abi);
             let a = abiStruct[0]
             if ((a.type == "function") && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
             let fingerprintID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 11).replaceAll("-", "_")
-            let schema = ethTool.createEvmSchema(abiStruct, fingerprintID)
-            let sch = schema.schema
-            let tableId = schema.tableId
-            let timePartitioning = schema.timePartitioning
 
+            let tableId = ethTool.computeTableId(abiStruct, fingerprintID)
+            if (tables[tableId] != undefined) {
+                console.log(`known tableId ${i} ${tableId}`)
+                continue
+            }
+            let schema = ethTool.createEvmSchema(abiStruct, fingerprintID, tableId)
+            let sch = schema.schema
+            let timePartitioning = schema.timePartitioning
             tables[tableId] = sch;
             if (isCeateTable) {
-                console.log(`\n\nNew Schema for ${tableId}`)
+                console.log(`\n\nNew Schema #${i} for ${tableId}`)
                 try {
                     const [table] = await bigquery
                         .dataset(datasetId)
@@ -541,7 +594,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                     console.log(`Skip -`,err.toString())
                 }
             }else{
-                console.log(`*****\nNew Schema ${tableId}\n`, sch, `\n`)
+                console.log(`*****\nNew Schema #${i} ${tableId}\n`, sch, `\n`)
             }
         }
     }
