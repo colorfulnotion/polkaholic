@@ -8483,6 +8483,8 @@ module.exports = class Indexer extends AssetManager {
         let decodedEvents = JSON.parse(evmLog.events)
         let tableId = schema.tableId
         let rec = {
+            chain_id: evmLog.id, //string
+            evm_chain_id: evmLog.chain_id,//integer
             contract_address: evmLog.address,
             evt_tx_hash: evmLog.transaction_hash,
             evt_index: evmLog.log_index,
@@ -8505,7 +8507,10 @@ module.exports = class Indexer extends AssetManager {
         let decodedParams = JSON.parse(evmTx.params)
         let tableId = schema.tableId
         let rec = {
+            chain_id: evmTx.id, //string
+            evm_chain_id: evmTx.chain_id,//integer
             contract_address: evmTx.to_address,
+            call_success: 1, //TODO
             call_tx_hash: evmTx.hash,
             call_block_time: evmTx.block_timestamp,
             call_block_number: evmTx.block_number,

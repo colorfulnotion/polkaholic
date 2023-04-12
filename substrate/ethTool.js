@@ -1329,7 +1329,7 @@ function recursive_params(decodedData, contractABIs, contractABISignatures){
         }
     }
     if (isRecursive){
-        console.log(`recursive_params`, JSON.stringify(decodedData, null, 4))
+        //console.log(`recursive_params`, JSON.stringify(decodedData, null, 4))
     }
     return decodedData
 }
