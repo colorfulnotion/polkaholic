@@ -500,6 +500,34 @@ module.exports = class EVMETL extends PolkaholicDB {
         var res = await this.poolREADONLY.query(sql);
         for (const r of res) {
             let abi = JSON.parse(r.abi);
+            let fingerprintID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 10).replaceAll("-", "_")
+            let schema = ethTool.createEvmSchema(methodABIStr, fingerprintID)
+            let sch = schema.schema
+            let tableId = schema.tableId
+            let timePartitioning = schema.timePartitioning
+            /*
+            let schema = {
+                tableId: tableId,
+                schema: sch,
+                timePartitioning: {
+                    type: 'HOUR',
+                    field: timePartitionField
+                },
+            }
+            */
+
+            tables[tableId] = sch;
+            if (createTable) {
+                const [table] = await bigquery
+                    .dataset(datasetId)
+                    .createTable(tableId, {
+                        schema: sch,
+                        location: 'us-central1',
+                        timePartitioning: timePartitioning,
+                    });
+            }
+
+/*
             if (abi.length > 0) {
                 let a = abi[0];
                 const methodID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 10).replaceAll("-", "_");
@@ -629,7 +657,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                     }
                 }
             }
-
+*/
         }
     }
 }

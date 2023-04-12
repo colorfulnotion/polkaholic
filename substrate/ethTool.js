@@ -2374,9 +2374,6 @@ function build_schema_info_from_fingerPrintID(methodSignature, fingerprintID, co
         let schemaInfo = {
             fingerprintID: fingerprintID,
             schemaType: schemaType,
-            //sectionName: sectionName,
-            //contractName: contractName,
-            //tblName: `${schemaType}_${sectionName}`,
             schema: schema
         }
         return schemaInfo
@@ -2728,4 +2725,5 @@ module.exports = {
     buildSchemaInfoFromSig: build_schema_info_from_sig,
     buildSchemaInfoFromFingerPrintID: build_schema_info_from_fingerPrintID,
     mapABITypeToBqType: mapABITypeToBqType,
+    computeTableId: computeTableId,
 };
