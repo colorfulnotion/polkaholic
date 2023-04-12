@@ -1,5 +1,4 @@
 const PolkaholicDB = require("./polkaholicDB");
-const ethTool = require("./ethTool");
 const mysql = require("mysql2");
 var SqlString = require('sqlstring');
 const util = require('util');
@@ -381,6 +380,26 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
         console.log(`dump_contract_abi len=${abiRows.length}`);
         await this.update_batchedSQL(true);
+    }
+
+    async setup_dataset(detasetID=`evm_dev`, projectID = `substrate-etl`){
+        let cmd = `bq --location=us-central1 mk --dataset --description="DESCRIPTION" ${projectID}:${detasetID}`
+        try {
+            console.log(cmd);
+            //await exec(cmd);
+        } catch (e) {
+            // TODO optimization: do not create twice
+        }
+    }
+
+    async delete_dataset(detasetID=`evm_dev`, projectID = `substrate-etl`){
+        //Dengerous!
+        let cmd = `bq rm -r -d ${projectID}:${detasetID}`
+        try {
+            console.log(cmd);
+        } catch (e) {
+            // TODO optimization: do not create twice
+        }
     }
 
     // sets up evm chain tables

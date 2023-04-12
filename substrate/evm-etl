@@ -58,7 +58,30 @@ async function main() {
             await substrateetl.setup_chain_evm(chainID, isUpdate);
             process.exit(0);
         })
-    
+
+
+    program.command('setupdataset')
+        .description("Setup dataset in substrate-etl")
+        .usage("-d evm_dev")
+        .option('-d, --datasetID <datasetID>', 'datasetID', 'evm_dev')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let datasetID = opt.datasetID
+            await evmetl.setup_dataset(datasetID);
+            process.exit(0);
+    })
+
+    program.command('deletedataset')
+        .description("Delete dataset in substrate-etl")
+        .usage("-d evm_dev")
+        .option('-d, --datasetID <datasetID>', 'datasetID', 'evm_dev')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let datasetID = opt.datasetID
+            await evmetl.delete_dataset(datasetID);
+            process.exit(0);
+    })
+
     program.command('abianalytics')
         .description(`Reload ABIs`)
         .action(async (abistr, opt) => {
@@ -66,7 +89,7 @@ async function main() {
 	    await evmetl.abiAnalytics();
 	    process.exit(0);
         });
-    
+
     program.command('callevents')
         .description(`Generate schemas for calls+events`)
         .action(async (opt) => {
