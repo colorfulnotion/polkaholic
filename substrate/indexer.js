@@ -8570,7 +8570,7 @@ module.exports = class Indexer extends AssetManager {
             chain_id: evmTx.id, //string
             evm_chain_id: evmTx.chain_id,//integer
             contract_address: evmTx.to_address,
-            call_success: 1, //TODO
+            call_success: true, //TODO
             call_tx_hash: evmTx.hash,
             call_block_time: evmTx.block_timestamp,
             call_block_number: evmTx.block_number,
@@ -8825,10 +8825,12 @@ module.exports = class Indexer extends AssetManager {
         // stream into call_ ,  evt_ table
         let tableIds = Object.keys(auto_evm_rows_map)
         console.log(`tableIds`, tableIds)
-        try {
-            let dataset = "evm_dev";
-            for (const tableId of tableIds) {
-                let rows = auto_evm_rows_map[tableId]
+        let dataset = "evm_dev";
+        for (const tableId of tableIds) {
+            console.log(`tableId ${tableId}`)
+            let rows = auto_evm_rows_map[tableId]
+            console.log(`tableId ${tableId} row`, rows)
+            try {
                 if (rows && rows.length > 0) {
                     await bigquery
                         .dataset(dataset)
@@ -8836,11 +8838,11 @@ module.exports = class Indexer extends AssetManager {
                         .insert(rows, {
                             raw: true
                         });
-                        console.log("WRITE", dataset, tbl, rows.length)
+                        console.log("WRITE", dataset, tableId, rows.length)
                 }
+            } catch (err){
+                console.log(`tableId=${tableId}, err=`, err.toString()); // TODO: logger
             }
-        } catch (err) {
-            console.log("err", JSON.stringify(err)); // TODO: logger
         }
     }
 
