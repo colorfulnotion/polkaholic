@@ -519,167 +519,30 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const r of res) {
             let abiStruct = JSON.parse(r.abi);
             let a = abiStruct[0]
+            if ((a.type == "function") && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
             let fingerprintID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 11).replaceAll("-", "_")
             let schema = ethTool.createEvmSchema(abiStruct, fingerprintID)
-            console.log(`Schema`, schema)
             let sch = schema.schema
             let tableId = schema.tableId
             let timePartitioning = schema.timePartitioning
-            /*
-            let schema = {
-                tableId: tableId,
-                schema: sch,
-                timePartitioning: {
-                    type: 'HOUR',
-                    field: timePartitionField
-                },
-            }
-            */
 
             tables[tableId] = sch;
             if (isCeateTable) {
-                const [table] = await bigquery
-                    .dataset(datasetId)
-                    .createTable(tableId, {
-                        schema: sch,
-                        location: 'us-central1',
-                        timePartitioning: timePartitioning,
-                    });
-            }else{
-                console.log(`****\nNew Schema ${tableId}\n`, sch, `\n*****\n`)
-            }
-
-/*
-            if (abi.length > 0) {
-                let a = abi[0];
-                const methodID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 10).replaceAll("-", "_");
-                const tablePrefix = (a.type == "function") ? "call" : "evt";
-                if (tablePrefix == "call" && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
-
-                const tableId = `${tablePrefix}_${a.name}_${methodID}`
-                const inputs = a.inputs;
-                //console.log(tableId, inputs); // .length, r.signature, r.signatureRaw, abi);
-                if (tables[tableId] == undefined) {
-                    const sch = [];
-                    try {
-                        let timePartitionField = null
-                        sch.push({
-                            "name": "chain_id",
-                            "type": "string",
-                            "mode": "REQUIRED"
+                console.log(`\n\nNew Schema for ${tableId}`)
+                try {
+                    const [table] = await bigquery
+                        .dataset(datasetId)
+                        .createTable(tableId, {
+                            schema: sch,
+                            location: 'us-central1',
+                            timePartitioning: timePartitioning,
                         });
-                        sch.push({
-                            "name": "evm_chain_id",
-                            "type": "integer",
-                            "mode": "REQUIRED"
-                        });
-                        sch.push({
-                            "name": "contract_address",
-                            "type": "string",
-                            "mode": "REQUIRED"
-                        });
-                        let protected_flds = ["chain_id", "evm_chain_id", "contract_address", "_partition", "_table_", "_file_", "_row_timestamp_", "__root__", "_colidentifier"];
-                        if (tablePrefix == "call") {
-                            sch.push({
-                                "name": "call_success",
-                                "type": "boolean",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "call_tx_hash",
-                                "type": "string",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "call_trace_address",
-                                "type": "JSON",
-                                "mode": "NULLABLE"
-                            });
-                            sch.push({
-                                "name": "call_block_time",
-                                "type": "timestamp",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "call_block_number",
-                                "type": "integer",
-                                "mode": "REQUIRED"
-                            });
-                            timePartitionField = "call_block_time";
-                            protected_flds.push("call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number")
-                        } else {
-                            sch.push({
-                                "name": "evt_tx_hash",
-                                "type": "string",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "evt_index",
-                                "type": "INTEGER",
-                                "mode": "NULLABLE"
-                            });
-                            sch.push({
-                                "name": "evt_block_time",
-                                "type": "timestamp",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "evt_block_number",
-                                "type": "integer",
-                                "mode": "REQUIRED"
-                            });
-                            timePartitionField = "evt_block_time";
-                            protected_flds.push("evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number");
-                        }
-                        let idx = 0;
-                        for (const inp of inputs) {
-                            switch (inp.internalType) {
-                                case "IERC20":
-                                case "ERC20":
-                                case "IERC20Ext":
-                                    // TODO: _symbol, _decimals, _price_usd, _float
-                                    break;
-                                case "IERC721":
-                                case "IERC1155":
-                                    // TODO: add
-                                    break;
-                            }
-                            let description = JSON.stringify(inp);
-                            // cap description
-                            if (description.length >= 1024) description = description.substr(0, 1024);
-                            // rename protected
-                            let nm = inp.name && inp.name.length > 0 ? inp.name : `_unnamed${idx}`
-                            if (protected_flds.includes(nm.toLowerCase())) {
-                                console.log
-                                nm = `renamed${nm}`;
-                            }
-                            sch.push({
-                                "name": nm,
-                                "type": ethTool.mapABITypeToBqType(inp.type),
-                                "description": description,
-                                "mode": "NULLABLE"
-                            });
-                            idx++;
-                        }
-                        tables[tableId] = sch;
-                        if (createTable) {
-                            const [table] = await bigquery
-                                .dataset(datasetId)
-                                .createTable(tableId, {
-                                    schema: sch,
-                                    location: 'us-central1',
-                                    timePartitioning: {
-                                        type: 'HOUR',
-                                        field: timePartitionField
-                                    },
-                                });
-                        }
-                    } catch (err) {
-                        console.log(err, sch);
-                    }
+                } catch (err){
+                    console.log(`Skip -`,err.toString())
                 }
+            }else{
+                console.log(`*****\nNew Schema ${tableId}\n`, sch, `\n`)
             }
-*/
         }
     }
 }
