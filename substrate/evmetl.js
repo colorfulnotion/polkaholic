@@ -89,18 +89,22 @@ function dechex(number) {
 
 module.exports = class EVMETL extends PolkaholicDB {
     methodMap = {};
-    
+
     async getStorageAt(storageSlot, address, chainID = 1) {
-	console.log("getStorageAt", storageSlot, address, chainID);
-	const ethers = require('ethers');
-	let chain = await this.getChain(chainID);
-	const contract = new ethers.Contract(address, [], new ethers.providers.JsonRpcProvider(chain.RPCBackfill));
-	let storageValue = await contract.provider.getStorageAt(address, storageSlot);
-	return {address, storageSlot, storageValue}
+        console.log("getStorageAt", storageSlot, address, chainID);
+        const ethers = require('ethers');
+        let chain = await this.getChain(chainID);
+        const contract = new ethers.Contract(address, [], new ethers.providers.JsonRpcProvider(chain.RPCBackfill));
+        let storageValue = await contract.provider.getStorageAt(address, storageSlot);
+        return {
+            address,
+            storageSlot,
+            storageValue
+        }
     }
-    
+
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
-	let chain = await this.getChain(chainID);
+        let chain = await this.getChain(chainID);
         let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
         if (cmd == null) {
             console.log("No api available for chainID", chainID);
@@ -146,8 +150,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
         if (abiRaw) {
             let abi = JSON.parse(j.result);
-	    let proxyAddress = null;
-            if ( proxyAddress = await this.get_proxy_address(address, chainID) ) {
+            let proxyAddress = null;
+            if (proxyAddress = await this.get_proxy_address(address, chainID)) {
                 let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
                 if (proxyABI) {
                     console.log("proxyABI", proxyABI);
@@ -155,7 +159,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                     vals.push('proxyAddress');
                     flds.push(`${mysql.escape(proxyAddress)}`);
                     replace.push("proxyAddress");
-		    
+
                     vals.push('proxyAddressLastUpdateDT');
                     flds.push(`Now()`);
                     replace.push("proxyAddressLastUpdateDT");
@@ -183,19 +187,19 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
 
     get_address_from_storage_value(storageVal) {
-	return storageVal.length < 40 ? storageVal : "0x" + storageVal.slice(-40);
+        return storageVal.length < 40 ? storageVal : "0x" + storageVal.slice(-40);
     }
-    
+
     async get_proxy_address(address, chainID) {
-	// https://eips.ethereum.org/EIPS/eip-1967
-	let logic = await this.getStorageAt("0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc", address, chainID);
-	let beacon = await this.getStorageAt("0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50", address, chainID);
-	if ( logic.storageValue != "0x0000000000000000000000000000000000000000000000000000000000000000" ) {
-	    return this.get_address_from_storage_value(logic.storageValue);
-	} 
-	if ( beacon.storageValue != "0x0000000000000000000000000000000000000000000000000000000000000000" ) {
-	    return this.get_address_from_storage_value(logic.storageValue);
-	} 
+        // https://eips.ethereum.org/EIPS/eip-1967
+        let logic = await this.getStorageAt("0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc", address, chainID);
+        let beacon = await this.getStorageAt("0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50", address, chainID);
+        if (logic.storageValue != "0x0000000000000000000000000000000000000000000000000000000000000000") {
+            return this.get_address_from_storage_value(logic.storageValue);
+        }
+        if (beacon.storageValue != "0x0000000000000000000000000000000000000000000000000000000000000000") {
+            return this.get_address_from_storage_value(logic.storageValue);
+        }
         return (false);
     }
 

@@ -6562,6 +6562,68 @@ module.exports = class Indexer extends AssetManager {
         return;
     }
 
+    generate_call_rows(c) {
+        let row = {
+            chain_id: c.id,
+            block_time: c.block_time,
+            relay_chain: c.relay_chain,
+            para_id: c.para_id,
+            extrinsic_id: c.extrinsic_id,
+            extrinsic_hash: c.extrinsic_hash,
+            call_id: c.call_id,
+            signer_ss58: c.signer_ss58,
+            signer_pub_key: c.signer_pub_key
+        }
+        let section = c.call_section;
+        let method = c.call_method;
+        let cap_section = paraTool.firstCharUpperCase(section);
+        let snake_method = paraTool.snake_case_string(method);
+        let tableName = `call_${cap_section}_${snake_method}`;
+        if (this.bqTablesCallsEvents[tableName]) {
+            let tbl = this.bqTablesCallsEvents[tableName];
+            let args = JSON.parse(c.call_args);
+            // console.log("FOUND generate_call_rows", tableName, tbl, tbl.columns, args);
+            for (const a of Object.keys(args)) {
+                let v = args[a];
+                if (tbl.columns[`${a}_ss58`]) {
+                    row[`${a}_ss58`] = v.id
+                    row[`${a}_pub_key`] = paraTool.getPubKey(v.id);
+                } else if (tbl.columns[`${a}_float`]) {
+                    row[a] = v;
+                    // TODO: 
+                    row[`${a}_usd`] = 0;
+                    row[`${a}_float`] = 0;
+                } else if (tbl.columns[`${a}_symbol`]) {
+                    row[a] = (typeof v == "object") ? JSON.stringify(v) : v;
+                    // TODO: 
+                    row[`${a}_symbol`] = "TODO";
+                    row[`${a}_decimals`] = 0;
+                } else if (tbl.columns[a]) {
+                    if (typeof v == "object") { // tbl.columns[a].data_type
+                        row[a] = JSON.stringify(v);
+                    } else {
+                        row[a] = v;
+                    }
+                }
+            }
+            return {
+                tableName,
+                rows: [{
+                    insertId: `ssdev-${c.extrinsic_id}-${c.call_id}`,
+                    json: row
+                }]
+            };
+        } else {
+            this.logger.error({
+                "op": "generate_call_rows-NOT FOUND",
+                "tableName": t.tableName,
+                "call": c,
+                "err": err
+            })
+        }
+        return null;
+    }
+
     async bq_streaming_insert_finalized_block(b) {
         if (this.BQ_SUBSTRATEETL_KEY == null) return;
         const bigquery = this.get_big_query();
@@ -6772,9 +6834,32 @@ module.exports = class Indexer extends AssetManager {
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
                     if (this.suppress_call(id, call.section, call.method)) {} else {
+                        let t = this.generate_call_rows(bqExtrinsicCall);
+                        if (t) {
+                            try {
+                                await bigquery
+                                    .dataset("substrate_dev")
+                                    .table(t.tableName)
+                                    .insert(t.rows, {
+                                        raw: true
+                                    });
+                                this.logger.info({
+                                    "op": "generate_call_rows",
+                                    "tableName": t.tableName,
+                                    "rows": t.rows,
+                                    "err": err
+                                })
+                            } catch (err) {
+                                console.log(t.tableName, JSON.stringify(err));
+                                this.logger.error({
+                                    "op": "generate_call_rows",
+                                    "tableName": t.tableName,
+                                    "rows": t.rows,
+                                    "err": err
+                                })
+                            }
+                        }
 
-			console.log("PREPARE WRITE CALL", bqExtrinsicCall);
-			
                         calls.push({
                             insertId: `${relayChain}-${paraID}-${ext.extrinsicID}-${call.id}`,
                             json: bqExtrinsicCall
@@ -7955,7 +8040,7 @@ module.exports = class Indexer extends AssetManager {
         let balanceupdates = [];
         let assetupdates = [];
         let idx = 0;
-        console.log(`***** processTraceFromAuto [${blockNumber}] [${blockHash}] finalized=${finalized} `, Object.keys(dedupEvents).length)
+
         for (const dedupK of Object.keys(dedupEvents)) {
             let a = dedupEvents[dedupK];
             let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
@@ -8025,20 +8110,18 @@ module.exports = class Indexer extends AssetManager {
                                         insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
                                         json: c
                                     });
-                                    console.log("BALANCEUPDATE", c);
+                                    //console.log("BALANCEUPDATE", c);
                                 } else if (a2.totalIssuance) {
                                     assetupdates.push({
                                         insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
                                         json: c
                                     });
-                                    console.log("CASSETUPDATE", c);
+                                    //console.log("CASSETUPDATE", c);
                                 }
                             }
                         } catch (err) {
                             console.log(' BROKE', err);
                         }
-                    } else {
-                        console.log("YYY", a2)
                     }
                 }
                 if (this.suppress_trace(id, a2.p, a2.s)) {

@@ -5002,355 +5002,422 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         //console.log(`fullTableIDs`, fullTableIDs)
         return fullTableIDs
     }
-    snake_case_string(str) {
-        return str && str.match(
-                /[A-Z]{2,}(?=[A-Z][a-z]+[0-9]*|\b)|[A-Z]?[a-z]+[0-9]*|[A-Z]|[0-9]+/g)
-            .map(s => s.toLowerCase())
-            .join('_');
-    }
 
 
     map_substratetype_to_bq_schematypes(f, idx) {
         let out = [];
         let st = "json";
-	let n = f.name ? this.snake_case_string(f.name) : `unnamed_${idx}`;
-	let type = f.type ? f.type : null
-	let typeName = f.typeName ? f.typeName : null
-	let description = typeName;
-	let mode = "REQUIRED";
-	if ( /^Option<.*>$/.test(typeName) ) {
-	    typeName = typeName.substring(7, typeName.length - 1);
-	    mode = "NULLABLE";
-	}
+        let n = f.name ? paraTool.snake_case_string(f.name) : `unnamed_${idx}`;
+        let type = f.type ? f.type : null
+        let typeName = f.typeName ? f.typeName : null
+        let description = typeName;
+        let mode = "REQUIRED";
+        if (/^Option<.*>$/.test(typeName)) {
+            typeName = typeName.substring(7, typeName.length - 1);
+            mode = "NULLABLE";
+        }
         if (["BalanceOf<T>", "T::Balance", 'BalanceOf<T, I>', 'Balance'].includes(typeName)) {
-            out.push({"name": n, "type": "string", description, mode});
-            out.push({"name": `${n}_usd`, "type": "float", description, mode});
-            out.push({"name": `${n}_float`, "type": "float", description, mode});
-        } else if (["T::AccountId", "AccountIdLookupOf<T>"].includes(typeName) ) {
-            out.push({"name": `${n}_ss58`, "type": "string", description, mode});
-            out.push({"name": `${n}_pub_key`, "type": "string", description, mode});
+            out.push({
+                "name": n,
+                "type": "string",
+                description,
+                mode
+            });
+            out.push({
+                "name": `${n}_usd`,
+                "type": "float",
+                description,
+                mode
+            });
+            out.push({
+                "name": `${n}_float`,
+                "type": "float",
+                description,
+                mode
+            });
+        } else if (["T::AccountId", "AccountIdLookupOf<T>"].includes(typeName)) {
+            out.push({
+                "name": `${n}_ss58`,
+                "type": "string",
+                description,
+                mode
+            });
+            out.push({
+                "name": `${n}_pub_key`,
+                "type": "string",
+                description,
+                mode
+            });
         } else if (["T::CurrencyId", "CurrencyId", "T::AssetId", "AssetId", "AssetId<T>", "AssetIdOf<T>", "T::PoolId", "PoolId", "PoolId<T>"].includes(typeName)) { // note: these could be big num
-            out.push({"name": n, "type": "string", description, mode});
-            out.push({"name": `${n}_symbol`, "type": "string", mode});
-            out.push({"name": `${n}_decimals`, "type": "integer", mode});
+            out.push({
+                "name": n,
+                "type": "string",
+                description,
+                mode
+            });
+            out.push({
+                "name": `${n}_symbol`,
+                "type": "string",
+                mode
+            });
+            out.push({
+                "name": `${n}_decimals`,
+                "type": "integer",
+                mode
+            });
         } else if (["u32", "Compact<u32>", "T::BlockNumber"].includes(typeName)) {
-            out.push({"name": n, "type": "integer", description, mode});
+            out.push({
+                "name": n,
+                "type": "integer",
+                description,
+                mode
+            });
         } else if (type == "bool" || f.type == "Boolean") {
-            out.push({"name": n, "type": "boolean", description, mode});
+            out.push({
+                "name": n,
+                "type": "boolean",
+                description,
+                mode
+            });
         } else if (typeName && typeName.includes("Vec<u8>")) {
-            out.push({"name": n, "type": "string", description, mode});
+            out.push({
+                "name": n,
+                "type": "string",
+                description,
+                mode
+            });
         } else if (["H160", 'T::Hash'].includes(typeName)) {
-            out.push({"name": n, "type": "string", description, mode});
+            out.push({
+                "name": n,
+                "type": "string",
+                description,
+                mode
+            });
         } else if (typeName && typeName.includes("Vec")) {
-            out.push({"name": n, "type": "json", description, mode});
+            out.push({
+                "name": n,
+                "type": "json",
+                description,
+                mode
+            });
         } else {
-            out.push({"name": n, "type": "json", description, mode});
+            out.push({
+                "name": n,
+                "type": "json",
+                description,
+                mode
+            });
         }
         return out;
     }
 
     async setup_storage_item(runtime, section, item, tables, datasetId, bigquery, createTable = true) {
-	try {
-	    let fingerprintId = "_0x"; // TODO: hash of item type signature
-	    let storage = item.name;
-	    const tableId = `storage_${section}_${storage}` // _${fingerprintId}`;
-	    let table_description = item.docs ? item.docs.join("") : "";
-	    if (tables[tableId] == undefined) {
-		const sch = [];
-		sch.push({
-		    "name": "chain_id",
-		    "type": "string"
-		});
-		sch.push({
-		    "name": "block_time",
-		    "type": "timestamp"
-		});
-		sch.push({
-		    "name": "block_number",
-		    "type": "integer"
-		});
-		sch.push({
-		    "name": "relay_chain",
-		    "type": "string"
-		});
-		sch.push({
-		    "name": "para_id",
-		    "type": "integer"
-		});
-		sch.push({
-		    "name": "trace_id",
-		    "type": "string"
-		});
-		
-		if ( item.type && item.type.plain != undefined ) {
-		    let plain = this.lookup_runtime_type(runtime, item.type.plain);
-		    let [typ, docs] = this.map_substrate_storage_type_to_bq_schematype(plain.def, runtime);
-		    sch.push({
-			"name": "v",
-			"type": typ,
-			"description": (typeof docs == "object" ) ?  JSON.stringify(docs) : docs
-		    });
-		} else if ( item.type && item.type.map  != undefined ) {
-		    let k = this.lookup_runtime_type(runtime, item.type.map.key);
-		    let v = this.lookup_runtime_type(runtime, item.type.map.value);
-		    let [k_type, k_docs] = k && k.def ? this.map_substrate_storage_type_to_bq_schematype(k.def, runtime) : [null,null];
-		    let [v_type, v_docs] = v && v.def ? this.map_substrate_storage_type_to_bq_schematype(v.def, runtime) : [null,null];
-		    if ( typeof k_type == "string" ) {
-			let k_desc = (typeof k_docs == "object" ) ?  JSON.stringify(k_docs) : k_docs;
-			if ( k_desc.length > 1024 ) k_desc = k_desc.substring(0, 1000);
-			sch.push({
-			    "name": "k",
-			    "type": k_type,
-			    "description": k_desc
-			});
-		    } else {
-			console.log("KEY TYPE FAIL", k.def);
-		    }
-		    if ( typeof v_type == "string" ) {
-			let v_desc = (typeof v_docs == "object" ) ?  JSON.stringify(v_docs) : v_docs;
-			if ( v_desc.length > 1024 ) v_desc = v_desc.substring(0, 1000);
-			sch.push({
-			    "name": "v",
-			    "type": v_type,
-			    "description": v_desc
-			});
-		    } else {
-			console.log("VAL TYPE FAIL", v.def);
-		    }
-		} else {
-		    console.log("******** WHAT", item);
-		}
-		tables[tableId] = sch
-		if ( createTable ) {
-		    try {
-			console.log("CREATE", tableId);
-			const [table] = await bigquery
-			      .dataset(datasetId)
-			      .createTable(tableId, {
-				  schema: sch,
-				  location: 'us-central1',
-				  description: table_description,
-				  timePartitioning: {
-				      type: 'HOUR',
-				      expirationMS: '7776000000', // 90d
-				      field: 'block_time',
-				  },
-			      });
-			console.log("DONE", tableId);
-		    } catch (e) {
-			console.log(e, sch);
-		    }
-		}
-	    }
-	} catch ( err) {
-	    console.log(err);
-	}
+        try {
+            let fingerprintId = "_0x"; // TODO: hash of item type signature
+            let storage = item.name;
+            const tableId = `storage_${section}_${storage}` // _${fingerprintId}`;
+            let table_description = item.docs ? item.docs.join("") : "";
+            if (tables[tableId] == undefined) {
+                const sch = [];
+                sch.push({
+                    "name": "chain_id",
+                    "type": "string"
+                });
+                sch.push({
+                    "name": "block_time",
+                    "type": "timestamp"
+                });
+                sch.push({
+                    "name": "block_number",
+                    "type": "integer"
+                });
+                sch.push({
+                    "name": "relay_chain",
+                    "type": "string"
+                });
+                sch.push({
+                    "name": "para_id",
+                    "type": "integer"
+                });
+                sch.push({
+                    "name": "trace_id",
+                    "type": "string"
+                });
+
+                if (item.type && item.type.plain != undefined) {
+                    let plain = this.lookup_runtime_type(runtime, item.type.plain);
+                    let [typ, docs] = this.map_substrate_storage_type_to_bq_schematype(plain.def, runtime);
+                    sch.push({
+                        "name": "v",
+                        "type": typ,
+                        "description": (typeof docs == "object") ? JSON.stringify(docs) : docs
+                    });
+                } else if (item.type && item.type.map != undefined) {
+                    let k = this.lookup_runtime_type(runtime, item.type.map.key);
+                    let v = this.lookup_runtime_type(runtime, item.type.map.value);
+                    let [k_type, k_docs] = k && k.def ? this.map_substrate_storage_type_to_bq_schematype(k.def, runtime) : [null, null];
+                    let [v_type, v_docs] = v && v.def ? this.map_substrate_storage_type_to_bq_schematype(v.def, runtime) : [null, null];
+                    if (typeof k_type == "string") {
+                        let k_desc = (typeof k_docs == "object") ? JSON.stringify(k_docs) : k_docs;
+                        if (k_desc.length > 1024) k_desc = k_desc.substring(0, 1000);
+                        sch.push({
+                            "name": "k",
+                            "type": k_type,
+                            "description": k_desc
+                        });
+                    } else {
+                        console.log("KEY TYPE FAIL", k.def);
+                    }
+                    if (typeof v_type == "string") {
+                        let v_desc = (typeof v_docs == "object") ? JSON.stringify(v_docs) : v_docs;
+                        if (v_desc.length > 1024) v_desc = v_desc.substring(0, 1000);
+                        sch.push({
+                            "name": "v",
+                            "type": v_type,
+                            "description": v_desc
+                        });
+                    } else {
+                        console.log("VAL TYPE FAIL", v.def);
+                    }
+                } else {
+                    console.log("******** WHAT", item);
+                }
+                tables[tableId] = sch
+                if (createTable) {
+                    try {
+                        console.log("CREATE", tableId);
+                        const [table] = await bigquery
+                            .dataset(datasetId)
+                            .createTable(tableId, {
+                                schema: sch,
+                                location: 'us-central1',
+                                description: table_description,
+                                timePartitioning: {
+                                    type: 'HOUR',
+                                    expirationMS: '7776000000', // 90d
+                                    field: 'block_time',
+                                },
+                            });
+                        console.log("DONE", tableId);
+                    } catch (e) {
+                        console.log(e, sch);
+                    }
+                }
+            }
+        } catch (err) {
+            console.log(err);
+        }
     }
 
     map_substrate_storage_type_to_bq_schematype(t, runtime) {
-	if ( t.composite && t.composite.fields ) {
-	    return ["json", t];
-	} else if ( t.tuple ) {
-	    let flds = t.tuple.map( (f) => {
-		let comp = this.lookup_runtime_type(runtime, f);
-		return { type: f, def: comp } // typeName?
-	    });
-	    return ["json", {tuple:flds}];
-	} else if ( t.variant && t.variant.variants ) {
-	    return ["json", t];
-	} else if ( t.sequence && t.sequence.type !== undefined ) {
-	    // this.map_substrate_storage_type_to_bq_schematype(t.sequence.type);
-	    let seq_type = this.lookup_runtime_type(runtime, t.sequence.type);
-	    let seq_type_def = seq_type && seq_type.def && seq_type.def.primitive;
-	    if ( seq_type_def == "U8" ) {
-		return ["string", t]; // hex bytes
-	    } else {
-		t.sequence.def = seq_type.def;
-		return ["json", t];
-	    }
-	} else if ( t.array && t.array.type !== undefined ) {
-	    let array_type = this.lookup_runtime_type(runtime, t.array.type);
-	    let array_type_def = array_type && array_type.def && array_type.def.primitive;
-	    if ( array_type_def == "U8" ) {
-		return ["string", t]; // hex bytes
-	    } else {
-		return ["json", t];
-	    }
-	} else if (t.historicMetaCompat ) {
-	    return ["json", t];
-	} else if ( t.primitive ) {
-	    let res = null
-	    switch ( t.primitive ) {
-	    case "U8": 
-	    case "U16":
-	    case "U32":
-	    case "I8":
-	    case "I16":
-	    case "I32":
-		res = "integer";
-		break;
-	    case "Bool":
-		res = "boolean";
-		break;
-	    case "U64":
-	    case "U128":
-	    case "I64":
-	    case "I128":
-		res = "string"
-		break;
-	    default:
-		console.log("UNKNOWN PRIMITIVE", t.primitive);
-	    }
-	    return [res, t.primitive];
-	}	
-	console.log("map_substrate_storage_type_to_bq_schematype MISSING", t);
-	return ["unk", "unk"]
-	
-    }
-    
-    async setup_pallet(runtime, group, section, section_methods, tables, datasetId, bigquery, createTable = true) {
-	if ( ! Array.isArray(section_methods) ) return(false);
-	for ( const sm of section_methods ) {
-	    let method = sm.name;
-	    let table_description = sm.docs ? sm.docs.join("") : "";
-	    let fingerprintId = "_0x"; // TODO: hash of section_methods signature
-	    const tableId = `${group}_${section}_${method}`;
-	    if (tables[tableId] == undefined) {
-		const sch = [];
-		let protected_flds = ["chain_id", "block_time", "relay_chain", "para_id", "extrinsic_id", "extrinsic_hash"];
+        if (t.composite && t.composite.fields) {
+            return ["json", t];
+        } else if (t.tuple) {
+            let flds = t.tuple.map((f) => {
+                let comp = this.lookup_runtime_type(runtime, f);
+                return {
+                    type: f,
+                    def: comp
+                } // typeName?
+            });
+            return ["json", {
+                tuple: flds
+            }];
+        } else if (t.variant && t.variant.variants) {
+            return ["json", t];
+        } else if (t.sequence && t.sequence.type !== undefined) {
+            // this.map_substrate_storage_type_to_bq_schematype(t.sequence.type);
+            let seq_type = this.lookup_runtime_type(runtime, t.sequence.type);
+            let seq_type_def = seq_type && seq_type.def && seq_type.def.primitive;
+            if (seq_type_def == "U8") {
+                return ["string", t]; // hex bytes
+            } else {
+                t.sequence.def = seq_type.def;
+                return ["json", t];
+            }
+        } else if (t.array && t.array.type !== undefined) {
+            let array_type = this.lookup_runtime_type(runtime, t.array.type);
+            let array_type_def = array_type && array_type.def && array_type.def.primitive;
+            if (array_type_def == "U8") {
+                return ["string", t]; // hex bytes
+            } else {
+                return ["json", t];
+            }
+        } else if (t.historicMetaCompat) {
+            return ["json", t];
+        } else if (t.primitive) {
+            let res = null
+            switch (t.primitive) {
+                case "U8":
+                case "U16":
+                case "U32":
+                case "I8":
+                case "I16":
+                case "I32":
+                    res = "integer";
+                    break;
+                case "Bool":
+                    res = "boolean";
+                    break;
+                case "U64":
+                case "U128":
+                case "I64":
+                case "I128":
+                    res = "string"
+                    break;
+                default:
+                    console.log("UNKNOWN PRIMITIVE", t.primitive);
+            }
+            return [res, t.primitive];
+        }
+        console.log("map_substrate_storage_type_to_bq_schematype MISSING", t);
+        return ["unk", "unk"]
 
-		sch.push({
-		    "name": "chain_id",
-		    "type": "string"
-		});
-		sch.push({
-		    "name": "block_time",
-		    "type": "timestamp"
-		});
-		sch.push({
-		    "name": "relay_chain",
-		    "type": "string"
-		});
-		sch.push({
-		    "name": "para_id",
-		    "type": "integer"
-		});
-		sch.push({
-		    "name": "extrinsic_id",
-		    "type": "string"
-		});
-		sch.push({
-		    "name": "extrinsic_hash",
-		    "type": "string"
-		});
-		if (group == "evt") {
-		    sch.push({
-			"name": "event_id",
-			"type": "string"
-		    })
-		    protected_flds.push("event_id");
-		} else {
-		    sch.push({
-			"name": "call_id",
-			"type": "string"
-		    });
-		    sch.push({
-			"name": "signer_ss58",
-			"type": "string"
-		    });
-		    sch.push({
-			"name": "signer_pub_key",
-			"type": "string"
-		    });
-		    protected_flds.push("call_id", "signer_ss58", "signer_pub_key");
-		}
-		let fields = sm.fields;
-		fields.forEach((f, idx) => {
-		    let out = this.map_substratetype_to_bq_schematypes(f, idx);
-		    for (const o of out) {
-			if ( protected_flds.includes(o.name) ) {
-			    o.name = `renamed_${o.name}`
-			    console.log("RENAME", sm);
-			}
-			sch.push(o);
-		    }
-		});
-		tables[tableId] = sch
-		if ( createTable ) {
-		    try {
-			console.log("CREATE", tableId);
-			const [table] = await bigquery
-			      .dataset(datasetId)
-			      .createTable(tableId, {
-				  schema: sch,
-				  location: 'us-central1',
-				  description: table_description,
-				  timePartitioning: {
-				      type: 'HOUR',
-				      expirationMS: '7776000000', // 90d
-				      field: 'block_time',
-				  },
-			      });
-			console.log("DONE", tableId);
-		    } catch (e) {
-			console.log(e);
-		    }
-		}
-	    }
-	}
     }
-    
+
+    async setup_pallet(runtime, group, section, section_methods, tables, datasetId, bigquery, createTable = true) {
+        if (!Array.isArray(section_methods)) return (false);
+        for (const sm of section_methods) {
+            let method = sm.name;
+            let table_description = sm.docs ? sm.docs.join("") : "";
+            let fingerprintId = "_0x"; // TODO: hash of section_methods signature
+            const tableId = `${group}_${section}_${method}`;
+            if (tables[tableId] == undefined) {
+                const sch = [];
+                let protected_flds = ["chain_id", "block_time", "relay_chain", "para_id", "extrinsic_id", "extrinsic_hash"];
+
+                sch.push({
+                    "name": "chain_id",
+                    "type": "string"
+                });
+                sch.push({
+                    "name": "block_time",
+                    "type": "timestamp"
+                });
+                sch.push({
+                    "name": "relay_chain",
+                    "type": "string"
+                });
+                sch.push({
+                    "name": "para_id",
+                    "type": "integer"
+                });
+                sch.push({
+                    "name": "extrinsic_id",
+                    "type": "string"
+                });
+                sch.push({
+                    "name": "extrinsic_hash",
+                    "type": "string"
+                });
+                if (group == "evt") {
+                    sch.push({
+                        "name": "event_id",
+                        "type": "string"
+                    })
+                    protected_flds.push("event_id");
+                } else {
+                    sch.push({
+                        "name": "call_id",
+                        "type": "string"
+                    });
+                    sch.push({
+                        "name": "signer_ss58",
+                        "type": "string"
+                    });
+                    sch.push({
+                        "name": "signer_pub_key",
+                        "type": "string"
+                    });
+                    protected_flds.push("call_id", "signer_ss58", "signer_pub_key");
+                }
+                let fields = sm.fields;
+                fields.forEach((f, idx) => {
+                    let out = this.map_substratetype_to_bq_schematypes(f, idx);
+                    for (const o of out) {
+                        if (protected_flds.includes(o.name)) {
+                            o.name = `renamed_${o.name}`
+                            console.log("RENAME", sm);
+                        }
+                        sch.push(o);
+                    }
+                });
+                tables[tableId] = sch
+                if (createTable) {
+                    try {
+                        console.log("CREATE", tableId);
+                        const [table] = await bigquery
+                            .dataset(datasetId)
+                            .createTable(tableId, {
+                                schema: sch,
+                                location: 'us-central1',
+                                description: table_description,
+                                timePartitioning: {
+                                    type: 'HOUR',
+                                    expirationMS: '7776000000', // 90d
+                                    field: 'block_time',
+                                },
+                            });
+                        console.log("DONE", tableId);
+                    } catch (e) {
+                        console.log(e);
+                    }
+                }
+            }
+        }
+    }
+
     async setupCallEvents() {
         const bigquery = this.get_big_query();
         // read the set of call + event tables 
         const datasetId = `substrate_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};
         let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%' or table_name like 'evt_%' or table_name like 'storage_%'`);
-	let ntables = 0;
+        let ntables = 0;
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
                 tables[t.table_name] = {};
-		ntables++;
+                ntables++;
             }
             tables[t.table_name][t.column_name] = t.data_type;
         }
-	console.log("TABLES LOADED", ntables);
-	// fetch metadata of latest specVersion
-	let sql = `select specVersions.chainID, l.specVersion, convert(metadata using utf8) as metadata from chain, specVersions, (select chainID, max(specVersion) specVersion from specVersions group by chainID) as l where specVersions.chainID = l.chainID and specVersions.specVersion = l.specVersion and chain.chainID = specVersions.chainID and chain.crawling = 1`;
-	let recs = await this.poolREADONLY.query(sql);
-	let specVersions = {};
-	for ( const r of recs ) {
-	    let chainID = r.chainID
-	    let latestRuntime = JSON.parse(r.metadata);
-	    if  ( latestRuntime.pallets ) {
-		for ( const pallet  of latestRuntime.pallets) {
-		    let section = pallet.name;
-		    let callsRaw = pallet.calls && pallet.calls.type ? this.lookup_runtime_type(latestRuntime, pallet.calls.type) : null;
-		    let calls = callsRaw && callsRaw.def && callsRaw.def.variant && callsRaw.def.variant.variants;
-		    let eventsRaw = pallet.events && pallet.events.type ? this.lookup_runtime_type(latestRuntime, pallet.events.type) : null;
-		    let events = eventsRaw && eventsRaw.def && eventsRaw.def.variant && eventsRaw.def.variant.variants;
-		    await this.setup_pallet(latestRuntime, "call", section,  calls, tables, datasetId, bigquery);
-		    await this.setup_pallet(latestRuntime,  "evt", section, events, tables, datasetId, bigquery);
-		    
-		    if ( pallet.storage && pallet.storage.items ) {
-			for (const item of pallet.storage.items) {
-			    await this.setup_storage_item(latestRuntime, section, item, tables, datasetId, bigquery);
-			}
-		    }
-		}
+        console.log("TABLES LOADED", ntables);
+        // fetch metadata of latest specVersion
+        let sql = `select specVersions.chainID, l.specVersion, convert(metadata using utf8) as metadata from chain, specVersions, (select chainID, max(specVersion) specVersion from specVersions group by chainID) as l where specVersions.chainID = l.chainID and specVersions.specVersion = l.specVersion and chain.chainID = specVersions.chainID and chain.crawling = 1`;
+        let recs = await this.poolREADONLY.query(sql);
+        let specVersions = {};
+        for (const r of recs) {
+            let chainID = r.chainID
+            let latestRuntime = JSON.parse(r.metadata);
+            if (latestRuntime.pallets) {
+                for (const pallet of latestRuntime.pallets) {
+                    let section = pallet.name;
+                    let callsRaw = pallet.calls && pallet.calls.type ? this.lookup_runtime_type(latestRuntime, pallet.calls.type) : null;
+                    let calls = callsRaw && callsRaw.def && callsRaw.def.variant && callsRaw.def.variant.variants;
+                    let eventsRaw = pallet.events && pallet.events.type ? this.lookup_runtime_type(latestRuntime, pallet.events.type) : null;
+                    let events = eventsRaw && eventsRaw.def && eventsRaw.def.variant && eventsRaw.def.variant.variants;
+                    await this.setup_pallet(latestRuntime, "call", section, calls, tables, datasetId, bigquery);
+                    await this.setup_pallet(latestRuntime, "evt", section, events, tables, datasetId, bigquery);
+
+                    if (pallet.storage && pallet.storage.items) {
+                        for (const item of pallet.storage.items) {
+                            await this.setup_storage_item(latestRuntime, section, item, tables, datasetId, bigquery);
+                        }
+                    }
+                }
             }
         }
     }
 
     lookup_runtime_type(runtime, type_id) {
-	let lookup = runtime.lookup;
-	if ( runtime.lookup && runtime.lookup.types ) {
-	    for ( const t of runtime.lookup.types ) {
-		if ( t.id == type_id ) {
-		    return(t.type);
-		}
-	    }
-	}
+        let lookup = runtime.lookup;
+        if (runtime.lookup && runtime.lookup.types) {
+            for (const t of runtime.lookup.types) {
+                if (t.id == type_id) {
+                    return (t.type);
+                }
+            }
+        }
     }
-    
+
 }

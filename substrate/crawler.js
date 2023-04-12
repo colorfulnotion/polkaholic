@@ -2172,15 +2172,15 @@ module.exports = class Crawler extends Indexer {
             this.readyToCrawlParachains = true;
         }
         if (chainID == 1 || chainID == 10 || chainID == 56 || chainID == 137 || chainID == 42161 || chainID == 43114) {
-	    //console.log("loading evm");
-	    //await this.load_calls_events("evm_dev");
+            //console.log("loading evm");
+            //await this.load_calls_events("evm_dev");
             this.crawlEVM(chainID);
             return [null, null, null];
         } else {
-	    console.log("loading substrate");
-	    await this.load_calls_events("substrate_dev");
-	}
-	
+            console.log("loading substrate");
+            await this.load_calls_events("substrate_dev");
+        }
+
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
         await this.check_chain_endpoint_correctness(chain);
