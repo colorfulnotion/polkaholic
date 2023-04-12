@@ -2726,4 +2726,5 @@ module.exports = {
     buildSchemaInfoFromFingerPrintID: build_schema_info_from_fingerPrintID,
     mapABITypeToBqType: mapABITypeToBqType,
     computeTableId: computeTableId,
+    createEvmSchema: createEvmSchema,
 };
