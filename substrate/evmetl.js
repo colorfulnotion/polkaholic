@@ -92,30 +92,19 @@ function dechex(number) {
 
 module.exports = class EVMETL extends PolkaholicDB {
     methodMap = {};
-
+    
+    async getStorageAt(storageSlot, address, chainID = 1) {
+	console.log("getStorageAt", storageSlot, address, chainID);
+	const ethers = require('ethers');
+	let chain = await this.getChain(chainID);
+	const contract = new ethers.Contract(address, [], new ethers.providers.JsonRpcProvider(chain.RPCBackfill));
+	let storageValue = await contract.provider.getStorageAt(address, storageSlot);
+	return {address, storageSlot, storageValue}
+    }
+    
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
-        let cmd = null;
-        console.log("CRAWLABI", address, chainID, project, contractName);
-        switch (chainID) {
-            case 1:
-                cmd = `curl -k -s -X GET 'https://api.etherscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["ethereum"]}'`;
-                break;
-            case 10:
-                cmd = `curl -k -s -X GET 'https://api-optimistic.etherscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["optimism"]}'`;
-                break;
-            case 2004:
-                cmd = `curl -k -s -X GET 'https://api-moonbeam.moonscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["moonbeam"]}'`;
-                break;
-            case 137:
-                cmd = `curl -k -s -X GET 'https://api.polygonscan.com/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["polygon"]}'`;
-                break;
-            case 42161:
-                cmd = `curl -k -s -X GET 'https://api.arbiscan.io/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS["arbitrum"]}'`;
-                break;
-            case 43114:
-                cmd = `curl -k -s -X GET 'api.avascan.info/v2/network/mainnet/evm/${chainID}/etherscan?module=contract&action=getabi&address=${address}'`;
-                break;
-        }
+	let chain = await this.getChain(chainID);
+        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
         if (cmd == null) {
             console.log("No api available for chainID", chainID);
             return (false);
@@ -160,21 +149,19 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
         if (abiRaw) {
             let abi = JSON.parse(j.result);
-            if (this.is_proxy_abi(abi)) {
-                let proxyAddress = await this.fetch_proxyAddress(address, abi, chainID)
-                if (proxyAddress && proxyAddress != "0x0000000000000000000000000000000000000000") {
-                    let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
-                    if (proxyABI) {
-                        console.log("proxyABI", proxyABI);
-                        j = proxyABI;
-                        vals.push('proxyAddress');
-                        flds.push(`${mysql.escape(proxyAddress)}`);
-                        replace.push("proxyAddress");
-
-                        vals.push('proxyAddressLastUpdateDT');
-                        flds.push(`Now()`);
-                        replace.push("proxyAddressLastUpdateDT");
-                    }
+	    let proxyAddress = null;
+            if ( proxyAddress = await this.get_proxy_address(address, chainID) ) {
+                let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
+                if (proxyABI) {
+                    console.log("proxyABI", proxyABI);
+                    j = proxyABI;
+                    vals.push('proxyAddress');
+                    flds.push(`${mysql.escape(proxyAddress)}`);
+                    replace.push("proxyAddress");
+		    
+                    vals.push('proxyAddressLastUpdateDT');
+                    flds.push(`Now()`);
+                    replace.push("proxyAddressLastUpdateDT");
                 }
             }
 
@@ -198,38 +185,27 @@ module.exports = class EVMETL extends PolkaholicDB {
         return j;
     }
 
-    async fetch_proxyAddress(address, abi, chainID) {
-        let ethers = require("ethers");
-        try {
-            let chain = await this.getChain(chainID);
-            const provider = new ethers.providers.JsonRpcProvider(chain.RPCBackfill);
-            const signer = new ethers.Wallet("0x3a59a6348c33937f34716cd37dbb41f24d305e2b1a10c01690b6073ff8a28e12", provider) // dummy
-            const contract = new ethers.Contract(address, abi, signer);
-            const implementation = await contract.implementation()
-            return implementation;
-        } catch (err) {
-            console.log(err);
-        }
-        return null
+    get_address_from_storage_value(storageVal) {
+	return storageVal.length < 40 ? storageVal : "0x" + storageVal.slice(-40);
     }
-
-
-    is_proxy_abi(abi) {
-        for (const a of abi) {
-            if (a.name == "implementation" && a.stateMutability == 'view') {
-                return (true);
-            }
-        }
+    
+    async get_proxy_address(address, chainID) {
+	// https://eips.ethereum.org/EIPS/eip-1967
+	let logic = await this.getStorageAt("0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc", address, chainID);
+	let beacon = await this.getStorageAt("0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50", address, chainID);
+	if ( logic.storageValue != "0x0000000000000000000000000000000000000000000000000000000000000000" ) {
+	    return this.get_address_from_storage_value(logic.storageValue);
+	} 
+	if ( beacon.storageValue != "0x0000000000000000000000000000000000000000000000000000000000000000" ) {
+	    return this.get_address_from_storage_value(logic.storageValue);
+	} 
         return (false);
     }
 
     async getTokenInfo(address = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2", chainID = 1) {
         const util = require("util");
         const exec = util.promisify(require("child_process").exec);
-
-        const url = "https://api.etherscan.io/api?module=token&action=tokeninfo&contractaddress=${address}&apikey=CMKYIM5MEM2IH7CTTADGFKW47P3SMKDF6D";
-        const cmd = "curl -k -s -X GET '" + url + "'";
-
+        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=token&action=tokeninfo&contractaddress=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
         const {
             stdout,
             stderr
