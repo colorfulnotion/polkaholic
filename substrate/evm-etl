@@ -55,7 +55,7 @@ async function main() {
             let isUpdate = (opt.update) ? true : false
             let isAll = (opt.all) ? true : false
             if (chainID != undefined) chainID = myParseInt(chainID)
-            await substrateetl.setup_chain_evm(chainID, isUpdate);
+            await evmetl.setup_chain_evm(chainID, isUpdate);
             process.exit(0);
         })
 
@@ -92,9 +92,11 @@ async function main() {
 
     program.command('callevents')
         .description(`Generate schemas for calls+events`)
+        .option('-c, --create', `crate table schema mode`, false)
         .action(async (opt) => {
             var evmetl = new EVMETL();
-	    await evmetl.setupCallEvents();
+            let isCreate = (opt.create) ? true : false
+	        await evmetl.setupCallEvents(isCreate);
             process.exit(0);
         });
 

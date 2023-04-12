@@ -496,7 +496,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         return [];
     }
 
-    async setupCallEvents() {
+    async setupCallEvents(isCeateTable = false) {
         const bigquery = new BigQuery({
             projectId: 'substrate-etl',
             keyFilename: this.BQ_SUBSTRATEETL_KEY
@@ -514,13 +514,13 @@ module.exports = class EVMETL extends PolkaholicDB {
             // TODO: get description for full ABI
         }
 
-        let createTable = true;
         let sql = `select name, fingerprintID, CONVERT(signature using utf8) as signature, CONVERT(signatureRaw using utf8) as signatureRaw, CONVERT(abi using utf8) as abi from contractabi limit 100000;`
         var res = await this.poolREADONLY.query(sql);
         for (const r of res) {
             let abi = JSON.parse(r.abi);
+            let a = abi[0]
             let fingerprintID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 10).replaceAll("-", "_")
-            let schema = ethTool.createEvmSchema(methodABIStr, fingerprintID)
+            let schema = ethTool.createEvmSchema(abi, fingerprintID)
             let sch = schema.schema
             let tableId = schema.tableId
             let timePartitioning = schema.timePartitioning
@@ -536,7 +536,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             */
 
             tables[tableId] = sch;
-            if (createTable) {
+            if (isCeateTable) {
                 const [table] = await bigquery
                     .dataset(datasetId)
                     .createTable(tableId, {
@@ -544,6 +544,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                         location: 'us-central1',
                         timePartitioning: timePartitioning,
                     });
+            }else{
+                console.log(`****\nNew Schema ${tableId}\n`, sch, `\n*****\n`)
             }
 
 /*
