@@ -2124,12 +2124,12 @@ module.exports = class Crawler extends Indexer {
                     }
                 } while (!block && block_tries < 10)
                 let numTransactions = block && block.transactions ? block.transactions.length : 0;
-                console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                 let rows_blocks = [];
                 let rows_transactions = [];
                 let rows_logs = [];
                 try {
                     if (numTransactions >= 0) {
+                        console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                         let isParallel = true
                         let log_tries = 0
                         let evmReceipts = false

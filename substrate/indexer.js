@@ -205,29 +205,6 @@ module.exports = class Indexer extends AssetManager {
     parentRelayCrawler = false;
     parentManager = false;
 
-    //TODO: REMOVE THIS
-    async execute_bqJob(sqlQuery, fn = false) {
-        // run bigquery job with suitable credentials
-        const bigqueryClient = new BigQuery();
-        const options = {
-            query: sqlQuery,
-            location: 'us-central1',
-        };
-
-        try {
-            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
-            const response = await bigqueryClient.createQueryJob(options);
-            const job = response[0];
-            const [rows] = await job.getQueryResults();
-            return rows;
-        } catch (err) {
-            console.log(err);
-            throw new Error(`An error has occurred.`, sqlQuery);
-        }
-        return [];
-    }
-
-
     setDebugLevel(debugLevel = paraTool.debugNoLog) {
         this.debugLevel = debugLevel
     }
@@ -8524,7 +8501,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async setupEvmCallEventSchemaInfo(signature, fingerprintID, contractABIs, contractABISignatures) {
-        //TODO
+        //TODO: unknown fingerprintID is just ignore and we are not bothered to decode again - need refresh strategy
         if (this.evmUnknownFingerprintMap[fingerprintID]){
             return false
         }
@@ -8850,7 +8827,16 @@ module.exports = class Indexer extends AssetManager {
                         timePartitioning: timePartitioning,
                     });
             } catch (err){
-                console.log(`${evmDatasetID}:${schemaTableId} Skip -`, err.toString())
+                let errorStr = err.toString()
+                if (!errorStr.includes('Already Exists')){
+                    console.log(`${evmDatasetID}:${schemaTableId} Error`, errorStr, `\nSchema:`, sch)
+                    this.logger.error({
+                        op: "auto_evm_schema_create",
+                        tableId: `${schemaTableId}`,
+                        error: errorStr,
+                        schema: sch
+                    })
+                }
             }
         }
 
@@ -8858,7 +8844,7 @@ module.exports = class Indexer extends AssetManager {
         console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
         for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
-            console.log(`${evmDatasetID}:${tableId} row`, rows)
+            //console.log(`${evmDatasetID}:${tableId} row`, rows)
             try {
                 if (rows && rows.length > 0) {
                     await bigquery
@@ -8870,7 +8856,16 @@ module.exports = class Indexer extends AssetManager {
                         console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
                 }
             } catch (err){
-                console.log(`tableId=${tableId}, err=`, err.toString()); // TODO: logger
+                let errorStr = err.toString()
+                if (!errorStr.includes('Already Exists')){
+                    console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
+                    this.logger.error({
+                        op: "auto_evm_row_insert",
+                        tableId: `${tableId}`,
+                        error: errorStr,
+                        rows: rows
+                    })
+                }
             }
         }
     }

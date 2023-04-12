@@ -592,7 +592,16 @@ module.exports = class EVMETL extends PolkaholicDB {
                             timePartitioning: timePartitioning,
                         });
                 } catch (err){
-                    console.log(`Skip -`,err.toString())
+                    let errorStr = err.toString()
+                    if (!errorStr.includes('Already Exists')){
+                        console.log(`${datasetId}:${tableId} Error`, errorStr)
+                        this.logger.error({
+                            op: "setupCallEvents:auto_evm_schema_create",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            schema: sch
+                        })
+                    }
                 }
             }else{
                 console.log(`*****\nNew Schema #${i} ${tableId}\n`, sch, `\n`)
