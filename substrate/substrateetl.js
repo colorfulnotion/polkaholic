@@ -49,9 +49,6 @@ const {
     hexToBn,
     bnToBn
 } = require("@polkadot/util");
-const {
-    BigQuery
-} = require('@google-cloud/bigquery');
 const fetch = require("node-fetch");
 
 // first day when balances are available daily in modern ways from Kusama
@@ -692,26 +689,6 @@ module.exports = class SubstrateETL extends AssetManager {
         }
     }
 
-    async execute_bqJob(sqlQuery, fn = false) {
-        // run bigquery job with suitable credentials
-        const bigqueryClient = new BigQuery();
-        const options = {
-            query: sqlQuery,
-            location: 'us-central1',
-        };
-
-        try {
-            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
-            const response = await bigqueryClient.createQueryJob(options);
-            const job = response[0];
-            const [rows] = await job.getQueryResults();
-            return rows;
-        } catch (err) {
-            console.log(err);
-            throw new Error(`An error has occurred.`, sqlQuery);
-        }
-        return [];
-    }
     async getFinalizedBlockInfo(chainID, api, logDT) {
         let done = false;
         let finalizedBlockHash = null;
@@ -5324,10 +5301,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     }
     
     async setupCallEvents() {
-        const bigquery = new BigQuery({
-            projectId: 'substrate-etl',
-            keyFilename: this.BQ_SUBSTRATEETL_KEY
-        });
+        const bigquery = this.get_big_query();
         // read the set of call + event tables 
         const datasetId = `substrate_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};

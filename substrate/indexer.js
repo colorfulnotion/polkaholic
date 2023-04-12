@@ -6564,13 +6564,7 @@ module.exports = class Indexer extends AssetManager {
 
     async bq_streaming_insert_finalized_block(b) {
         if (this.BQ_SUBSTRATEETL_KEY == null) return;
-        const {
-            BigQuery
-        } = require('@google-cloud/bigquery');
-        const bigquery = new BigQuery({
-            projectId: 'substrate-etl',
-            keyFilename: this.BQ_SUBSTRATEETL_KEY
-        })
+        const bigquery = this.get_big_query();
         let chainID = this.chainID
         let relayChain = paraTool.getRelayChainByChainID(chainID);
         let paraID = paraTool.getParaIDfromChainID(chainID);
@@ -6778,6 +6772,9 @@ module.exports = class Indexer extends AssetManager {
                         signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
                     }
                     if (this.suppress_call(id, call.section, call.method)) {} else {
+
+			console.log("PREPARE WRITE CALL", bqExtrinsicCall);
+			
                         calls.push({
                             insertId: `${relayChain}-${paraID}-${ext.extrinsicID}-${call.id}`,
                             json: bqExtrinsicCall
@@ -6867,13 +6864,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
         try {
-            const {
-                BigQuery
-            } = require('@google-cloud/bigquery');
-            const bigquery = new BigQuery({
-                projectId: 'substrate-etl',
-                keyFilename: this.BQ_SUBSTRATEETL_KEY
-            })
+            const bigquery = this.get_big_query();
             await bigquery
                 .dataset(relayChain)
                 .table("xcm")
@@ -7119,6 +7110,7 @@ module.exports = class Indexer extends AssetManager {
         }
         return xcmList
     }
+
 
     async processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts = false, evmTrace = false, autoTraces = false, finalized = false, unused = false, isTip = false, tracesPresent = false) {
         //processExtrinsic + processBlockAndReceipt + processEVMFullBlock
@@ -8120,13 +8112,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0) || (traces.length > 0))) {
-            const {
-                BigQuery
-            } = require('@google-cloud/bigquery');
-            const bigquery = new BigQuery({
-                projectId: 'substrate-etl',
-                keyFilename: this.BQ_SUBSTRATEETL_KEY
-            })
+            const bigquery = this.get_big_query();
             let tables = ["balanceupdates", "assetupdates", "traces", "tokentransfer"];
             for (const t of tables) {
                 let rows = null;
@@ -8395,13 +8381,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID) {
-        const {
-            BigQuery
-        } = require('@google-cloud/bigquery');
-        const bigquery = new BigQuery({
-            projectId: 'substrate-etl',
-            keyFilename: this.BQ_SUBSTRATEETL_KEY
-        })
+        const bigquery = this.get_big_query();
         let chain = await this.getChain(chainID);
         let contractABIs = (this.contractABIs) ? this.contractABIs : await this.getContractABI();
         let rows_blocks = [];
@@ -8558,13 +8538,7 @@ module.exports = class Indexer extends AssetManager {
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
         const Web3 = require('web3')
-        const {
-            BigQuery
-        } = require('@google-cloud/bigquery');
-        const bigquery = new BigQuery({
-            projectId: 'substrate-etl',
-            keyFilename: this.BQ_SUBSTRATEETL_KEY
-        })
+        const bigquery = this.get_big_query();
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }

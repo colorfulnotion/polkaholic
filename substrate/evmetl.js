@@ -4,9 +4,6 @@ var SqlString = require('sqlstring');
 const util = require('util');
 // Uses Ankr API to crawl blocks for ETH style chains to store blocks and txs in the BASEDIR
 const exec = util.promisify(require('child_process').exec);
-const {
-    BigQuery
-} = require('@google-cloud/bigquery');
 
 const ethTool = require("./ethTool");
 
@@ -488,32 +485,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
-    async execute_bqJob(sqlQuery, fn = false) {
-        // run bigquery job with suitable credentials
-        const bigqueryClient = new BigQuery();
-        const options = {
-            query: sqlQuery,
-            location: 'us-central1',
-        };
-
-        try {
-            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
-            const response = await bigqueryClient.createQueryJob(options);
-            const job = response[0];
-            const [rows] = await job.getQueryResults();
-            return rows;
-        } catch (err) {
-            console.log(err);
-            throw new Error(`An error has occurred.`, sqlQuery);
-        }
-        return [];
-    }
-
     async setupCallEvents() {
-        const bigquery = new BigQuery({
-            projectId: 'substrate-etl',
-            keyFilename: this.BQ_SUBSTRATEETL_KEY
-        });
+        const bigquery = this.get_big_query();
         // read the set of call + event tables 
 
         const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way

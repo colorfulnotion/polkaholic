@@ -19,6 +19,9 @@ const ini = require('node-ini');
 const {
     Bigtable
 } = require("@google-cloud/bigtable");
+const {
+    BigQuery
+} = require('@google-cloud/bigquery');
 const stream = require("stream");
 const paraTool = require("./paraTool.js");
 const mysql = require("mysql2");
@@ -71,10 +74,11 @@ module.exports = class PolkaholicDB {
 
     EXTERNAL_WS_PROVIDER_URL = null;
     EXTERNAL_WS_PROVIDER_KEY = null;
+    WSProviderQueue = {};
 
     BQ_SUBSTRATEETL_KEY = null;
-
-    WSProviderQueue = {};
+    bigQuery = null;
+    bqTablesCallsEvents = null;
 
     constructor(serviceName = "polkaholic") {
 
@@ -216,7 +220,6 @@ module.exports = class PolkaholicDB {
 
         this.btAPIKeys = this.instance.table(tableAPIKeys);
     }
-
 
     convert_dbconfig(c) {
         return {
@@ -889,6 +892,53 @@ from chain where chainID = '${chainID}' limit 1`);
         this.isConneted = false
         this.isErrored = true
         this.disconnectedCnt += 1
+    }
+
+    get_big_query() {
+	if ( this.bigQuery ) return this.bigQuery;
+	this.bigQuery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+	})
+	return this.bigQuery;
+    }
+    
+    async execute_bqJob(sqlQuery, fn = false) {
+        // run bigquery job with suitable credentials
+        const bigqueryClient = this.get_big_query();
+        const options = {
+            query: sqlQuery,
+            location: 'us-central1',
+        };
+
+        try {
+            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
+            const response = await bigqueryClient.createQueryJob(options);
+            const job = response[0];
+            const [rows] = await job.getQueryResults();
+            return rows;
+        } catch (err) {
+            console.log(err);
+            throw new Error(`An error has occurred.`, sqlQuery);
+        }
+        return [];
+    }
+
+    async load_calls_events(datasetId = "substrate_dev") {
+        const bigquery = this.get_big_query()
+	let sql = `select table_name, column_name, data_type, ordinal_position, is_nullable from substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS where ( table_name like 'call_%' or table_name like 'evt_%' ) and column_name not in ("chain_id", "block_time", "relay_chain", "para_id", "extrinsic_id", "extrinsic_hash", "call_id", "signer_ss58", "signer_pub_key") limit 1000000`;
+	let columns = await this.execute_bqJob(sql);
+	this.bqTablesCallsEvents = {}
+	for (const c of columns) {
+	    let sa = c.table_name.split("_");
+	    if ( this.bqTablesCallsEvents[c.table_name] == undefined ) {
+		this.bqTablesCallsEvents[c.table_name] = {
+		    columns: [],
+		    description: null
+		};
+	    }
+	    this.bqTablesCallsEvents[c.table_name].columns.push(c);
+	}
     }
 
     async get_api(chain, useWSBackfill = false) {
