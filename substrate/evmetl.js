@@ -315,11 +315,32 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log("function - signature types", f_typeCnt);
     }
 
-    async reloadABI() {
-        let sql = `select abiType, name, signatureID, abi from contractabi where outdated = 1;`
-        //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
+    async reloadABI(targetSQL = null) {
+        let sql = (targetSQL != undefined)? targetSQL :  `select abiType, name, signatureID, abi from contractabi where outdated = 1 order by numContracts desc;`
         var res = await this.poolREADONLY.query(sql);
+        let i = 0;
+        let n = 0
+        let batchSize = 100; // safety check
+        while (i < res.length) {
+            let currBatch = res.slice(i, i + batchSize);
+            console.log(`currBatch#${n}`, currBatch)
+            if (currBatch.length > 0) {
+                let abiABI = []
+                for (const r of currBatch){
+                    let abiStr = r.abi.toString('utf8')
+                    let abi = JSON.parse(abiStr)[0]
+                    abiABI.push(abi)
+                }
+                await this.loadABI(JSON.stringify(abiABI))
+                i += batchSize;
+                n++
+            }
+        }
+
+        /*
         if (res.length > 0) {
+            let batchSize = 100
+            let batchSize
             for (let i = 0; i < res.length; i++) {
                 let r = res[i]
                 let abiType = r.abiType
@@ -332,6 +353,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         } else {
             return false
         }
+        */
     }
 
     async abiAnalytics() {
@@ -433,10 +455,6 @@ module.exports = class EVMETL extends PolkaholicDB {
         */
         console.log(`dump_contract_abi len=${abiRows.length}`);
         await this.update_batchedSQL(true);
-    }
-
-    async reloadABI() {
-
     }
 
     async setup_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {

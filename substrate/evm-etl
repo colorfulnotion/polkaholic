@@ -55,6 +55,15 @@ async function main() {
 	    process.exit(0);
         });
 
+    program.command('reloadabi')
+        .description(`Reload ABI`)
+        .option('-s, --sql <targetSQL>', 'Target SQL', null)
+        .action(async (abistr, opt) => {
+    	let evmetl = new EVMETL();
+    	await evmetl.reloadABI(opt.sql);
+    	process.exit(0);
+        });
+
     program.command('setupevm')
         .description("Setup or update BigQuery tables for EVM Chain. Use -u to update tbl schema")
         .usage("-c 137")
