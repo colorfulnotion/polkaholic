@@ -1456,11 +1456,17 @@ function parseAbiSignature(abiStrArr) {
         let signatureRaw = getMethodSignatureRaw(e)
         let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
         let fingerprint = getMethodFingureprint(e)
-        let fingerprintID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint)
+        /*
+        previous fingerprintID is now secondaryID, which is NOT unique
+        New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
+        */
+        let secondaryID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) // this is NOT Unique
+        let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
         let abiStr = JSON.stringify([e])
         output.push({
             fingerprint: fingerprint,
             fingerprintID: fingerprintID,
+            secondaryID: secondaryID,
             signatureID: signatureID,
             signatureRaw: signatureRaw,
             signature: signature,

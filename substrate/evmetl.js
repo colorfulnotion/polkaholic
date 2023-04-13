@@ -315,6 +315,25 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log("function - signature types", f_typeCnt);
     }
 
+    async reloadABI() {
+        let sql = `select abiType, name, signatureID, abi from contractabi where outdated = 1;`
+        //if (this.debugLevel >= paraTool.debugTracing) console.log(`getBlockRangebyTS`, sql)
+        var res = await this.poolREADONLY.query(sql);
+        if (res.length > 0) {
+            for (let i = 0; i < res.length; i++) {
+                let r = res[i]
+                let abiType = r.abiType
+                let name = r.name
+                let signatureID = r.signatureID
+                let abiABIStr = r.abi.toString('utf8')
+                console.log(`[#${i}] [${abiType}] [${signatureID}] ${name}`, abiABIStr)
+                await this.loadABI(abiABIStr)
+            }
+        } else {
+            return false
+        }
+    }
+
     async abiAnalytics() {
         let sql = `select CONVERT(abi using utf8) as abi from contractabi`
         var res = await this.poolREADONLY.query(sql);
@@ -382,26 +401,42 @@ module.exports = class EVMETL extends PolkaholicDB {
                 numContractsTally[fingerprintID]++;
             }
         });
-        return
+        //return
         let abiRows = [];
         for (const fingerprintID of Object.keys(sigs)) {
             let data = sigs[fingerprintID];
             let numContracts = numContractsTally[fingerprintID];
             //fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength
-            let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}', '1')`
+            let row = `('${data.fingerprintID}', '${data.secondaryID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${data.topicLength}', '1', '0', NOW())`
             abiRows.push(row);
             console.log(`[${data.name}] ${row}`)
         }
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": "contractabi",
+            "keys": ["fingerprintID"],
+            "vals": ["secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", "firstSeenDT"],
+            "data": abiRows,
+            "replace": ["secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", ],
+            "replaceIfNull": ["firstSeenDT"]
+        }, sqlDebug);
+
         console.log(abiRows.length + " records");
+        /*
         for (let i = 0; i < abiRows.length; i += 2000) {
             let j = i + 10000;
             if (j > abiRows.length) j = abiRows.length;
-            let sql = "insert into contractabi (fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength, audited) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength), audited = values(audited)";
+            let sql = "insert into contractabi (fingerprintID, secondaryID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength, audited) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength), audited = values(audited)";
             console.log(`sql`, sql)
             this.batchedSQL.push(sql)
         }
+        */
         console.log(`dump_contract_abi len=${abiRows.length}`);
         await this.update_batchedSQL(true);
+    }
+
+    async reloadABI() {
+
     }
 
     async setup_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
