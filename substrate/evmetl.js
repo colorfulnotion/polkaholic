@@ -634,4 +634,28 @@ module.exports = class EVMETL extends PolkaholicDB {
             }
         }
     }
+
+    async updateContractTypes(chainID)
+    {
+	let contractTypeABIs = await this.poolREADONLY.query('select contractType, CONVERT(abiRaw using utf8) abiRaw from contractType');
+	let abimethods = {};
+	for ( const c of contractTypeABIs ) {
+	    if ( abimethods[c.contractType] == undefined ) {
+		abimethods[c.contractType] = {
+		    calls: [],
+		    evts: []
+		}
+	    }
+	    let a = c.abiRaw;
+	    // TODO: get all methodIDs of abi that are perfectly predictive
+
+	    // TODO: get the methods which are the ones we will test with (e.g symbols, decimals), store in "asset"
+
+	}
+
+	// Now, for the last 7 days with contractaddress-methodID combinations, find the contractAddresses using those methodIDs
+	// if any are unknown, then 
+	
+	
+    }
 }
