@@ -7,6 +7,9 @@ const exec = util.promisify(require('child_process').exec);
 
 const ethTool = require("./ethTool");
 
+const fs = require('fs');
+const readline = require('readline');
+
 // Function: mint(address poolToken,uint256 amount,address to,uint256 deadline)
 // MethodID: 0x3c173a4f
 // [0]:  000000000000000000000000e69c2c761931c4bf719cf5931af37c6a09889d06
@@ -382,6 +385,62 @@ module.exports = class EVMETL extends PolkaholicDB {
         await this.update_batchedSQL(true);
     }
 
+    async setup_dataset(detasetID=`evm_dev`, projectID = `substrate-etl`){
+        let cmd = `bq --location=us-central1 mk --dataset --description="DESCRIPTION" ${projectID}:${detasetID}`
+        try {
+            console.log(cmd);
+            //await exec(cmd);
+        } catch (e) {
+            // TODO optimization: do not create twice
+        }
+    }
+
+    async delete_dataset(detasetID=`evm_dev`, projectID = `substrate-etl`){
+        //Dengerous!
+        let cmd = `bq rm -r -d ${projectID}:${detasetID}`
+        try {
+            console.log(cmd);
+        } catch (e) {
+            // TODO optimization: do not create twice
+        }
+    }
+
+    async getAlltables(detasetID=`evm_dev`, projectID = `substrate-etl`) {
+        let fullTableIDs = []
+        let bqCmd = `bq ls --max_results 1000000 --project_id=${projectID} --dataset_id="${detasetID}" --format=json | jq -r '.[].tableReference.tableId' > schema/substrateetl/evm/callevenets.txt`
+        let res = await exec(bqCmd)
+        try {
+            if (res.stdout && res.stderr == '') {
+                console.log(res.stdout)
+                /*
+                let tbls = JSON.parse(res.stdout)
+                for (const tbl of tbls) {
+                    let fullTableID = tbl.id
+                    fullTableIDs.push(fullTableID)
+                }
+                */
+                //console.log(`r`, r)
+            }
+        } catch (e) {
+            console.log(`getAlltables err`, e)
+        }
+        return fullTableIDs
+    }
+
+    async readTableIds(fn = 'schema/substrateetl/evm/callevenets.txt') {
+      const fileStream = fs.createReadStream(fn);
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+
+      const lines = [];
+      for await (const line of rl) {
+        lines.push(line);
+      }
+      return lines;
+    }
+
     // sets up evm chain tables
     async setup_chain_evm(chainID = null, isUpdate = false, execute = false) {
         let projectID = `${this.project}`
@@ -455,47 +514,47 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0)
     }
 
-    map_abitype_to_bqtype(typ) {
-        switch (typ) {
-            case "address":
-                return "STRING";
-            case "uint256":
-                return "STRING";
-            case "string":
-                return "STRING";
-            case "bool":
-                return "BOOLEAN";
-            case "int8":
-            case "int16":
-            case "int24":
-            case "int32":
-            case "uint8":
-            case "uint16":
-            case "uint24":
-                return "INTEGER";
-            case "uint32":
-                return "INTEGER";
-            case "bytes":
-                return "STRING"; // HEX string
-                break;
-            case "bytes32":
-                return "STRING"; // HEX string
-                break;
-            case "tuple":
-                return "JSON";
-                break;
-            default:
-                return "JSON";
+    async execute_bqJob(sqlQuery, fn = false) {
+        // run bigquery job with suitable credentials
+        const bigqueryClient = new BigQuery();
+        const options = {
+            query: sqlQuery,
+            location: 'us-central1',
+        };
+
+        try {
+            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
+            const response = await bigqueryClient.createQueryJob(options);
+            const job = response[0];
+            const [rows] = await job.getQueryResults();
+            return rows;
+        } catch (err) {
+            console.log(err);
+            throw new Error(`An error has occurred.`, sqlQuery);
         }
+        return [];
     }
 
-    async setupCallEvents() {
-        const bigquery = this.get_big_query();
-        // read the set of call + event tables 
-
-        const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
+    async setupCallEvents(isCeateTable = false) {
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        });
+        // read the set of call + event tables
         let tables = {};
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'event%'`);
+        const datasetId = `evm_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
+        /*
+        let knowntableIds = {}
+        await this.getAlltables()
+        let tableIdFn = 'schema/substrateetl/evm/callevenets.txt'
+        let loadedTableIDs = await this.readTableIds(tableIdFn)
+        for (const loadedTableID of loadedTableIDs){
+            knowntableIds[loadedTableID] = 1
+        }
+        console.log(`loaded evm`, loadedTableIDs)
+        */
+
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
                 tables[t.table_name] = {};
@@ -504,141 +563,49 @@ module.exports = class EVMETL extends PolkaholicDB {
             // TODO: get description for full ABI
         }
 
-        let createTable = true;
         let sql = `select name, fingerprintID, CONVERT(signature using utf8) as signature, CONVERT(signatureRaw using utf8) as signatureRaw, CONVERT(abi using utf8) as abi from contractabi limit 100000;`
         var res = await this.poolREADONLY.query(sql);
-        for (const r of res) {
-            let abi = JSON.parse(r.abi);
-            if (abi.length > 0) {
-                let a = abi[0];
-                const methodID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 10).replaceAll("-", "_");
-                const tablePrefix = (a.type == "function") ? "call" : "evt";
-                if (tablePrefix == "call" && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
+        for (let i = 0; i < res.length; i++) {
+            let r = res[i]
+            let abiStruct = JSON.parse(r.abi);
+            let a = abiStruct[0]
+            if ((a.type == "function") && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
+            let fingerprintID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 11).replaceAll("-", "_")
 
-                const tableId = `${tablePrefix}_${a.name}_${methodID}`
-                const inputs = a.inputs;
-                //console.log(tableId, inputs); // .length, r.signature, r.signatureRaw, abi);
-                if (tables[tableId] == undefined) {
-                    const sch = [];
-                    try {
-                        let timePartitionField = null
-                        sch.push({
-                            "name": "chain_id",
-                            "type": "string",
-                            "mode": "REQUIRED"
+            let tableId = ethTool.computeTableId(abiStruct, fingerprintID)
+            if (tables[tableId] != undefined) {
+                console.log(`known tableId ${i} ${tableId}`)
+                continue
+            }
+            let schema = ethTool.createEvmSchema(abiStruct, fingerprintID, tableId)
+            let sch = schema.schema
+            let timePartitioning = schema.timePartitioning
+            tables[tableId] = sch;
+            if (isCeateTable) {
+                console.log(`\n\nNew Schema #${i} for ${tableId}`)
+                try {
+                    const [table] = await bigquery
+                        .dataset(datasetId)
+                        .createTable(tableId, {
+                            schema: sch,
+                            location: 'us-central1',
+                            timePartitioning: timePartitioning,
                         });
-                        sch.push({
-                            "name": "evm_chain_id",
-                            "type": "integer",
-                            "mode": "REQUIRED"
-                        });
-                        sch.push({
-                            "name": "contract_address",
-                            "type": "string",
-                            "mode": "REQUIRED"
-                        });
-                        let protected_flds = ["chain_id", "evm_chain_id", "contract_address", "_partition", "_table_", "_file_", "_row_timestamp_", "__root__", "_colidentifier"];
-                        if (tablePrefix == "call") {
-                            sch.push({
-                                "name": "call_success",
-                                "type": "boolean",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "call_tx_hash",
-                                "type": "string",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "call_trace_address",
-                                "type": "JSON",
-                                "mode": "NULLABLE"
-                            });
-                            sch.push({
-                                "name": "call_block_time",
-                                "type": "timestamp",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "call_block_number",
-                                "type": "integer",
-                                "mode": "REQUIRED"
-                            });
-                            timePartitionField = "call_block_time";
-                            protected_flds.push("call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number")
-                        } else {
-                            sch.push({
-                                "name": "evt_tx_hash",
-                                "type": "string",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "evt_index",
-                                "type": "INTEGER",
-                                "mode": "NULLABLE"
-                            });
-                            sch.push({
-                                "name": "evt_block_time",
-                                "type": "timestamp",
-                                "mode": "REQUIRED"
-                            });
-                            sch.push({
-                                "name": "evt_block_number",
-                                "type": "integer",
-                                "mode": "REQUIRED"
-                            });
-                            timePartitionField = "evt_block_time";
-                            protected_flds.push("evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number");
-                        }
-                        let idx = 0;
-                        for (const inp of inputs) {
-                            switch (inp.internalType) {
-                                case "IERC20":
-                                case "ERC20":
-                                case "IERC20Ext":
-                                    // TODO: _symbol, _decimals, _price_usd, _float
-                                    break;
-                                case "IERC721":
-                                case "IERC1155":
-                                    // TODO: add 
-                                    break;
-                            }
-                            let description = JSON.stringify(inp);
-                            // cap description
-                            if (description.length >= 1024) description = description.substr(0, 1024);
-                            // rename protected
-                            let nm = inp.name && inp.name.length > 0 ? inp.name : `_unnamed${idx}`
-                            if (protected_flds.includes(nm.toLowerCase())) {
-                                console.log
-                                nm = `renamed${nm}`;
-                            }
-                            sch.push({
-                                "name": nm,
-                                "type": this.map_abitype_to_bqtype(inp.type),
-                                "description": description,
-                                "mode": "NULLABLE"
-                            });
-                            idx++;
-                        }
-                        tables[tableId] = sch;
-                        if (createTable) {
-                            const [table] = await bigquery
-                                .dataset(datasetId)
-                                .createTable(tableId, {
-                                    schema: sch,
-                                    location: 'us-central1',
-                                    timePartitioning: {
-                                        type: 'HOUR',
-                                        field: timePartitionField
-                                    },
-                                });
-                        }
-                    } catch (err) {
-                        console.log(err, sch);
+                } catch (err){
+                    let errorStr = err.toString()
+                    if (!errorStr.includes('Already Exists')){
+                        console.log(`${datasetId}:${tableId} Error`, errorStr)
+                        this.logger.error({
+                            op: "setupCallEvents:auto_evm_schema_create",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            schema: sch
+                        })
                     }
                 }
+            }else{
+                console.log(`*****\nNew Schema #${i} ${tableId}\n`, sch, `\n`)
             }
-
         }
     }
 }

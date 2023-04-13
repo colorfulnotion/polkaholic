@@ -715,6 +715,133 @@ async function sendSignedRLPTx(web3Api, rlpTx) {
     return isError
 }
 
+function decodedTxnInputRaw(txInput='0x13ead5620000000000000000000000005283d291dbcf85356a21ba090e6db59121208b44000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000049456c01b13e8b05bf22f1a', contractABIs, contractABISignatures){
+    //etherscan is marking native case as "Transfer"
+    let contractcreationAddress = false
+    let methodID = '0x';
+    let decodedTxnInput = {};
+
+    if (!contractcreationAddress) {
+        if (txInput.length >= 10) {
+            methodID = txInput.slice(0, 10)
+        } else if (txInput >= '0x') {
+            // TODO: check weird case
+            // console.log(`check txhash ${txn.hash}`)
+            methodID = txInput
+        }
+    }
+
+    if (methodID != '0x') {
+        let foundApi = fetchABI(methodID, contractABIs, contractABISignatures)
+        if (foundApi) {
+            let methodSignature = foundApi.signature
+            //console.log(`${methodID} -> ${methodSignature}`)
+            let methodABIStr = foundApi.abi
+            let cachedDecoder = foundApi.decoder
+            let cachedEtherjsDecoder = foundApi.etherjsDecoder
+            let decodedInput = decode_txn_input_raw(txInput, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
+            if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
+                decodedTxnInput.decodeStatus = decodedInput.name
+                decodedTxnInput.methodID = methodID
+                decodedTxnInput.txInput = txInput
+            } else {
+                //sucessfully decoded, dropping txInput
+                decodedTxnInput.decodeStatus = 'success'
+                decodedTxnInput.methodID = methodID
+                decodedTxnInput.signature = methodSignature
+                decodedTxnInput.params = decodedInput.params
+            }
+        } else {
+            //methodID not found
+            decodedTxnInput.decodeStatus = 'unknown'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.txInput = txInput
+        }
+    } else {
+        //native transfer case or contract creation
+        if (contractcreationAddress) {
+            //contract creation
+            decodedTxnInput.decodeStatus = 'contractCreation'
+            decodedTxnInput.contractAddress = contractcreationAddress
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `contractCreation`
+        } else {
+            //native transfer
+            decodedTxnInput.decodeStatus = 'success'
+            decodedTxnInput.methodID = methodID
+            decodedTxnInput.signature = `nativeTransfer`
+            decodedTxnInput.params = []
+        }
+    }
+    return decodedTxnInput
+}
+
+function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder, etherjsDecoder) {
+    //const abiDecoder = require('abi-decoder');
+    //abiDecoder.addABI(methodABIStr)
+    //abiDecoder.addABI(JSON.parse(methodABIStr));
+    try {
+        let methodID = txInput.slice(0, 10)
+        let decodedData = abiDecoder.decodeMethod(txInput);
+        if (decodedData != null) {
+            //success case with {name: 'swapExactTokensForTokens', params: []}
+            decodedData.decodeStatus = 'success'
+            return decodedData
+        } else {
+            //decode null
+            //console.log(`decodeErr input=${txn.input}`)
+            console.log(`abi-decoder failed. Use etherJS methodID=${methodID}\n methodSignature=${methodSignature}`)
+            abiDecoder.discardNonDecodedLogs()
+            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder)
+            if (isSuccess) {
+                decodedData = {}
+                decodedData.params = decodedDataEtherJS
+                decodedData.decodeStatus = 'success'
+                //console.log(`** decodedData`, decodedData)
+                return decodedData
+            }
+        }
+        let decodeNull = {
+            decodeStatus: 'null'
+        }
+        return decodeNull
+    } catch (e) {
+        //error decoding inputs
+        console.log(`decodeErr methodSignature=${methodSignature}`)
+        console.log(`decodeErr`, e)
+        let decodeErr = {
+            decodeStatus: 'error'
+        }
+        return decodeErr
+    }
+}
+
+function decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder) {
+    try {
+        let methodID = txInput.slice(0, 10)
+        //console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
+        //var iface = new ethers.utils.Interface(methodABIStr)
+        var txn_input_stub = build_txn_input_stub(methodSignature)
+        var res = etherjsDecoder.decodeFunctionData(methodID, txInput)
+        let combinedTxnInputs = []
+        for (const t of txn_input_stub) {
+            let fld = t.name
+            let val = res[fld]
+            val = JSON.parse(JSON.stringify(val))
+            if (val != undefined) {
+                //console.log(`val!!`, val)
+                t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
+            }
+            combinedTxnInputs.push(t)
+        }
+        console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
+        return [combinedTxnInputs, true]
+    } catch (e) {
+        console.log(`decode_txn_input_etherjs err`, e)
+        return [false, false]
+    }
+}
+
 function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
     //etherscan is marking native case as "Transfer"
     let contractcreationAddress = false
@@ -740,7 +867,7 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
             let methodABIStr = foundApi.abi
             let cachedDecoder = foundApi.decoder
             let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder, contractABIs, contractABISignatures)
             if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
                 decodedTxnInput.decodeStatus = decodedInput.name
                 decodedTxnInput.methodID = methodID
@@ -803,7 +930,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             let methodABIStr = foundApi.abi
             let cachedDecoder = foundApi.decoder
             let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
+            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder, contractABIs, contractABISignatures)
             if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
                 decodedTxnInput.decodeStatus = decodedInput.name
                 decodedTxnInput.methodID = methodID
@@ -963,8 +1090,9 @@ function decodeRLPTx(raw = '') {
     return r
 }
 
-function parseMethodInputs(paramsString, nested) {
+function parseMethodInputs(paramsString, nested, fingerprintID = false) {
     const splitInputs = [];
+    let parseType = (fingerprintID && fingerprintID.length == 10)? 'func': 'event'
     let currentParam = '';
     let nestedLevel = 0;
     for (let i = 0; i < paramsString.length; i++) {
@@ -986,8 +1114,20 @@ function parseMethodInputs(paramsString, nested) {
     }
     const paramsArray = splitInputs.map(param => {
         const separatorIndex = param.lastIndexOf(' ');
-        const type = param.slice(0, separatorIndex).trim();
         const name = param.slice(separatorIndex + 1).trim();
+        let type = param.slice(0, separatorIndex).trim();
+        let topicIndex = false
+        let hasTopicIndex = false
+        try {
+            if (parseType == 'event' && type.includes("index_topic_")){
+                let p = type.split(' ')
+                hasTopicIndex = true
+                topicIndex = parseInt(p[0].replace('index_topic_',''))
+                type = p[1]
+            }
+        } catch (e){
+            console.log(`parseMethodInputs event parsing err`, e)
+        }
         if (nested && type.includes('(')) {
             const nestedStartIndex = type.indexOf('(');
             const nestedEndIndex = type.lastIndexOf(')');
@@ -1000,10 +1140,14 @@ function parseMethodInputs(paramsString, nested) {
                 type: parseMethodInputs(nestedParamsString, nested)
             };
         } else {
-            return {
+            let t = {
                 name: name,
                 type: type,
-            };
+            }
+            if (hasTopicIndex){
+                t.topicIndex = topicIndex
+            }
+            return t
         }
     });
     return paramsArray;
@@ -1014,6 +1158,25 @@ function build_txn_input_stub(methodSignature = 'callBridgeCall(address token, u
     const endIndex = methodSignature.lastIndexOf(')');
     const inputs = methodSignature.slice(startIndex, endIndex);
     return parseMethodInputs(inputs, nested);
+}
+
+function buildSchemaInfoFromSig(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
+    const startIndex = methodSignature.indexOf('(') + 1;
+    const endIndex = methodSignature.lastIndexOf(')');
+    const inputs = methodSignature.slice(startIndex, endIndex);
+    let schema = parseMethodInputs(inputs, nested, fingerprintID);
+    let schemaType = (fingerprintID && fingerprintID.length == 10)? 'call': 'evt'
+    let sectionName = methodSignature.substr(0, methodSignature.indexOf('('))
+    let contractName = 'ContractName_TODO'
+    let schemaInfo = {
+        fingerprintID: fingerprintID,
+        schemaType: schemaType,
+        sectionName: sectionName,
+        contractName: contractName,
+        tblName: `${schemaType}_${sectionName}`,
+        schema: schema
+    }
+    return schemaInfo
 }
 
 function convertBigNumberStruct(val) {
@@ -1089,7 +1252,7 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
 
 //'0x38ed1739'
 //decodeMethod
-function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherjsDecoder) {
+function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherjsDecoder, contractABIs, contractABISignatures) {
     //const abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
@@ -1101,6 +1264,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
         if (decodedData != null) {
             //success case with {name: 'swapExactTokensForTokens', params: []}
             decodedData.decodeStatus = 'success'
+            decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
             return decodedData
         } else {
             //decode null
@@ -1112,6 +1276,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
                 decodedData = {}
                 decodedData.params = decodedDataEtherJS
                 decodedData.decodeStatus = 'success'
+                decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
                 //console.log(`** decodedData`, decodedData)
                 return decodedData
             }
@@ -1131,6 +1296,42 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
         }
         return decodeErr
     }
+}
+
+function recursive_params(decodedData, contractABIs, contractABISignatures){
+    let isRecursive = false
+    if (Array.isArray(decodedData.params)){
+        for (let i = 0; i < decodedData.params.length; i++){
+            let p = decodedData.params[i]
+            if (p.type == 'bytes[]' && Array.isArray(p.value)){
+                p.valueDecoded = []
+                let decodeSuccesscnt = 0
+                for (let t = 0; t < p.value.length; t++){
+                    let pVal = p.value[t]
+                    if (pVal.length >= 10){
+                        try {
+                            let decodedTxnInput = decodedTxnInputRaw(pVal, contractABIs, contractABISignatures)
+                            p.valueDecoded[t] = decodedTxnInput
+                            if (decodedTxnInput.decodeStatus == 'success'){
+                                decodeSuccesscnt++
+                            }
+                        } catch (e){
+                            console.log(`recursive_params err`, e)
+                        }
+                    }
+                    if (decodeSuccesscnt){
+                        isRecursive = true
+                        decodedData.params[i] = p
+                    }
+                }
+            }
+
+        }
+    }
+    if (isRecursive){
+        //console.log(`recursive_params`, JSON.stringify(decodedData, null, 4))
+    }
+    return decodedData
 }
 
 //return function signature like transferFrom(address sender, address recipient, uint256 amount) from abi
@@ -1650,7 +1851,7 @@ function categorizeTokenTransfers(dLog) {
 }
 
 //more expensive decode when cached decoder fails..
-function decode_event_fresh(log, eventAbIStr, eventSignature) {
+function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     var abiDecoder = require('abi-decoder');
     abiDecoder.addABI(eventAbIStr)
     try {
@@ -1664,6 +1865,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
+            fingerprintID: fingerprintID,
             events: decodedLog.events
         }
         return res
@@ -1680,7 +1882,8 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
             transactionLogIndex: log.transactionLogIndex,
             logIndex: log.logIndex,
             data: log.data,
-            topics: log.topics
+            topics: log.topics,
+            fingerprintID: fingerprintID,
         }
         return unknown
     }
@@ -1688,7 +1891,7 @@ function decode_event_fresh(log, eventAbIStr, eventSignature) {
 
 // for a transfer event the "address" is the contract address
 // minimum requirement topics, data, address + abi
-function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
+function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecoder) {
     //var abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(eventAbIStr)
     try {
@@ -1703,6 +1906,7 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
             data: log.data,
             topics: log.topics,
             signature: eventSignature,
+            fingerprintID: fingerprintID,
             events: decodedLog.events
         }
         return res
@@ -1711,41 +1915,46 @@ function decode_event(log, eventAbIStr, eventSignature, abiDecoder) {
         let topic0 = log.topics[0]
         let topicLen = log.topics.length
         console.log(`fallback decode txHash=${log.transactionHash} transactionLogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
-        return decode_event_fresh(log, eventAbIStr, eventSignature)
+        return decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature)
     }
 }
 
 function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
-    let signatureID = fingerprintID.split('-')[0]
-    let matchedABI = contractABIs[fingerprintID]
-    let cachedFingerprintID = contractABISignatures[signatureID]
-    if (matchedABI != undefined) {
-        if (matchedABI.decoder == undefined) {
-            if (cachedFingerprintID != undefined && cachedFingerprintID != fingerprintID) {
+    try {
+        let signatureID = fingerprintID.split('-')[0]
+        let matchedABI = contractABIs[fingerprintID]
+        let cachedFingerprintID = contractABISignatures[signatureID]
+        if (matchedABI != undefined) {
+            if (matchedABI.decoder == undefined) {
+                if (cachedFingerprintID != undefined && cachedFingerprintID != fingerprintID) {
+                    //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
+                }
+                const abiDecoder = require('abi-decoder');
+                abiDecoder.addABI(matchedABI.abi)
+                matchedABI.decoder = abiDecoder
+                const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
+                matchedABI.etherjsDecoder = etherjsDecoder
+                contractABIs[fingerprintID] = matchedABI
+                contractABISignatures[signatureID] = fingerprintID
+                //console.log(`cache decoder -> ${fingerprintID}`)
+                //console.log(`cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
+            } else if (cachedFingerprintID != fingerprintID) {
                 //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
+                const abiDecoder = require('abi-decoder');
+                abiDecoder.addABI(matchedABI.abi)
+                matchedABI.decoder = abiDecoder
+                const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
+                matchedABI.etherjsDecoder = etherjsDecoder
+                contractABISignatures[signatureID] = fingerprintID
+                //console.log(`re-cache decoder -> ${fingerprintID}`)
+                //console.log(`re-cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
             }
-            const abiDecoder = require('abi-decoder');
-            abiDecoder.addABI(matchedABI.abi)
-            matchedABI.decoder = abiDecoder
-            const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
-            matchedABI.etherjsDecoder = etherjsDecoder
-            contractABIs[fingerprintID] = matchedABI
-            contractABISignatures[signatureID] = fingerprintID
-            //console.log(`cache decoder -> ${fingerprintID}`)
-            //console.log(`cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
-        } else if (cachedFingerprintID != fingerprintID) {
-            //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
-            const abiDecoder = require('abi-decoder');
-            abiDecoder.addABI(matchedABI.abi)
-            matchedABI.decoder = abiDecoder
-            const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
-            matchedABI.etherjsDecoder = etherjsDecoder
-            contractABISignatures[signatureID] = fingerprintID
-            //console.log(`re-cache decoder -> ${fingerprintID}`)
-            //console.log(`re-cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
+            return matchedABI
         }
-        return matchedABI
+    } catch (err){
+        console.log(`fetchABI fingerprintID=${fingerprintID}`, err)
     }
+
     return false
 }
 
@@ -1760,7 +1969,24 @@ function decode_log(log, contractABIs, contractABISignatures) {
         //console.log(`${topic0} -> ${eventSignature}`)
         let eventABIStr = foundApi.abi
         let cachedDecoder = foundApi.decoder
-        let decodedRes = decode_event(log, eventABIStr, eventSignature, cachedDecoder)
+        let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
+        let decodedEvents = decodedRes.events
+        for (let i = 0; i < decodedEvents.length; i++){
+            let dEvent = decodedEvents[i]
+            //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+            if ((dEvent.type.includes('int'))){
+                if (Array.isArray(dEvent.value)){
+                    for (let j = 0; j < dEvent.value; j++){
+                        dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
+                    }
+                } else if (dEvent.value.substr(0,2) == '0x') {
+                    dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+                }
+                //console.log(`new dEvent.value`, dEvent.value)
+            }
+            decodedRes.events[i] = dEvent
+        }
+        //console.log(`decodedRes.events`, decodedRes.events)
         return decodedRes
     }
     //console.log(`[#${log.blockNumber}-${log.transactionIndex}] decode_log: topic not found ${topic0} (topicLen ${topicLen})`)
@@ -1770,7 +1996,8 @@ function decode_log(log, contractABIs, contractABISignatures) {
         transactionLogIndex: log.transactionLogIndex,
         logIndex: log.logIndex,
         data: log.data,
-        topics: log.topics
+        topics: log.topics,
+        fingerprintID: fingerprintID,
     }
     return unknown
 }
@@ -2113,6 +2340,214 @@ function int_to_hex(id) {
     return web3.utils.toHex(id)
 }
 
+function mapABITypeToBqType(typ) {
+    switch (typ) {
+        case "address":
+            return "STRING";
+        case "uint256":
+            return "STRING";
+        case "string":
+            return "STRING";
+        case "bool":
+            return "BOOLEAN";
+        case "int8":
+        case "int16":
+        case "int24":
+        case "int32":
+        case "uint8":
+        case "uint16":
+        case "uint24":
+            return "INTEGER";
+        case "uint32":
+            return "INTEGER";
+        case "bytes":
+            return "STRING"; // HEX string
+            break;
+        case "bytes32":
+            return "STRING"; // HEX string
+            break;
+        case "tuple":
+            return "JSON";
+            break;
+        default:
+            return "JSON";
+    }
+}
+
+function buildSchemaInfoFromFingerprintID(methodSignature, fingerprintID, contractABIs, contractABISignatures) {
+    let schemaInfo = false
+    let foundApi = fetchABI(fingerprintID, contractABIs, contractABISignatures)
+    if (foundApi){
+        let methodSignature = foundApi.signature
+        //console.log(`${methodID} -> ${methodSignature}`)
+        let methodABIStr = foundApi.abi
+        let schema = createEvmSchema(methodABIStr, fingerprintID)
+        let schemaType = (fingerprintID && fingerprintID.length == 10)? 'call': 'evt'
+        let schemaInfo = {
+            fingerprintID: fingerprintID,
+            schemaType: schemaType,
+            schema: schema
+        }
+        return schemaInfo
+    }
+    return schemaInfo
+}
+
+function computeTableId(abiStruct, fingerprintID){
+    //console.log(`computeTableId abiStr`, abiStruct)
+    let tableId = false
+    let abi = abiStruct
+    if (abi.length > 0) {
+        let a = abi[0];
+        const methodID = (a.type == "function") ? fingerprintID.substring(0, 10) : fingerprintID.replaceAll("-", "_");
+        const tablePrefix = (a.type == "function") ? "call" : "evt";
+        if (tablePrefix == "call" && (a.stateMutability == "view" || a.stateMutability == "pure")) return tableId;
+        tableId = `${tablePrefix}_${a.name}_${methodID}`
+    }
+    return tableId
+}
+
+function createEvmSchema(abiStruct, fingerprintID, tableId = false){
+    let abi = abiStruct
+    if (abi.length > 0) {
+        let a = abi[0];
+        //const methodID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 10).replaceAll("-", "_");
+        const tablePrefix = (a.type == "function") ? "call" : "evt";
+        //if (tablePrefix == "call" && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
+        //tableId = `${tablePrefix}_${a.name}_${methodID}`
+        if (!tableId) tableId = computeTableId(abi, fingerprintID)
+        const inputs = a.inputs;
+        //console.log(tableId, inputs); // .length, r.signature, r.signatureRaw, abi);
+        const sch = [];
+        try {
+            let timePartitionField = null
+            sch.push({
+                "name": "chain_id",
+                "type": "string",
+                "mode": "REQUIRED"
+            });
+            sch.push({
+                "name": "evm_chain_id",
+                "type": "integer",
+                "mode": "REQUIRED"
+            });
+            sch.push({
+                "name": "contract_address",
+                "type": "string",
+                "mode": "REQUIRED"
+            });
+            let protected_flds = ["chain_id", "evm_chain_id", "contract_address", "_partition", "_table_", "_file_", "_row_timestamp_", "__root__", "_colidentifier"];
+            if (tablePrefix == "call") {
+                sch.push({
+                    "name": "call_success",
+                    "type": "boolean",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
+                    "name": "call_tx_hash",
+                    "type": "string",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
+                    "name": "call_trace_address",
+                    "type": "JSON",
+                    "mode": "NULLABLE"
+                });
+                sch.push({
+                    "name": "call_block_time",
+                    "type": "timestamp",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
+                    "name": "call_block_number",
+                    "type": "integer",
+                    "mode": "REQUIRED"
+                });
+                timePartitionField = "call_block_time";
+                protected_flds.push("call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number")
+            } else {
+                sch.push({
+                    "name": "evt_tx_hash",
+                    "type": "string",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
+                    "name": "evt_index",
+                    "type": "INTEGER",
+                    "mode": "NULLABLE"
+                });
+                sch.push({
+                    "name": "evt_block_time",
+                    "type": "timestamp",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
+                    "name": "evt_block_number",
+                    "type": "integer",
+                    "mode": "REQUIRED"
+                });
+                timePartitionField = "evt_block_time";
+                protected_flds.push("evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number");
+            }
+            let idx = 0;
+            for (const inp of inputs) {
+                switch (inp.internalType) {
+                    case "IERC20":
+                    case "ERC20":
+                    case "IERC20Ext":
+                        // TODO: _symbol, _decimals, _price_usd, _float
+                        break;
+                    case "IERC721":
+                    case "IERC1155":
+                        // TODO: add
+                        break;
+                }
+                let description = JSON.stringify(inp);
+                // cap description
+                if (description.length >= 1024) description = description.substr(0, 1024);
+                // rename protected
+                let nm = inp.name && inp.name.length > 0 ? inp.name : `_unnamed${idx}`
+                if (protected_flds.includes(nm.toLowerCase())) {
+                    console.log
+                    nm = `renamed${nm}`;
+                }
+                sch.push({
+                    "name": nm,
+                    "type": mapABITypeToBqType(inp.type),
+                    "description": description,
+                    "mode": "NULLABLE"
+                });
+                idx++;
+            }
+            let schema = {
+                tableId: tableId,
+                schema: sch,
+                timePartitioning: {
+                    type: 'HOUR',
+                    field: timePartitionField
+                },
+            }
+            return schema
+        } catch (err) {
+            console.log(err, sch);
+            return false
+        }
+    }
+}
+
+function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3'){
+    let fingerprintID = false
+    if (tableID.substr(0,5) == 'call_'){
+        fingerprintID = tableID.split('_').pop()
+    }else if (tableID.substr(0,4) == 'evt_'){
+        let pieces = tableID.split('_')
+        let topicLen = pieces.pop()
+        let topic0 = pieces.pop()
+        fingerprintID = `${topic0}-${topicLen}`
+    }
+    return fingerprintID
+}
+
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     for (let i = 0; i < evmTrace.length; i++) {
         let t = evmTrace[i];
@@ -2311,5 +2746,11 @@ module.exports = {
     },
     getABIByAssetType: function(assetType) {
         return getABIByAssetType(assetType);
-    }
+    },
+    buildSchemaInfoFromSig: buildSchemaInfoFromSig,
+    buildSchemaInfoFromFingerprintID: buildSchemaInfoFromFingerprintID,
+    mapABITypeToBqType: mapABITypeToBqType,
+    computeTableId: computeTableId,
+    createEvmSchema: createEvmSchema,
+    getFingerprintIDFromTableID: getFingerprintIDFromTableID,
 };

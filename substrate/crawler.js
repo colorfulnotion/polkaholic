@@ -2100,6 +2100,7 @@ module.exports = class Crawler extends Indexer {
 
         const Web3 = require('web3')
         const bigquery = this.get_big_query();
+        await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
@@ -2123,12 +2124,12 @@ module.exports = class Crawler extends Indexer {
                     }
                 } while (!block && block_tries < 10)
                 let numTransactions = block && block.transactions ? block.transactions.length : 0;
-                console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                 let rows_blocks = [];
                 let rows_transactions = [];
                 let rows_logs = [];
                 try {
                     if (numTransactions >= 0) {
+                        console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                         let isParallel = true
                         let log_tries = 0
                         let evmReceipts = false
@@ -2149,7 +2150,7 @@ module.exports = class Crawler extends Indexer {
                         ])
                         let [dTxns, dReceipts] = await statusesPromise
                         let evmTrace = false
-                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID)
+                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
                     }
                 } catch (err) {
                     console.log(err)

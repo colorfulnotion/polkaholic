@@ -22,6 +22,11 @@ const fs = require('fs');
 const extrinsic_args_conversion_list = ['Compact<u128>', 'u128', 'i128']
 const event_conversion_list = ['Compact<u128>', 'u128']
 
+//TODO:
+const {
+    BigQuery
+} = require('@google-cloud/bigquery');
+
 module.exports = class Indexer extends AssetManager {
     debugLevel = paraTool.debugNoLog;
     writeData = true; // true = production level write, false = debug SKIPs
@@ -78,6 +83,9 @@ module.exports = class Indexer extends AssetManager {
     xcmmsgSentAtUnknownMap = {};
     xcmTrailingKeyMap = {}; //keep the firstSeen BN. TODO: remove
     evmcontractMap = {};
+    evmSchemaMap = {}; //by tableId
+    evmFingerprintMap = {}; //by fingerprintID
+    evmUnknownFingerprintMap = {};
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -6590,12 +6598,12 @@ module.exports = class Indexer extends AssetManager {
                     row[`${a}_pub_key`] = paraTool.getPubKey(v.id);
                 } else if (tbl.columns[`${a}_float`]) {
                     row[a] = v;
-                    // TODO: 
+                    // TODO:
                     row[`${a}_usd`] = 0;
                     row[`${a}_float`] = 0;
                 } else if (tbl.columns[`${a}_symbol`]) {
                     row[a] = (typeof v == "object") ? JSON.stringify(v) : v;
-                    // TODO: 
+                    // TODO:
                     row[`${a}_symbol`] = "TODO";
                     row[`${a}_decimals`] = 0;
                 } else if (tbl.columns[a]) {
@@ -8461,13 +8469,119 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
-    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID) {
-        const bigquery = this.get_big_query();
+    async initEvmSchemaMap(datasetId = 'evm_dev'){
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
+        let evmSchemaMap = {}
+        let evmFingerprintMap = {}
+        for (const t of tablesRecs) {
+            let tableId = t.table_name
+            let fingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
+            if (evmSchemaMap[tableId] == undefined) {
+                evmSchemaMap[tableId] = {};
+            }
+            if (evmFingerprintMap[fingerprintID] == undefined) {
+                evmFingerprintMap[fingerprintID] = tableId;
+            }
+            evmSchemaMap[tableId][t.column_name] = t.data_type;
+            // TODO: get description for full ABI
+        }
+        this.evmSchemaMap = evmSchemaMap
+        this.evmFingerprintMap = evmFingerprintMap
+        console.log(`evmSchemaMap ${Object.keys(evmSchemaMap).length}`)
+        console.log(`evmFingerprintMap ${Object.keys(evmFingerprintMap).length}`)
+        console.log(`initEvmSchemaMap DONE`)
+    }
+
+    getTableIDFromFingerprintID(fingerprintID){
+        let tableID = false
+        if (this.evmFingerprintMap[fingerprintID] != undefined){
+            tableID = this.evmFingerprintMap[fingerprintID]
+        }
+        return tableID
+    }
+
+    async setupEvmCallEventSchemaInfo(signature, fingerprintID, contractABIs, contractABISignatures) {
+        //TODO: unknown fingerprintID is just ignore and we are not bothered to decode again - need refresh strategy
+        if (this.evmUnknownFingerprintMap[fingerprintID]){
+            return false
+        }
+        console.log(`signature=${signature}, fingerprintID=${fingerprintID}`)
+        let schemaInfo = ethTool.buildSchemaInfoFromFingerprintID(signature, fingerprintID, contractABIs, contractABISignatures)
+        if (schemaInfo){
+            let schema = schemaInfo.schema
+            let sch = schema.schema
+            let tableId = schema.tableId
+            // add to known mapping
+            this.evmSchemaMap[tableId] = sch
+            this.evmFingerprintMap[fingerprintID] = tableId
+        }else{
+            this.evmUnknownFingerprintMap[fingerprintID] = 1
+        }
+        return schemaInfo
+    }
+
+    generateEventBqRec(tableId, evmLog){
+        let decodedEvents = JSON.parse(evmLog.events)
+        let rec = {
+            chain_id: evmLog.id, //string
+            evm_chain_id: evmLog.chain_id,//integer
+            contract_address: evmLog.address,
+            evt_tx_hash: evmLog.transaction_hash,
+            evt_index: evmLog.log_index,
+            evt_block_time: evmLog.block_timestamp,
+            evt_block_number: evmLog.block_number,
+        }
+        for (const dEvent of decodedEvents){
+            rec[dEvent.name] =  dEvent.value
+        }
+        let bqRec = {
+            insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
+            json: rec
+        }
+        return bqRec
+    }
+
+    generateCallBqRec(tableId, evmTx){
+        let decodedParams = JSON.parse(evmTx.params)
+        let rec = {
+            chain_id: evmTx.id, //string
+            evm_chain_id: evmTx.chain_id,//integer
+            contract_address: evmTx.to_address,
+            call_success: true, //TODO
+            call_tx_hash: evmTx.hash,
+            call_block_time: evmTx.block_timestamp,
+            call_block_number: evmTx.block_number,
+        }
+        for (const dParam of decodedParams){
+            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON'){
+                rec[dParam.name] =  JSON.stringify(dParam.value)
+            }else{
+                rec[dParam.name] =  dParam.value
+            }
+        }
+        let bqRec = {
+            insertId: `${tableId}_${evmTx.hash}`,
+            json: rec
+        }
+        return bqRec
+    }
+
+
+    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures){
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
         let chain = await this.getChain(chainID);
-        let contractABIs = (this.contractABIs) ? this.contractABIs : await this.getContractABI();
         let rows_blocks = [];
         let rows_transactions = [];
         let rows_logs = [];
+        let auto_evm_rows_map = {} // tableID => rows
+        let auto_evm_schema_map = {} // tableID => rows
+
         let block = JSON.parse(JSON.stringify(evmlBlock))
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
         //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
@@ -8512,7 +8626,11 @@ module.exports = class Indexer extends AssetManager {
             tx.decodedLogs = logs; // fuse here
             let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
             //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
-            let t = {
+            let methodID = null
+            if (tx.to && tx.input.length >= 10){
+                methodID = tx.input.substr(0,10)
+            }
+            let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
                 hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
@@ -8533,28 +8651,63 @@ module.exports = class Indexer extends AssetManager {
                 block_number: tx.blockNumber,
                 block_hash: tx.blockHash,
                 decoded: false,
-                method_id: null,
+                method_id: methodID,
                 signature: null,
                 params: null
             }
             if (decodedInput) {
-                t.decoded = (decodedInput.decodeStatus == 'success');
-                t.method_id = decodedInput.methodID;
-                t.signature = decodedInput.signature;
-                if (t.decoded) {
-                    t.params = JSON.stringify(decodedInput.params);
+                evmTx.decoded = (decodedInput.decodeStatus == 'success');
+                evmTx.method_id = methodID;
+                if (evmTx.decoded){
+                    evmTx.signature = decodedInput.signature;
+                    evmTx.params = JSON.stringify(decodedInput.params);
+                    // write specific call_ table
+                    // try to find tableID
+                    if (methodID != null){ //skip nativeTransfer
+                        let tableID = this.getTableIDFromFingerprintID(methodID)
+                        let bqCall = false
+                        let isNewSchema = false
+                        let schemaInfo = false
+                        if (tableID){
+                            bqCall = this.generateCallBqRec(tableID, evmTx)
+
+                        }else{
+                            schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
+                            if (schemaInfo){
+                                tableID = schemaInfo.schema.tableId
+                                bqCall = this.generateCallBqRec(tableID, evmTx)
+                                isNewSchema = true
+                            }else{
+                                //shouldn't get here?
+                                console.log(`Unknown methodID ${methodID}\n`)
+                            }
+                        }
+                        if (bqCall && tableID){
+                            console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
+                            if (auto_evm_rows_map[tableID] == undefined){
+                                auto_evm_rows_map[tableID] = []
+                            }
+                            auto_evm_rows_map[tableID].push(bqCall)
+                        }
+                        if (isNewSchema && schemaInfo && tableID){
+                            console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
+                            auto_evm_schema_map[tableID] = schemaInfo
+                        }
+                    }
                 }
             }
             let bqEvmTransaction = {
                 insertId: `${tx.transactionHash}`,
-                json: t
+                json: evmTx
             }
             console.log(`bq+`, bqEvmTransaction)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
                     let l = logs[j]
-                    let ll = {
+                    let eSig = l.signature ? l.signature : null
+                    let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
+                    let evmLog = {
                         chain_id: chainID,
                         id: chain.id,
                         log_index: l.logIndex,
@@ -8566,15 +8719,54 @@ module.exports = class Indexer extends AssetManager {
                         block_timestamp: block.timestamp,
                         block_number: block.number,
                         block_hash: block.hash,
-                        signature: l.signature ? l.signature : null, // TODO: check
+                        signature: eSig,
                         events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
                     }
                     let bqEvmLog = {
-                        insertId: `${tx.transactionHash}${l.logIndex}`,
-                        json: ll
+                        insertId: `${tx.transactionHash}_${l.logIndex}`,
+                        json: evmLog
                     }
                     console.log(`bqEvmLog`, bqEvmLog)
                     rows_logs.push(bqEvmLog);
+
+                    // write specific evt_ table
+                    if (eSig){
+                        // try to find tableID
+                        let tableID = this.getTableIDFromFingerprintID(eFingerprintID)
+                        let bqEvent = false
+                        let isNewSchema = false
+                        let schemaInfo = false
+                        if (tableID){
+                            bqEvent = this.generateEventBqRec(tableID, evmLog)
+                        }else{
+                            //do the abi lookup
+                            schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                            if (schemaInfo){
+                                isNewSchema = true
+                                tableID = schemaInfo.schema.tableId
+                                bqEvent = this.generateEventBqRec(tableID, evmLog)
+                                if (auto_evm_rows_map[tableID] == undefined){
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push()
+                            }else{
+                                //shouldn't get here?
+                                console.log(`Unknown eFingerprintID ${eFingerprintID}\n`, eSig)
+                            }
+                        }
+                        if (bqEvent && tableID){
+                            console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
+                            if (auto_evm_rows_map[tableID] == undefined){
+                                auto_evm_rows_map[tableID] = []
+                            }
+                            auto_evm_rows_map[tableID].push(bqEvent)
+                        }
+
+                        if (isNewSchema && schemaInfo && tableID){
+                            console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
+                            auto_evm_schema_map[tableID] = schemaInfo
+                        }
+                    }
                 }
             }
             // NOTE: we do not write out hashes yet (development)
@@ -8584,7 +8776,7 @@ module.exports = class Indexer extends AssetManager {
         // stream into blocks, transactions
         try {
             let dataset = "evm";
-            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "logs" ]
+            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
             for (const tbl of tables) {
                 let rows = null
                 switch (tbl) {
@@ -8607,19 +8799,82 @@ module.exports = class Indexer extends AssetManager {
                         .insert(rows, {
                             raw: true
                         });
-                    console.log("WRITE", dataset, tbl, rows.length)
+                    console.log(`WRITE ${dataset}:${tbl} len=${rows.length}`)
                 }
             }
         } catch (err) {
             console.log("err", JSON.stringify(err)); // TODO: logger
         }
 
+        // evm _call _evt datasetId
+        let evmDatasetID = "evm_dev";
+
+        // update schems
+        console.log(`new schemas`, Object.keys(auto_evm_schema_map))
+
+        for (const schemaTableId of Object.keys(auto_evm_schema_map)) {
+            let schemaInfo = auto_evm_schema_map[schemaTableId]
+            let schema = schemaInfo.schema
+            let sch = schema.schema
+            let timePartitioning = schema.timePartitioning
+            console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            try {
+                const [table] = await bigquery
+                    .dataset(evmDatasetID)
+                    .createTable(schemaTableId, {
+                        schema: sch,
+                        location: 'us-central1',
+                        timePartitioning: timePartitioning,
+                    });
+            } catch (err){
+                let errorStr = err.toString()
+                if (!errorStr.includes('Already Exists')){
+                    console.log(`${evmDatasetID}:${schemaTableId} Error`, errorStr, `\nSchema:`, sch)
+                    this.logger.error({
+                        op: "auto_evm_schema_create",
+                        tableId: `${schemaTableId}`,
+                        error: errorStr,
+                        schema: sch
+                    })
+                }
+            }
+        }
+
+        // stream into call_ ,  evt_ table
+        console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
+        for (const tableId of Object.keys(auto_evm_rows_map)) {
+            let rows = auto_evm_rows_map[tableId]
+            //console.log(`${evmDatasetID}:${tableId} row`, rows)
+            try {
+                if (rows && rows.length > 0) {
+                    await bigquery
+                        .dataset(evmDatasetID)
+                        .table(tableId)
+                        .insert(rows, {
+                            raw: true
+                        });
+                        console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
+                }
+            } catch (err){
+                let errorStr = err.toString()
+                if (!errorStr.includes('Already Exists')){
+                    console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
+                    this.logger.error({
+                        op: "auto_evm_row_insert",
+                        tableId: `${tableId}`,
+                        error: errorStr,
+                        rows: rows
+                    })
+                }
+            }
+        }
     }
 
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
         const Web3 = require('web3')
         const bigquery = this.get_big_query();
+        await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
@@ -8668,7 +8923,7 @@ module.exports = class Indexer extends AssetManager {
                 ])
                 let [dTxns, dReceipts] = await statusesPromise
                 let evmTrace = false
-                await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID)
+                await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
             }
         } catch (err) {
             console.log(err)
