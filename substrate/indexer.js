@@ -93,7 +93,7 @@ module.exports = class Indexer extends AssetManager {
 
     /*** DEVELOPEMENT: change to evm_test ***/
     evmDatasetID = "evm_test";
-    //evmDataset = "evm_dev";
+    //evmDatasetID = "evm_dev";
 
     xcmMeta = []; //this should be removed after every block
 
@@ -8475,19 +8475,31 @@ module.exports = class Indexer extends AssetManager {
 
     async initEvmSchemaMap() {
         let evmDataset = this.evmDatasetID
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
+
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
         for (const t of tablesRecs) {
+            let tblType = t.tbl_type
             let tableId = t.table_name
+            let colName = t.column_name
+            let ordinalIdx = t.ordinal_position-1
             let fingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
             if (evmSchemaMap[tableId] == undefined) {
                 evmSchemaMap[tableId] = {};
             }
             if (evmFingerprintMap[fingerprintID] == undefined) {
-                evmFingerprintMap[fingerprintID] = tableId;
+                //evmFingerprintMap[fingerprintID] = tableId;
+                evmFingerprintMap[fingerprintID] = {}
+                evmFingerprintMap[fingerprintID].flds = []
+                evmFingerprintMap[fingerprintID].tableId = tableId
             }
-            evmSchemaMap[tableId][t.column_name] = t.data_type;
+            if (tblType == 'call' && ordinalIdx >= 8){
+                evmFingerprintMap[fingerprintID].flds.push(colName)
+            }else if (tblType == 'evt' && ordinalIdx >= 7){
+                evmFingerprintMap[fingerprintID].flds.push(colName)
+            }
+            evmSchemaMap[tableId][colName] = t.data_type;
             // TODO: get description for full ABI
         }
         this.evmSchemaMap = evmSchemaMap
@@ -8500,9 +8512,17 @@ module.exports = class Indexer extends AssetManager {
     getTableIDFromFingerprintID(fingerprintID) {
         let tableID = false
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
-            tableID = this.evmFingerprintMap[fingerprintID]
+            tableID = this.evmFingerprintMap[fingerprintID].tableId
         }
         return tableID
+    }
+
+    getSchemaFlds(fingerprintID){
+        let flds = false
+        if (this.evmFingerprintMap[fingerprintID] != undefined){
+            flds = this.evmFingerprintMap[fingerprintID].flds
+        }
+        return flds
     }
 
     async setupEvmCallEventSchemaInfo(signature, fingerprintID, contractABIs, contractABISignatures) {
@@ -8517,43 +8537,20 @@ module.exports = class Indexer extends AssetManager {
             let sch = schema.schema
             let tableId = schema.tableId
             // add to known mapping
-            this.evmSchemaMap[tableId] = sch
-            this.evmFingerprintMap[fingerprintID] = tableId
+            this.evmSchemaMap[tableId] = {}
+            for (const s of sch){
+                this.evmSchemaMap[tableId][s.name] = s.type
+            }
+            this.evmFingerprintMap[fingerprintID] = {}
+            this.evmFingerprintMap[fingerprintID].flds = ethTool.getEVMFlds(sch)
+            this.evmFingerprintMap[fingerprintID].tableId = tableId
         } else {
             this.evmUnknownFingerprintMap[fingerprintID] = 1
         }
         return schemaInfo
     }
 
-    jsonToCsv(jsonObject) {
-      const flattenObject = (obj, prefix = '') => {
-        let flatObject = {};
-        for (const key in obj) {
-          const newKey = prefix ? `${prefix}.${key}` : key;
-          if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
-            Object.assign(flatObject, flattenObject(obj[key], newKey));
-          } else {
-            flatObject[newKey] = obj[key];
-          }
-        }
-        return flatObject;
-      };
-
-      const flatJsonObject = flattenObject(jsonObject);
-      const csvRow = Object.values(flatJsonObject)
-        .map((value) => {
-          if (typeof value === 'string') {
-            value = value.replace(/"/g, '""');
-            return `"${value}"`;
-          }
-          return value;
-        })
-        .join(',');
-
-      return csvRow;
-    }
-
-    generateEventBqRec(tableId, evmLog) {
+    generateEventBqRec(tableId, fingerprintID, evmLog) {
         let decodedEvents = JSON.parse(evmLog.events)
         let rec = {
             chain_id: evmLog.id, //string
@@ -8564,22 +8561,35 @@ module.exports = class Indexer extends AssetManager {
             evt_block_time: evmLog.block_timestamp,
             evt_block_number: evmLog.block_number,
         }
+        let flds = this.getSchemaFlds(fingerprintID)
+        if (flds.length != decodedEvents.length) {
+            this.logger.error({
+                op: "generateEventBqRec",
+                tableId: `${tableId}`,
+                error: `flds mismatch`,
+                flds: flds,
+                params: decodedEvents,
+            })
+            return false
+        }
+        for (let i = 0; i < decodedEvents.length; i++){
+            let fldName = flds[i]
+            let dEvent = decodedEvents[i]
+            rec[fldName] = dEvent.value
+        }
+        /*
         for (const dEvent of decodedEvents) {
             rec[dEvent.name] = dEvent.value
         }
-        let reccsv = this.jsonToCsv(rec)
+        */
         let bqRec = {
             insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
             json: rec
         }
-        let bqRec2 = {
-            insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
-            csv: reccsv
-        }
-        return bqRec2
+        return bqRec
     }
 
-    generateCallBqRec(tableId, evmTx) {
+    generateCallBqRec(tableId, fingerprintID, evmTx) {
         let decodedParams = JSON.parse(evmTx.params)
         let rec = {
             chain_id: evmTx.id, //string
@@ -8590,6 +8600,28 @@ module.exports = class Indexer extends AssetManager {
             call_block_time: evmTx.block_timestamp,
             call_block_number: evmTx.block_number,
         }
+        let flds = this.getSchemaFlds(fingerprintID)
+
+        if (flds.length != decodedParams.length) {
+            this.logger.error({
+                op: "generateCallBqRec",
+                tableId: `${tableId}`,
+                error: `flds mismatch`,
+                flds: flds,
+                params: decodedParams,
+            })
+            return false
+        }
+        for (let i = 0; i < decodedParams.length; i++){
+            let fldName = flds[i]
+            let dParam = decodedParams[i]
+            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+                rec[fldName] = JSON.stringify(dParam.value)
+            } else {
+                rec[fldName] = dParam.value
+            }
+        }
+        /*
         for (const dParam of decodedParams) {
             if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
                 rec[dParam.name] = JSON.stringify(dParam.value)
@@ -8597,6 +8629,7 @@ module.exports = class Indexer extends AssetManager {
                 rec[dParam.name] = dParam.value
             }
         }
+        */
         let bqRec = {
             insertId: `${tableId}_${evmTx.hash}`,
             json: rec
@@ -8707,13 +8740,13 @@ module.exports = class Indexer extends AssetManager {
                         let isNewSchema = false
                         let schemaInfo = false
                         if (tableID) {
-                            bqCall = this.generateCallBqRec(tableID, evmTx)
+                            bqCall = this.generateCallBqRec(tableID, methodID, evmTx)
 
                         } else {
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
                             if (schemaInfo) {
                                 tableID = schemaInfo.schema.tableId
-                                bqCall = this.generateCallBqRec(tableID, evmTx)
+                                bqCall = this.generateCallBqRec(tableID, methodID, evmTx)
                                 isNewSchema = true
                             } else {
                                 //shouldn't get here?
@@ -8775,14 +8808,14 @@ module.exports = class Indexer extends AssetManager {
                         let isNewSchema = false
                         let schemaInfo = false
                         if (tableID) {
-                            bqEvent = this.generateEventBqRec(tableID, evmLog)
+                            bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog)
                         } else {
                             //do the abi lookup
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
                             if (schemaInfo) {
                                 isNewSchema = true
                                 tableID = schemaInfo.schema.tableId
-                                bqEvent = this.generateEventBqRec(tableID, evmLog)
+                                bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog)
                                 if (auto_evm_rows_map[tableID] == undefined) {
                                     auto_evm_rows_map[tableID] = []
                                 }

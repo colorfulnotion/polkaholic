@@ -2406,6 +2406,20 @@ function computeTableId(abiStruct, fingerprintID) {
     return tableId
 }
 
+function getEVMFlds(schema){
+    let flds = []
+    let protected_flds = ["chain_id", "evm_chain_id", "contract_address", "_partition", "_table_", "_file_", "_row_timestamp_", "__root__", "_colidentifier",
+    "call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number",
+    "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"
+    ]
+    for (const sch of schema){
+        if (!protected_flds.includes(sch.name)){
+            flds.push(sch.name)
+        }
+    }
+    return flds
+}
+
 function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
     let abi = abiStruct
     if (abi.length > 0) {
@@ -2752,4 +2766,5 @@ module.exports = {
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
+    getEVMFlds: getEVMFlds
 };

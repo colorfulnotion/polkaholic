@@ -372,6 +372,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         var sigs = {};
         var numContractsTally = {};
         var output = ethTool.parseAbiSignature(contractABIStr)
+        console.log(`output`, output)
         output.forEach(function(e) {
             var fingerprintID = e.fingerprintID
             if (!sigs[fingerprintID]) {
@@ -381,6 +382,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 numContractsTally[fingerprintID]++;
             }
         });
+        return
         let abiRows = [];
         for (const fingerprintID of Object.keys(sigs)) {
             let data = sigs[fingerprintID];
