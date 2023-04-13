@@ -91,6 +91,10 @@ module.exports = class Indexer extends AssetManager {
     numXCMMessagesIn = {};
     numXCMMessagesOut = {};
 
+    /*** DEVELOPEMENT: change to evm_test ***/
+    evmDatasetID = "evm_test";
+    //evmDataset = "evm_dev";
+
     xcmMeta = []; //this should be removed after every block
 
     xcmMetaMap = {};
@@ -8469,8 +8473,9 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
-    async initEvmSchemaMap(datasetId = 'evm_dev') {
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
+    async initEvmSchemaMap() {
+        let evmDataset = this.evmDatasetID
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
         for (const t of tablesRecs) {
@@ -8520,6 +8525,34 @@ module.exports = class Indexer extends AssetManager {
         return schemaInfo
     }
 
+    jsonToCsv(jsonObject) {
+      const flattenObject = (obj, prefix = '') => {
+        let flatObject = {};
+        for (const key in obj) {
+          const newKey = prefix ? `${prefix}.${key}` : key;
+          if (typeof obj[key] === 'object' && !Array.isArray(obj[key])) {
+            Object.assign(flatObject, flattenObject(obj[key], newKey));
+          } else {
+            flatObject[newKey] = obj[key];
+          }
+        }
+        return flatObject;
+      };
+
+      const flatJsonObject = flattenObject(jsonObject);
+      const csvRow = Object.values(flatJsonObject)
+        .map((value) => {
+          if (typeof value === 'string') {
+            value = value.replace(/"/g, '""');
+            return `"${value}"`;
+          }
+          return value;
+        })
+        .join(',');
+
+      return csvRow;
+    }
+
     generateEventBqRec(tableId, evmLog) {
         let decodedEvents = JSON.parse(evmLog.events)
         let rec = {
@@ -8534,11 +8567,16 @@ module.exports = class Indexer extends AssetManager {
         for (const dEvent of decodedEvents) {
             rec[dEvent.name] = dEvent.value
         }
+        let reccsv = this.jsonToCsv(rec)
         let bqRec = {
             insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
             json: rec
         }
-        return bqRec
+        let bqRec2 = {
+            insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
+            csv: reccsv
+        }
+        return bqRec2
     }
 
     generateCallBqRec(tableId, evmTx) {
@@ -8807,7 +8845,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         // evm _call _evt datasetId
-        let evmDatasetID = "evm_dev";
+        let evmDatasetID = this.evmDatasetID;
 
         // update schems
         console.log(`new schemas`, Object.keys(auto_evm_schema_map))
