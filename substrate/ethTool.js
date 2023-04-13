@@ -563,11 +563,10 @@ async function getTokenHoldersRawBalances(web3Api, contractAddress, holders, tok
 function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
     if (!dReceipt || dReceipt.transactionHash === undefined) {
         console.log(`decorateTxn: missing receipts`, dReceipt)
-        process.exit(0);
+        return;
     }
     if (dTxn.hash != dReceipt.transactionHash) {
         console.log(`decorateTxn: txnHash mismatch (tx:${dTxn.hash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
-        process.exit(0);
         return
     }
     //todo: how to detect reverted but successful case?
@@ -715,7 +714,7 @@ async function sendSignedRLPTx(web3Api, rlpTx) {
     return isError
 }
 
-function decodedTxnInputRaw(txInput='0x13ead5620000000000000000000000005283d291dbcf85356a21ba090e6db59121208b44000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000049456c01b13e8b05bf22f1a', contractABIs, contractABISignatures){
+function decodedTxnInputRaw(txInput = '0x13ead5620000000000000000000000005283d291dbcf85356a21ba090e6db59121208b44000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000049456c01b13e8b05bf22f1a', contractABIs, contractABISignatures) {
     //etherscan is marking native case as "Transfer"
     let contractcreationAddress = false
     let methodID = '0x';
@@ -1092,7 +1091,7 @@ function decodeRLPTx(raw = '') {
 
 function parseMethodInputs(paramsString, nested, fingerprintID = false) {
     const splitInputs = [];
-    let parseType = (fingerprintID && fingerprintID.length == 10)? 'func': 'event'
+    let parseType = (fingerprintID && fingerprintID.length == 10) ? 'func' : 'event'
     let currentParam = '';
     let nestedLevel = 0;
     for (let i = 0; i < paramsString.length; i++) {
@@ -1119,13 +1118,13 @@ function parseMethodInputs(paramsString, nested, fingerprintID = false) {
         let topicIndex = false
         let hasTopicIndex = false
         try {
-            if (parseType == 'event' && type.includes("index_topic_")){
+            if (parseType == 'event' && type.includes("index_topic_")) {
                 let p = type.split(' ')
                 hasTopicIndex = true
-                topicIndex = parseInt(p[0].replace('index_topic_',''))
+                topicIndex = parseInt(p[0].replace('index_topic_', ''))
                 type = p[1]
             }
-        } catch (e){
+        } catch (e) {
             console.log(`parseMethodInputs event parsing err`, e)
         }
         if (nested && type.includes('(')) {
@@ -1144,7 +1143,7 @@ function parseMethodInputs(paramsString, nested, fingerprintID = false) {
                 name: name,
                 type: type,
             }
-            if (hasTopicIndex){
+            if (hasTopicIndex) {
                 t.topicIndex = topicIndex
             }
             return t
@@ -1160,12 +1159,12 @@ function build_txn_input_stub(methodSignature = 'callBridgeCall(address token, u
     return parseMethodInputs(inputs, nested);
 }
 
-function buildSchemaInfoFromSig(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID='0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
+function buildSchemaInfoFromSig(methodSignature = 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)', fingerprintID = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4', nested = false) {
     const startIndex = methodSignature.indexOf('(') + 1;
     const endIndex = methodSignature.lastIndexOf(')');
     const inputs = methodSignature.slice(startIndex, endIndex);
     let schema = parseMethodInputs(inputs, nested, fingerprintID);
-    let schemaType = (fingerprintID && fingerprintID.length == 10)? 'call': 'evt'
+    let schemaType = (fingerprintID && fingerprintID.length == 10) ? 'call' : 'evt'
     let sectionName = methodSignature.substr(0, methodSignature.indexOf('('))
     let contractName = 'ContractName_TODO'
     let schemaInfo = {
@@ -1298,28 +1297,28 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
     }
 }
 
-function recursive_params(decodedData, contractABIs, contractABISignatures){
+function recursive_params(decodedData, contractABIs, contractABISignatures) {
     let isRecursive = false
-    if (Array.isArray(decodedData.params)){
-        for (let i = 0; i < decodedData.params.length; i++){
+    if (Array.isArray(decodedData.params)) {
+        for (let i = 0; i < decodedData.params.length; i++) {
             let p = decodedData.params[i]
-            if (p.type == 'bytes[]' && Array.isArray(p.value)){
+            if (p.type == 'bytes[]' && Array.isArray(p.value)) {
                 p.valueDecoded = []
                 let decodeSuccesscnt = 0
-                for (let t = 0; t < p.value.length; t++){
+                for (let t = 0; t < p.value.length; t++) {
                     let pVal = p.value[t]
-                    if (pVal.length >= 10){
+                    if (pVal.length >= 10) {
                         try {
                             let decodedTxnInput = decodedTxnInputRaw(pVal, contractABIs, contractABISignatures)
                             p.valueDecoded[t] = decodedTxnInput
-                            if (decodedTxnInput.decodeStatus == 'success'){
+                            if (decodedTxnInput.decodeStatus == 'success') {
                                 decodeSuccesscnt++
                             }
-                        } catch (e){
+                        } catch (e) {
                             console.log(`recursive_params err`, e)
                         }
                     }
-                    if (decodeSuccesscnt){
+                    if (decodeSuccesscnt) {
                         isRecursive = true
                         decodedData.params[i] = p
                     }
@@ -1328,7 +1327,7 @@ function recursive_params(decodedData, contractABIs, contractABISignatures){
 
         }
     }
-    if (isRecursive){
+    if (isRecursive) {
         //console.log(`recursive_params`, JSON.stringify(decodedData, null, 4))
     }
     return decodedData
@@ -1951,7 +1950,7 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
             }
             return matchedABI
         }
-    } catch (err){
+    } catch (err) {
         console.log(`fetchABI fingerprintID=${fingerprintID}`, err)
     }
 
@@ -1971,15 +1970,15 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
         let decodedEvents = decodedRes.events
-        for (let i = 0; i < decodedEvents.length; i++){
+        for (let i = 0; i < decodedEvents.length; i++) {
             let dEvent = decodedEvents[i]
             //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
-            if ((dEvent.type.includes('int'))){
-                if (Array.isArray(dEvent.value)){
-                    for (let j = 0; j < dEvent.value; j++){
+            if ((dEvent.type.includes('int'))) {
+                if (Array.isArray(dEvent.value)) {
+                    for (let j = 0; j < dEvent.value; j++) {
                         dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
                     }
-                } else if (dEvent.value.substr(0,2) == '0x') {
+                } else if (dEvent.value.substr(0, 2) == '0x') {
                     dEvent.value = paraTool.dechexToIntStr(dEvent.value)
                 }
                 //console.log(`new dEvent.value`, dEvent.value)
@@ -2377,12 +2376,12 @@ function mapABITypeToBqType(typ) {
 function buildSchemaInfoFromFingerprintID(methodSignature, fingerprintID, contractABIs, contractABISignatures) {
     let schemaInfo = false
     let foundApi = fetchABI(fingerprintID, contractABIs, contractABISignatures)
-    if (foundApi){
+    if (foundApi) {
         let methodSignature = foundApi.signature
         //console.log(`${methodID} -> ${methodSignature}`)
         let methodABIStr = foundApi.abi
         let schema = createEvmSchema(methodABIStr, fingerprintID)
-        let schemaType = (fingerprintID && fingerprintID.length == 10)? 'call': 'evt'
+        let schemaType = (fingerprintID && fingerprintID.length == 10) ? 'call' : 'evt'
         let schemaInfo = {
             fingerprintID: fingerprintID,
             schemaType: schemaType,
@@ -2393,7 +2392,7 @@ function buildSchemaInfoFromFingerprintID(methodSignature, fingerprintID, contra
     return schemaInfo
 }
 
-function computeTableId(abiStruct, fingerprintID){
+function computeTableId(abiStruct, fingerprintID) {
     //console.log(`computeTableId abiStr`, abiStruct)
     let tableId = false
     let abi = abiStruct
@@ -2407,7 +2406,7 @@ function computeTableId(abiStruct, fingerprintID){
     return tableId
 }
 
-function createEvmSchema(abiStruct, fingerprintID, tableId = false){
+function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
     let abi = abiStruct
     if (abi.length > 0) {
         let a = abi[0];
@@ -2535,11 +2534,11 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false){
     }
 }
 
-function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3'){
+function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3') {
     let fingerprintID = false
-    if (tableID.substr(0,5) == 'call_'){
+    if (tableID.substr(0, 5) == 'call_') {
         fingerprintID = tableID.split('_').pop()
-    }else if (tableID.substr(0,4) == 'evt_'){
+    } else if (tableID.substr(0, 4) == 'evt_') {
         let pieces = tableID.split('_')
         let topicLen = pieces.pop()
         let topic0 = pieces.pop()
