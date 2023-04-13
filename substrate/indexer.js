@@ -8469,7 +8469,7 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
-    async initEvmSchemaMap(datasetId = 'evm_dev'){
+    async initEvmSchemaMap(datasetId = 'evm_dev') {
         let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
@@ -8492,9 +8492,9 @@ module.exports = class Indexer extends AssetManager {
         console.log(`initEvmSchemaMap DONE`)
     }
 
-    getTableIDFromFingerprintID(fingerprintID){
+    getTableIDFromFingerprintID(fingerprintID) {
         let tableID = false
-        if (this.evmFingerprintMap[fingerprintID] != undefined){
+        if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID]
         }
         return tableID
@@ -8502,37 +8502,37 @@ module.exports = class Indexer extends AssetManager {
 
     async setupEvmCallEventSchemaInfo(signature, fingerprintID, contractABIs, contractABISignatures) {
         //TODO: unknown fingerprintID is just ignore and we are not bothered to decode again - need refresh strategy
-        if (this.evmUnknownFingerprintMap[fingerprintID]){
+        if (this.evmUnknownFingerprintMap[fingerprintID]) {
             return false
         }
         console.log(`signature=${signature}, fingerprintID=${fingerprintID}`)
         let schemaInfo = ethTool.buildSchemaInfoFromFingerprintID(signature, fingerprintID, contractABIs, contractABISignatures)
-        if (schemaInfo){
+        if (schemaInfo) {
             let schema = schemaInfo.schema
             let sch = schema.schema
             let tableId = schema.tableId
             // add to known mapping
             this.evmSchemaMap[tableId] = sch
             this.evmFingerprintMap[fingerprintID] = tableId
-        }else{
+        } else {
             this.evmUnknownFingerprintMap[fingerprintID] = 1
         }
         return schemaInfo
     }
 
-    generateEventBqRec(tableId, evmLog){
+    generateEventBqRec(tableId, evmLog) {
         let decodedEvents = JSON.parse(evmLog.events)
         let rec = {
             chain_id: evmLog.id, //string
-            evm_chain_id: evmLog.chain_id,//integer
+            evm_chain_id: evmLog.chain_id, //integer
             contract_address: evmLog.address,
             evt_tx_hash: evmLog.transaction_hash,
             evt_index: evmLog.log_index,
             evt_block_time: evmLog.block_timestamp,
             evt_block_number: evmLog.block_number,
         }
-        for (const dEvent of decodedEvents){
-            rec[dEvent.name] =  dEvent.value
+        for (const dEvent of decodedEvents) {
+            rec[dEvent.name] = dEvent.value
         }
         let bqRec = {
             insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
@@ -8541,22 +8541,22 @@ module.exports = class Indexer extends AssetManager {
         return bqRec
     }
 
-    generateCallBqRec(tableId, evmTx){
+    generateCallBqRec(tableId, evmTx) {
         let decodedParams = JSON.parse(evmTx.params)
         let rec = {
             chain_id: evmTx.id, //string
-            evm_chain_id: evmTx.chain_id,//integer
+            evm_chain_id: evmTx.chain_id, //integer
             contract_address: evmTx.to_address,
             call_success: true, //TODO
             call_tx_hash: evmTx.hash,
             call_block_time: evmTx.block_timestamp,
             call_block_number: evmTx.block_number,
         }
-        for (const dParam of decodedParams){
-            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON'){
-                rec[dParam.name] =  JSON.stringify(dParam.value)
-            }else{
-                rec[dParam.name] =  dParam.value
+        for (const dParam of decodedParams) {
+            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+                rec[dParam.name] = JSON.stringify(dParam.value)
+            } else {
+                rec[dParam.name] = dParam.value
             }
         }
         let bqRec = {
@@ -8567,7 +8567,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
 
-    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures){
+    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
         const {
             BigQuery
         } = require('@google-cloud/bigquery');
@@ -8627,8 +8627,8 @@ module.exports = class Indexer extends AssetManager {
             let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
             //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
             let methodID = null
-            if (tx.to && tx.input.length >= 10){
-                methodID = tx.input.substr(0,10)
+            if (tx.to && tx.input.length >= 10) {
+                methodID = tx.input.substr(0, 10)
             }
             let evmTx = {
                 chain_id: chainID,
@@ -8658,38 +8658,38 @@ module.exports = class Indexer extends AssetManager {
             if (decodedInput) {
                 evmTx.decoded = (decodedInput.decodeStatus == 'success');
                 evmTx.method_id = methodID;
-                if (evmTx.decoded){
+                if (evmTx.decoded) {
                     evmTx.signature = decodedInput.signature;
                     evmTx.params = JSON.stringify(decodedInput.params);
                     // write specific call_ table
                     // try to find tableID
-                    if (methodID != null){ //skip nativeTransfer
+                    if (methodID != null) { //skip nativeTransfer
                         let tableID = this.getTableIDFromFingerprintID(methodID)
                         let bqCall = false
                         let isNewSchema = false
                         let schemaInfo = false
-                        if (tableID){
+                        if (tableID) {
                             bqCall = this.generateCallBqRec(tableID, evmTx)
 
-                        }else{
+                        } else {
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
-                            if (schemaInfo){
+                            if (schemaInfo) {
                                 tableID = schemaInfo.schema.tableId
                                 bqCall = this.generateCallBqRec(tableID, evmTx)
                                 isNewSchema = true
-                            }else{
+                            } else {
                                 //shouldn't get here?
                                 console.log(`Unknown methodID ${methodID}\n`)
                             }
                         }
-                        if (bqCall && tableID){
+                        if (bqCall && tableID) {
                             console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
-                            if (auto_evm_rows_map[tableID] == undefined){
+                            if (auto_evm_rows_map[tableID] == undefined) {
                                 auto_evm_rows_map[tableID] = []
                             }
                             auto_evm_rows_map[tableID].push(bqCall)
                         }
-                        if (isNewSchema && schemaInfo && tableID){
+                        if (isNewSchema && schemaInfo && tableID) {
                             console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
                             auto_evm_schema_map[tableID] = schemaInfo
                         }
@@ -8730,39 +8730,39 @@ module.exports = class Indexer extends AssetManager {
                     rows_logs.push(bqEvmLog);
 
                     // write specific evt_ table
-                    if (eSig){
+                    if (eSig) {
                         // try to find tableID
                         let tableID = this.getTableIDFromFingerprintID(eFingerprintID)
                         let bqEvent = false
                         let isNewSchema = false
                         let schemaInfo = false
-                        if (tableID){
+                        if (tableID) {
                             bqEvent = this.generateEventBqRec(tableID, evmLog)
-                        }else{
+                        } else {
                             //do the abi lookup
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
-                            if (schemaInfo){
+                            if (schemaInfo) {
                                 isNewSchema = true
                                 tableID = schemaInfo.schema.tableId
                                 bqEvent = this.generateEventBqRec(tableID, evmLog)
-                                if (auto_evm_rows_map[tableID] == undefined){
+                                if (auto_evm_rows_map[tableID] == undefined) {
                                     auto_evm_rows_map[tableID] = []
                                 }
                                 auto_evm_rows_map[tableID].push()
-                            }else{
+                            } else {
                                 //shouldn't get here?
                                 console.log(`Unknown eFingerprintID ${eFingerprintID}\n`, eSig)
                             }
                         }
-                        if (bqEvent && tableID){
+                        if (bqEvent && tableID) {
                             console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
-                            if (auto_evm_rows_map[tableID] == undefined){
+                            if (auto_evm_rows_map[tableID] == undefined) {
                                 auto_evm_rows_map[tableID] = []
                             }
                             auto_evm_rows_map[tableID].push(bqEvent)
                         }
 
-                        if (isNewSchema && schemaInfo && tableID){
+                        if (isNewSchema && schemaInfo && tableID) {
                             console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
                             auto_evm_schema_map[tableID] = schemaInfo
                         }
@@ -8826,9 +8826,9 @@ module.exports = class Indexer extends AssetManager {
                         location: 'us-central1',
                         timePartitioning: timePartitioning,
                     });
-            } catch (err){
+            } catch (err) {
                 let errorStr = err.toString()
-                if (!errorStr.includes('Already Exists')){
+                if (!errorStr.includes('Already Exists')) {
                     console.log(`${evmDatasetID}:${schemaTableId} Error`, errorStr, `\nSchema:`, sch)
                     this.logger.error({
                         op: "auto_evm_schema_create",
@@ -8836,6 +8836,7 @@ module.exports = class Indexer extends AssetManager {
                         error: errorStr,
                         schema: sch
                     })
+                    await this.log_streaming_error(schemaTableId, "auto_evm_schema_create", sch, errorStr);
                 }
             }
         }
@@ -8853,12 +8854,13 @@ module.exports = class Indexer extends AssetManager {
                         .insert(rows, {
                             raw: true
                         });
-                        console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
+                    console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
                 }
-            } catch (err){
+            } catch (err) {
                 let errorStr = err.toString()
-                if (!errorStr.includes('Already Exists')){
+                if (!errorStr.includes('Already Exists')) {
                     console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
+                    await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr);
                     this.logger.error({
                         op: "auto_evm_row_insert",
                         tableId: `${tableId}`,
@@ -8867,6 +8869,17 @@ module.exports = class Indexer extends AssetManager {
                     })
                 }
             }
+        }
+    }
+    // create table streamingerror (tableId varchar(128), op varchar(128), streamObject mediumblob, streamingError blob, lastErrorDT date, numErrors int default 0, primary key (tableId, op) )
+    async log_streaming_error(tableId, op, json_object, streamingError) {
+        try {
+            let sql = `insert into streamingerror ( tableId, op, streamObject, streamingError, lastErrorDT, numErrors ) values ('${tableId}', '${op}', ${mysql.escape(JSON.stringify(json_object))}, ${mysql.escape(streamingError)}, Now(), 1) on duplicate key update lastErrorDT = values(lastErrorDT), streamObject = values(streamObject), numErrors = numErrors + 1`
+            console.log(sql)
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL();
+        } catch (err) {
+            console.log(err);
         }
     }
 

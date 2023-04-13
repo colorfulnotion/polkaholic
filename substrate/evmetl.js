@@ -124,6 +124,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         let assetType = 'Contract';
         let abiRaw = j.result;
         if (abiRaw.length > 3 && abiRaw.substr(0, 3) == "Con") {
+            this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
+            await this.update_batchedSQL();
             abiRaw = null;
         } else {
             var contractABI = JSON.parse(abiRaw);
@@ -138,8 +140,8 @@ module.exports = class EVMETL extends PolkaholicDB {
             // TODO: use the methodsig to categorize the assetType (ERC20/721/.. vs Router/ERC20LP)
         }
         let flds = [];
-        let vals = ["assetType"];
-        let replace = ["assetType"];
+        let vals = [];
+        let replace = [];
         let fldstr = "";
         if (project) {
             vals.push('project');
@@ -152,40 +154,55 @@ module.exports = class EVMETL extends PolkaholicDB {
             replace.push("contractName");
         }
         if (abiRaw) {
+            flds.push(`'${address}'`);
+
+            vals.push('status');
+            flds.push(`'Found'`);
+            replace.push("status");
+
+            vals.push('foundDT');
+            flds.push(`Now()`);
+            replace.push("foundDT");
+
+            vals.push('abiRaw');
+            flds.push(`${mysql.escape(JSON.stringify(j))}`);
+            replace.push("abiRaw");
+
             let abi = JSON.parse(j.result);
             let proxyAddress = null;
             if (proxyAddress = await this.get_proxy_address(address, chainID)) {
                 let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
                 if (proxyABI) {
                     console.log("proxyABI", proxyABI);
-                    j = proxyABI;
-                    vals.push('proxyAddress');
-                    flds.push(`${mysql.escape(proxyAddress)}`);
-                    replace.push("proxyAddress");
+                    if (proxyABI && proxyABI.status == 1) {
+                        j = proxyABI;
+                        vals.push('proxyAddress');
+                        flds.push(`${mysql.escape(proxyAddress)}`);
+                        replace.push("proxyAddress");
 
-                    vals.push('proxyAddressLastUpdateDT');
-                    flds.push(`Now()`);
-                    replace.push("proxyAddressLastUpdateDT");
+                        vals.push('proxyAddressLastUpdateDT');
+                        flds.push(`Now()`);
+                        replace.push("proxyAddressLastUpdateDT");
+                    }
                 }
             }
 
-            vals.push('abiRaw');
-            flds.push(`${mysql.escape(JSON.stringify(j))}`);
-            replace.push("abiRaw");
+            fldstr = flds.join(",");
+            let data = `(${fldstr})`
+            await this.upsertSQL({
+                "table": "abirepo",
+                "keys": ["address"],
+                "vals": vals,
+                "data": [data],
+                "replace": replace
+            }, true);
 
             await this.loadABI(j.result)
+
+        } else {
+            this.batchedSQL.push(`update abirepo set lastAttemptDT = Now(), attempted = attempted + 1 where address = '${address}'`);
+            await this.update_batchedSQL();
         }
-        if (flds.length > 0) {
-            fldstr = "," + flds.join(",");
-        }
-        let data = `('${chainID}', '${address.toLowerCase()}', '${assetType}' ${fldstr})`
-        await this.upsertSQL({
-            "table": "asset",
-            "keys": ["chainID", "asset"],
-            "vals": vals,
-            "data": [data],
-            "replace": replace
-        }, true);
         return j;
     }
 
@@ -385,7 +402,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         await this.update_batchedSQL(true);
     }
 
-    async setup_dataset(detasetID=`evm_dev`, projectID = `substrate-etl`){
+    async setup_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         let cmd = `bq --location=us-central1 mk --dataset --description="DESCRIPTION" ${projectID}:${detasetID}`
         try {
             console.log(cmd);
@@ -395,7 +412,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
-    async delete_dataset(detasetID=`evm_dev`, projectID = `substrate-etl`){
+    async delete_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         //Dengerous!
         let cmd = `bq rm -r -d ${projectID}:${detasetID}`
         try {
@@ -405,7 +422,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
-    async getAlltables(detasetID=`evm_dev`, projectID = `substrate-etl`) {
+    async getAlltables(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         let fullTableIDs = []
         let bqCmd = `bq ls --max_results 1000000 --project_id=${projectID} --dataset_id="${detasetID}" --format=json | jq -r '.[].tableReference.tableId' > schema/substrateetl/evm/callevenets.txt`
         let res = await exec(bqCmd)
@@ -428,17 +445,17 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
 
     async readTableIds(fn = 'schema/substrateetl/evm/callevenets.txt') {
-      const fileStream = fs.createReadStream(fn);
-      const rl = readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity,
-      });
+        const fileStream = fs.createReadStream(fn);
+        const rl = readline.createInterface({
+            input: fileStream,
+            crlfDelay: Infinity,
+        });
 
-      const lines = [];
-      for await (const line of rl) {
-        lines.push(line);
-      }
-      return lines;
+        const lines = [];
+        for await (const line of rl) {
+            lines.push(line);
+        }
+        return lines;
     }
 
     // sets up evm chain tables
@@ -514,23 +531,32 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0)
     }
 
-    async execute_bqJob(sqlQuery, fn = false) {
-        // run bigquery job with suitable credentials
-        const bigqueryClient = new BigQuery();
-        const options = {
-            query: sqlQuery,
-            location: 'us-central1',
-        };
-
-        try {
-            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
-            const response = await bigqueryClient.createQueryJob(options);
-            const job = response[0];
-            const [rows] = await job.getQueryResults();
-            return rows;
-        } catch (err) {
-            console.log(err);
-            throw new Error(`An error has occurred.`, sqlQuery);
+    async crawlABIs(chainID = null, renew = false) {
+        let w = chainID ? ` and chainID = ${chainID}` : ""
+        let sql = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 10 group by to_address having count(*) >= 2 order by numTransactions7d desc limit 100000`;
+        let recs = renew ? await this.execute_bqJob(sql) : [];
+        let out = [];
+        let vals = ["chainID", "numTransactions7d", "createDT"];
+        let replace = ["numTransactions7d", "chainID"];
+        for (const r of recs) {
+            let address = r.to_address;
+            if (address) {
+                address = address.toLowerCase();
+                out.push(`('${address}', '${r.chainID}', '${r.numTransactions7d}', Now())`)
+            }
+        }
+        await this.upsertSQL({
+            "table": "abirepo",
+            "keys": ["address"],
+            "vals": vals,
+            "data": out,
+            "replace": replace
+        });
+        sql = `select address, chainID from abirepo where status = 'Unknown' and ( lastAttemptDT is null or lastAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and numTransactions7d > 3 ${w} order by numTransactions7d desc, chainID asc limit 1000`;
+        var res = await this.poolREADONLY.query(sql);
+        for (const r of res) {
+            console.log(r.address, r.chainID)
+            await this.crawlABI(r.address, r.chainID);
         }
         return [];
     }
@@ -591,9 +617,9 @@ module.exports = class EVMETL extends PolkaholicDB {
                             location: 'us-central1',
                             timePartitioning: timePartitioning,
                         });
-                } catch (err){
+                } catch (err) {
                     let errorStr = err.toString()
-                    if (!errorStr.includes('Already Exists')){
+                    if (!errorStr.includes('Already Exists')) {
                         console.log(`${datasetId}:${tableId} Error`, errorStr)
                         this.logger.error({
                             op: "setupCallEvents:auto_evm_schema_create",
@@ -603,7 +629,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                         })
                     }
                 }
-            }else{
+            } else {
                 console.log(`*****\nNew Schema #${i} ${tableId}\n`, sch, `\n`)
             }
         }
