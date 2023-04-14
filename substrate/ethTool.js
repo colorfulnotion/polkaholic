@@ -2000,7 +2000,7 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
 }
 
 //TODO standardize event_type recursively -- currently only handle one level deep
-function standardizeDecodedEvnets(decodedEvents){
+function standardizeDecodedEvnets_old(decodedEvents){
     //console.log(`decodedEvents`, decodedEvents)
     for (let i = 0; i < decodedEvents.length; i++) {
         let dEvent = decodedEvents[i]
@@ -2025,6 +2025,43 @@ function standardizeDecodedEvnets(decodedEvents){
     return decodedEvents
 }
 
+function standardizeDecodedEvnetType(dEventVal, dEventType){
+    let decodedVal = dEventVal
+    if (dEventVal == '0x0000000000000000000000000000000000000000000000000000000000000001'){
+        console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`)
+    }
+    if (dEventType.includes('int') && dEventVal.substr(0,2) == '0x'){
+        decodedVal = paraTool.dechexToIntStr(dEventVal)
+    }else if (dEventType.includes('bool') && typeof dEventVal === 'string'){
+        // some bool are decoded as '0x0000000000000000000000000000000000000000000000000000000000000001'
+        // console.log(`boolean dEventType, dEventVal`, dEventVal)
+        decodedVal = (decodedVal.includes('1'))? true : false
+    }
+    return decodedVal
+}
+
+function standardizeDecodedEvnets(decodedEvents){
+    //console.log(`decodedEvents`, decodedEvents)
+    for (let i = 0; i < decodedEvents.length; i++) {
+        let dEvent = decodedEvents[i]
+        let dEventType = dEvent.type
+        if (Array.isArray(dEvent.value)){
+            //console.log(`dEvent.value`, dEvent.value)
+            for (let j = 0; j < dEvent.value.length; j++) {
+                console.log(`dEvent.value[${j}]`, dEvent.value[j])
+                dEvent.value[j] = standardizeDecodedEvnetType(dEvent.value[j], dEventType)
+            }
+        }else{
+            //do the type checking here
+            dEvent.value = standardizeDecodedEvnetType(dEvent.value, dEventType)
+        }
+        //console.log(`updated dEvent[${i}]`, dEvent)
+        decodedEvents[i] = dEvent
+    }
+    console.log(`standardizeDecodedEvnets`, decodedEvents)
+    return decodedEvents
+}
+
 function decode_log(log, contractABIs, contractABISignatures) {
     let topics = log.topics
     let topicLen = log.topics.length
@@ -2042,6 +2079,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let decodedEvents = decodedRes.events
         //console.log(`decodeStatus=[${decodeStatus}] decodedEvents\n`, JSON.stringify(decodedEvents))
         if (decodedEvents) {
+            //decodedRes.events = standardizeDecodedEvnets_old(decodedEvents)
             decodedRes.events = standardizeDecodedEvnets(decodedEvents)
         }else{
             //console.log(`decodedEvents empty!`)
