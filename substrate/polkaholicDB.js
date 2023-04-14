@@ -784,25 +784,27 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async getContractABI() {
-        let contractabis = await this.poolREADONLY.query(`select signatureID, signature, abi, abiType, topicLength from contractabi`);
+        let contractabis = await this.poolREADONLY.query(`select fingerprintID, signatureID, signature, abi, abiType, topicLength from contractabi order by firstSeenDT`);
         let abis = {}
         for (const abi of contractabis) {
             let signatureID = abi.signatureID
             let abiType = abi.abiType
             let topicLen = abi.topicLength
-            let fingerprintID = (abiType == 'event') ? `${signatureID}-${topicLen}` : signatureID
+            let lookupID = (abiType == 'event') ? `${signatureID}-${topicLen}` : signatureID // this is ID that we use for lookup from indexing txInput/method (without verified abi)
+            let fingerprintID = abi.fingerprintID
             let jsonABI = JSON.parse(abi.abi.toString('utf8'))
             let r = {
+                fingerprintID: fingerprintID,
                 signatureID: signatureID,
                 signature: abi.signature.toString('utf8'),
                 abi: jsonABI,
                 abiType: abiType,
                 topicLength: topicLen
             }
-            if (abis[fingerprintID] == undefined) {
-                abis[fingerprintID] = r
+            if (abis[lookupID] == undefined) {
+                abis[lookupID] = r
             } else {
-                // console.log(`fingerprint collision detected ${fingerprintID}`)
+                // console.log(`lookupID collision detected ${fingerprintID}`)
             }
         }
         return (abis);

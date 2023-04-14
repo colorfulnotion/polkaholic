@@ -122,7 +122,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 		    }
 		}
 	    });
-	    
+
 	    await this.upsertSQL({
 		"table": "abirepo",
 		"keys": ["address"],
@@ -157,7 +157,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 		"vals": ["tokenName", "website", "numHolders"],
 		"data": out,
 		"replace": ["tokenName", "website", "numHolders"]
-            }, true); 
+            }, true);
 	}
 	process.exit(0);
 	var labelsData = JSON.parse(fs.readFileSync(filePath));
@@ -186,7 +186,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 
 	process.exit(0);
     }
-    
+
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
         let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
@@ -396,6 +396,47 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log("function - signature types", f_typeCnt);
     }
 
+    async reloadABI(targetSQL = null) {
+        let sql = (targetSQL != undefined)? targetSQL :  `select abiType, name, signatureID, abi from contractabi where outdated = 1 order by numContracts desc;`
+        var res = await this.poolREADONLY.query(sql);
+        let i = 0;
+        let n = 0
+        let batchSize = 100; // safety check
+        while (i < res.length) {
+            let currBatch = res.slice(i, i + batchSize);
+            console.log(`currBatch#${n}`, currBatch)
+            if (currBatch.length > 0) {
+                let abiABI = []
+                for (const r of currBatch){
+                    let abiStr = r.abi.toString('utf8')
+                    let abi = JSON.parse(abiStr)[0]
+                    abiABI.push(abi)
+                }
+                await this.loadABI(JSON.stringify(abiABI))
+                i += batchSize;
+                n++
+            }
+        }
+
+        /*
+        if (res.length > 0) {
+            let batchSize = 100
+            let batchSize
+            for (let i = 0; i < res.length; i++) {
+                let r = res[i]
+                let abiType = r.abiType
+                let name = r.name
+                let signatureID = r.signatureID
+                let abiABIStr = r.abi.toString('utf8')
+                console.log(`[#${i}] [${abiType}] [${signatureID}] ${name}`, abiABIStr)
+                await this.loadABI(abiABIStr)
+            }
+        } else {
+            return false
+        }
+        */
+    }
+
     async abiAnalytics() {
         let sql = `select CONVERT(abi using utf8) as abi from contractabi`
         var res = await this.poolREADONLY.query(sql);
@@ -453,6 +494,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         var sigs = {};
         var numContractsTally = {};
         var output = ethTool.parseAbiSignature(contractABIStr)
+        console.log(`output`, output)
         output.forEach(function(e) {
             var fingerprintID = e.fingerprintID
             if (!sigs[fingerprintID]) {
@@ -462,23 +504,36 @@ module.exports = class EVMETL extends PolkaholicDB {
                 numContractsTally[fingerprintID]++;
             }
         });
+        //return
         let abiRows = [];
         for (const fingerprintID of Object.keys(sigs)) {
             let data = sigs[fingerprintID];
             let numContracts = numContractsTally[fingerprintID];
             //fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength
-            let row = `('${data.fingerprintID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${numContracts}', '${data.topicLength}', '1')`
+            let row = `('${data.fingerprintID}', '${data.secondaryID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${data.topicLength}', '1', '0', NOW())`
             abiRows.push(row);
             console.log(`[${data.name}] ${row}`)
         }
+        let sqlDebug = true
+        await this.upsertSQL({
+            "table": "contractabi",
+            "keys": ["fingerprintID"],
+            "vals": ["secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", "firstSeenDT"],
+            "data": abiRows,
+            "replace": ["secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", ],
+            "replaceIfNull": ["firstSeenDT"]
+        }, sqlDebug);
+
         console.log(abiRows.length + " records");
+        /*
         for (let i = 0; i < abiRows.length; i += 2000) {
             let j = i + 10000;
             if (j > abiRows.length) j = abiRows.length;
-            let sql = "insert into contractabi (fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength, audited) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength), audited = values(audited)";
+            let sql = "insert into contractabi (fingerprintID, secondaryID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength, audited) values " + abiRows.slice(i, j).join(",") + " on duplicate key update name = values(name), signature = values(signature), signatureRaw = values(signatureRaw),signatureID = values(signatureID), abi = values(abi), abiType = values(abiType), numContracts = values(numContracts), topicLength = values(topicLength), audited = values(audited)";
             console.log(`sql`, sql)
             this.batchedSQL.push(sql)
         }
+        */
         console.log(`dump_contract_abi len=${abiRows.length}`);
         await this.update_batchedSQL(true);
     }
@@ -754,7 +809,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 	    });
 	    //console.log(c.contractType, methodIDs);
 	    knownmethodIDs  = knownmethodIDs.concat(methodIDs)
-	    
+
 	    let inside_set = - Math.log( methodIDs.length ); // 1/N chance
 	    let outside_set = - Math.log( 100 ); // 1% chance
 	    if ( methodIDs.length > 0 ) {
@@ -769,7 +824,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 	for (const c of unknowncontractRecs) {
 	    unknowncontracts[c.address] = c.contractType;
 	}
-	
+
 	console.log("CURRENT TESTADDRESS contractType", unknowncontracts[testAddress])
 
 	// Now, for the last 7 days with contractaddress-methodID combinations, find the contractAddresses using those methodIDs, computing log likelihood across all contract types
@@ -790,7 +845,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 		    contractType = arr[0][0];
 		    if ( unknowncontracts[address] == "Unknown" ) {
 			// if this is unknown, then for all viewmethods, check which  which are the ones we will test with (e.g symbols, decimals), store in JSON field, for now
-			let sqlout = `update abirepo set contractType = '${contractType}' where address = '${d.to_address}' and contractType = 'Unknown'` 
+			let sqlout = `update abirepo set contractType = '${contractType}' where address = '${d.to_address}' and contractType = 'Unknown'`
 			this.batchedSQL.push(sqlout);
 			console.log(contractType, d.to_address);
 		    }
@@ -799,7 +854,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 	}
 	await this.update_batchedSQL();
 
-	
+
 	// show the methodIDs
 	let training_sql = `select method_id, signature, count(distinct to_address) numContracts, min(to_address), max(to_address), count(*) numCalls from \`substrate-etl.evm.transactions\` where length(input) > 2 and chain_id = 1 and method_id not in (${knownmethodIDs.join(",")}) group by method_id, signature having numContracts >= 4 and numCalls >= 4 order by numContracts desc;`
 	console.log(training_sql);

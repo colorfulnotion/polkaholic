@@ -1458,15 +1458,21 @@ function parseAbiSignature(abiStrArr) {
         let signatureRaw = getMethodSignatureRaw(e)
         let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
         let fingerprint = getMethodFingureprint(e)
-        let fingerprintID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint)
+        /*
+        previous fingerprintID is now secondaryID, which is NOT unique
+        New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
+        */
+        let secondaryID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) // this is NOT Unique
+        let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
         let abiStr = JSON.stringify([e])
         output.push({
-            fingerprint,
-	    stateMutability,
-            fingerprintID,
-            signatureID,
-            signatureRaw,
-            signature,
+            stateMutability,
+            fingerprint: fingerprint,
+            fingerprintID: fingerprintID,
+            secondaryID: secondaryID,
+            signatureID: signatureID,
+            signatureRaw: signatureRaw,
+            signature: signature,
             name: firstCharUpperCase(e.name),
             abi: abiStr,
             abiType,
@@ -1861,6 +1867,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     try {
         let decodedLogs = abiDecoder.decodeLogs([log])
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
+        //console.log(`decodedLog`, decodedLog)
         let res = {
             decodeStatus: 'success',
             address: decodedLog.address,
@@ -1880,6 +1887,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
         console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
         console.log(`decodeErr`, e)
+        //console.log(`log`, log)
         let unknown = {
             decodeStatus: 'error',
             address: log.address,
@@ -1975,20 +1983,22 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
         let decodedEvents = decodedRes.events
-        for (let i = 0; i < decodedEvents.length; i++) {
-            let dEvent = decodedEvents[i]
-            //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
-            if ((dEvent.type.includes('int'))) {
-                if (Array.isArray(dEvent.value)) {
-                    for (let j = 0; j < dEvent.value; j++) {
-                        dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
+        if (decodedEvents){
+            for (let i = 0; i < decodedEvents.length; i++) {
+                let dEvent = decodedEvents[i]
+                //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+                if ((dEvent.type.includes('int'))) {
+                    if (Array.isArray(dEvent.value)) {
+                        for (let j = 0; j < dEvent.value; j++) {
+                            dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
+                        }
+                    } else if (dEvent.value.substr(0, 2) == '0x') {
+                        dEvent.value = paraTool.dechexToIntStr(dEvent.value)
                     }
-                } else if (dEvent.value.substr(0, 2) == '0x') {
-                    dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+                    //console.log(`new dEvent.value`, dEvent.value)
                 }
-                //console.log(`new dEvent.value`, dEvent.value)
+                decodedRes.events[i] = dEvent
             }
-            decodedRes.events[i] = dEvent
         }
         //console.log(`decodedRes.events`, decodedRes.events)
         return decodedRes
@@ -2411,6 +2421,20 @@ function computeTableId(abiStruct, fingerprintID) {
     return tableId
 }
 
+function getEVMFlds(schema){
+    let flds = []
+    let protected_flds = ["chain_id", "evm_chain_id", "contract_address", "_partition", "_table_", "_file_", "_row_timestamp_", "__root__", "_colidentifier",
+    "call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number",
+    "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"
+    ]
+    for (const sch of schema){
+        if (!protected_flds.includes(sch.name)){
+            flds.push(sch.name)
+        }
+    }
+    return flds
+}
+
 function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
     let abi = abiStruct
     if (abi.length > 0) {
@@ -2757,4 +2781,5 @@ module.exports = {
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
+    getEVMFlds: getEVMFlds
 };
