@@ -55,6 +55,16 @@ async function main() {
 	    process.exit(0);
         });
 
+    program.command('addcontracttype')
+        .description(`Add Contract Type ABI for contract`)
+        .argument('<contractType>', 'Contract Address')
+        .argument('<abistr>', 'Contract Address')
+        .action(async (contractType, abistr, opt) => {
+	    let evmetl = new EVMETL();
+	    await evmetl.addContractType(contractType, abistr);
+	    process.exit(0);
+        });
+    
     program.command('contracttypes')
         .description(`Update Contract Types`)
         .action(async (opt) => {
@@ -64,6 +74,7 @@ async function main() {
 	    process.exit(0);
         });
 
+    
     program.command('setupevm')
         .description("Setup or update BigQuery tables for EVM Chain. Use -u to update tbl schema")
         .usage("-c 137")
@@ -120,6 +131,15 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('loadlabels')
+	.argument('<chainID>', 'Address')
+        .argument('<fileName>', `Storage Slot`)
+        .action(async (chainID, fileName, opt) => {
+            var evmetl = new EVMETL();
+	    await evmetl.loadLabels(chainID, fileName);
+            process.exit(0);
+        });
+    
     program.command('getStorageAt')
         .description(`run getStorageAt`)
 	.argument('<address>', 'Address')

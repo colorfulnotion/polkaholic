@@ -1447,10 +1447,12 @@ function encodeSelector(f, encodeLen = false) {
 }
 
 function parseAbiSignature(abiStrArr) {
-    var contractABI = JSON.parse(abiStrArr)
-    var intputs = contractABI.filter(e => e.type === "event" || e.type === "function")
     var output = []
-    intputs.forEach(function(e) {
+    try {
+    var contractABI = JSON.parse(abiStrArr)
+    var inputs = contractABI.filter(e => e.type === "event" || e.type === "function")
+    inputs.forEach(function(e) {
+	let stateMutability = e.stateMutability
         let abiType = e.type
         let [signature, topicLen] = getMethodSignature(e)
         let signatureRaw = getMethodSignatureRaw(e)
@@ -1459,17 +1461,20 @@ function parseAbiSignature(abiStrArr) {
         let fingerprintID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint)
         let abiStr = JSON.stringify([e])
         output.push({
-            fingerprint: fingerprint,
-            fingerprintID: fingerprintID,
-            signatureID: signatureID,
-            signatureRaw: signatureRaw,
-            signature: signature,
+            fingerprint,
+	    stateMutability,
+            fingerprintID,
+            signatureID,
+            signatureRaw,
+            signature,
             name: firstCharUpperCase(e.name),
             abi: abiStr,
-            abiType: abiType,
+            abiType,
             topicLength: topicLen
         })
     });
+    } catch (err) {
+    }
     return output
 }
 
