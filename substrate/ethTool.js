@@ -1890,43 +1890,43 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     abiDecoder.addABI(eventAbIStr)
     let transactionLogIndex = (log.transactionLogIndex != undefined)? log.transactionLogIndex: log.transactionIndex
     try {
-        console.log(`decodedLog ***`, log)
         let decodedLogs = abiDecoder.decodeLogs([log])
-        console.log(`decodedLogs ****`, decodedLogs)
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
-        console.log(`decodedLog`, decodedLog)
-        let res = {
-            decodeStatus: 'success',
-            address: decodedLog.address,
-            transactionLogIndex: transactionLogIndex,
-            logIndex: log.logIndex,
-            data: log.data,
-            topics: log.topics,
-            signature: eventSignature,
-            fingerprintID: fingerprintID,
-            events: decodedLog.events
+        //console.log(`decodedLog`, decodedLog)
+        if (decodedLog){
+            let res = {
+                decodeStatus: 'success',
+                address: decodedLog.address,
+                transactionLogIndex: transactionLogIndex,
+                logIndex: log.logIndex,
+                data: log.data,
+                topics: log.topics,
+                signature: eventSignature,
+                fingerprintID: fingerprintID,
+                events: decodedLog.events
+            }
+            return res
         }
-        return res
     } catch (e) {
-        abiDecoder.discardNonDecodedLogs()
         let topic0 = log.topics[0]
         let topicLen = log.topics.length
         console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
         console.log(`decodeErr`, e)
-        //console.log(`log`, log)
-        let unknownLog = {
-            decodeStatus: 'error',
-            address: log.address,
-            transactionLogIndex: transactionLogIndex,
-            logIndex: log.logIndex,
-            data: log.data,
-            topics: log.topics,
-            fingerprintID: fingerprintID,
-        }
-        console.log(`decode_event_fresh unknownLog`, unknownLog)
-        return unknownLog
     }
+    //console.log(`log`, log)
+    abiDecoder.discardNonDecodedLogs()
+    let unknownLog = {
+        decodeStatus: 'error',
+        address: log.address,
+        transactionLogIndex: transactionLogIndex,
+        logIndex: log.logIndex,
+        data: log.data,
+        topics: log.topics,
+        fingerprintID: fingerprintID,
+    }
+    console.log(`decode_event_fresh unknownLog`, unknownLog)
+    return unknownLog
 }
 
 // for a transfer event the "address" is the contract address
