@@ -1881,6 +1881,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
         console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
         console.log(`decodeErr`, e)
+        console.log(`log`, log)
         let unknown = {
             decodeStatus: 'error',
             address: log.address,
@@ -1976,20 +1977,22 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
         let decodedEvents = decodedRes.events
-        for (let i = 0; i < decodedEvents.length; i++) {
-            let dEvent = decodedEvents[i]
-            //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
-            if ((dEvent.type.includes('int'))) {
-                if (Array.isArray(dEvent.value)) {
-                    for (let j = 0; j < dEvent.value; j++) {
-                        dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
+        if (decodedEvents){
+            for (let i = 0; i < decodedEvents.length; i++) {
+                let dEvent = decodedEvents[i]
+                console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+                if ((dEvent.type.includes('int'))) {
+                    if (Array.isArray(dEvent.value)) {
+                        for (let j = 0; j < dEvent.value; j++) {
+                            dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
+                        }
+                    } else if (dEvent.value.substr(0, 2) == '0x') {
+                        dEvent.value = paraTool.dechexToIntStr(dEvent.value)
                     }
-                } else if (dEvent.value.substr(0, 2) == '0x') {
-                    dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+                    //console.log(`new dEvent.value`, dEvent.value)
                 }
-                //console.log(`new dEvent.value`, dEvent.value)
+                decodedRes.events[i] = dEvent
             }
-            decodedRes.events[i] = dEvent
         }
         //console.log(`decodedRes.events`, decodedRes.events)
         return decodedRes

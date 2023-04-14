@@ -91,9 +91,8 @@ module.exports = class Indexer extends AssetManager {
     numXCMMessagesIn = {};
     numXCMMessagesOut = {};
 
-    /*** DEVELOPEMENT: change to evm_test ***/
-    evmDatasetID = "evm_test";
-    //evmDatasetID = "evm_dev";
+
+    evmDatasetID = "evm_dev"; /*** FOR DEVELOPEMENT: change to evm_test ***/
 
     xcmMeta = []; //this should be removed after every block
 
@@ -8656,7 +8655,8 @@ module.exports = class Indexer extends AssetManager {
         let block = JSON.parse(JSON.stringify(evmlBlock))
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
         //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
-
+        let evm_chain_id = chainID
+        let evm_blk_num = block.number
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8907,7 +8907,7 @@ module.exports = class Indexer extends AssetManager {
                         error: errorStr,
                         schema: sch
                     })
-                    await this.log_streaming_error(schemaTableId, "auto_evm_schema_create", sch, errorStr);
+                    await this.log_streaming_error(schemaTableId, "auto_evm_schema_create", sch, errorStr, evm_chain_id, evm_blk_num);
                 }
             }
         }
@@ -8931,7 +8931,7 @@ module.exports = class Indexer extends AssetManager {
                 let errorStr = err.toString()
                 if (!errorStr.includes('Already Exists')) {
                     console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
-                    await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr);
+                    await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
                     this.logger.error({
                         op: "auto_evm_row_insert",
                         tableId: `${tableId}`,
@@ -8943,9 +8943,9 @@ module.exports = class Indexer extends AssetManager {
         }
     }
     // create table streamingerror (tableId varchar(128), op varchar(128), streamObject mediumblob, streamingError blob, lastErrorDT date, numErrors int default 0, primary key (tableId, op) )
-    async log_streaming_error(tableId, op, json_object, streamingError) {
+    async log_streaming_error(tableId, op, json_object, streamingError, chainID, blockNumber) {
         try {
-            let sql = `insert into streamingerror ( tableId, op, streamObject, streamingError, lastErrorDT, numErrors ) values ('${tableId}', '${op}', ${mysql.escape(JSON.stringify(json_object))}, ${mysql.escape(streamingError)}, Now(), 1) on duplicate key update lastErrorDT = values(lastErrorDT), streamObject = values(streamObject), numErrors = numErrors + 1`
+            let sql = `insert into streamingerror ( tableId, op, streamObject, streamingError, lastErrorDT, numErrors, chainID, blockNumber ) values ('${tableId}', '${op}', ${mysql.escape(JSON.stringify(json_object))}, ${mysql.escape(streamingError)}, Now(), 1, '${chainID}', '${blockNumber}' ) on duplicate key update lastErrorDT = values(lastErrorDT), streamObject = values(streamObject), numErrors = numErrors + 1, chainID = values(chainID), blockNumber = values(blockNumber)`
             console.log(sql)
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
