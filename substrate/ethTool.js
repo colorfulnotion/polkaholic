@@ -1558,11 +1558,13 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
         let dReceipt = dReceipts[i]
         let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
         let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
-        if (fTxn) {
+        if (fTxn){
+            fTxns.push(fTxn)
+            //write connected txn
             if (fTxn.isConnectedCall) {
                 fTxnsConnected.push(fTxn)
             }
-            fTxns.push(fTxn)
+            //write internal txn
             if (fTxn.transactionsInternal && fTxn.transactionsInternal.length > 0) {
                 for (let j = 0; j < fTxn.transactionsInternal.length; j++) {
                     fTxnsInternal.push(fTxn.transactionsInternal[j]);
