@@ -780,6 +780,7 @@ function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
     try {
+        /*
         let methodID = txInput.slice(0, 10)
         let decodedData = abiDecoder.decodeMethod(txInput);
         if (decodedData != null) {
@@ -800,8 +801,17 @@ function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder
                 return decodedData
             }
         }
+        */
         let decodeNull = {
             decodeStatus: 'null'
+        }
+        let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder)
+        if (isSuccess) {
+            decodedData = {}
+            decodedData.params = decodedDataEtherJS
+            decodedData.decodeStatus = 'success'
+            //console.log(`** decodedData`, decodedData)
+            return decodedData
         }
         return decodeNull
     } catch (e) {
@@ -1257,6 +1267,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
     //abiDecoder.addABI(JSON.parse(methodABIStr));
     if (txn.hash == undefined) txn.hash = null
     try {
+        /*
         let txInput = txn.input
         let methodID = txn.input.slice(0, 10)
         let decodedData = abiDecoder.decodeMethod(txInput);
@@ -1279,6 +1290,16 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
                 //console.log(`** decodedData`, decodedData)
                 return decodedData
             }
+        }
+        */
+        let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder)
+        if (isSuccess) {
+            decodedData = {}
+            decodedData.params = decodedDataEtherJS
+            decodedData.decodeStatus = 'success'
+            decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
+            //console.log(`** decodedData`, decodedData)
+            return decodedData
         }
         let decodeNull = {
             decodeStatus: 'null'
@@ -1865,9 +1886,11 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     var abiDecoder = require('abi-decoder');
     abiDecoder.addABI(eventAbIStr)
     try {
+        console.log(`decodedLog ***`, log)
         let decodedLogs = abiDecoder.decodeLogs([log])
+        console.log(`decodedLogs ****`, decodedLogs)
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
-        //console.log(`decodedLog`, decodedLog)
+        console.log(`decodedLog`, decodedLog)
         let res = {
             decodeStatus: 'success',
             address: decodedLog.address,
@@ -1888,7 +1911,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
         console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
         console.log(`decodeErr`, e)
         //console.log(`log`, log)
-        let unknown = {
+        let unknownLog = {
             decodeStatus: 'error',
             address: log.address,
             transactionLogIndex: log.transactionLogIndex,
@@ -1897,7 +1920,8 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
             topics: log.topics,
             fingerprintID: fingerprintID,
         }
-        return unknown
+        console.log(`unknownLog`, unknownLog)
+        return unknownLog
     }
 }
 

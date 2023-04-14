@@ -8860,11 +8860,11 @@ module.exports = class Indexer extends AssetManager {
                         break;
                     case "transactions":
                         rows = rows_transactions;
-                        console.log(`transactions`, rows_transactions)
+                        //console.log(`transactions`, rows_transactions)
                         break;
                     case "logs":
                         rows = rows_logs;
-                        console.log(`log`, rows_logs)
+                        //console.log(`log`, rows_logs)
                         break;
                 }
                 if (rows && rows.length > 0) {

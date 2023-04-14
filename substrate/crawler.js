@@ -2112,6 +2112,7 @@ module.exports = class Crawler extends Indexer {
         await this.assetManagerInit()
         web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
+                console.log(`newBlockHeaders`, result)
                 let blockNumber = result.number;
                 let block = null;
                 let block_tries = 0;
@@ -2153,7 +2154,7 @@ module.exports = class Crawler extends Indexer {
                         await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
                     }
                 } catch (err) {
-                    console.log(err)
+                    console.log(`crawlEvmReceipts err`, err)
                 }
             } else {
                 console.error(error);
