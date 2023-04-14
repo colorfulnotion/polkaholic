@@ -1631,9 +1631,9 @@ function decodeReceipt(r, contractABIs, contractABISignatures) {
     if (res.logs) {
         for (const log of res.logs) {
             let logIndex = log.logIndex
-            console.log(`+++ decode_log before logIndex=${logIndex}`, log)
+            //console.log(`+++ decode_log before logIndex=${logIndex}`, log)
             let decodedRes = decode_log(log, contractABIs, contractABISignatures)
-            console.log(`+++ decode_log after logIndex=${logIndex}`)
+            //console.log(`+++ decode_log after logIndex=${logIndex}`)
             decodedLogs.push(decodedRes)
         }
         delete res.logs
@@ -1999,15 +1999,15 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
     return false
 }
 
-function standardizeEvnet(){
-    var decodedEvents = JSON.parse('[{"name":"operator","type":"address","value":"0x921fd42f147b26b51aa3c7fa3f2e2ce7704c2858"},{"name":"from","type":"address","value":"0xd5654ed277d9771dfbbb7d9ef400a1e948374b16"},{"name":"to","type":"address","value":"0x280b8e99d2322fd89d58c8a3a0d89853d5c8216c"},{"name":"ids","type":"uint256[]","value":["96521632312203830051044393884124946371400813335785245886777580492585084973076"]},{"name":"values","type":"uint256[]","value":["1"]}]')
-    console.log(`decodedEvents`, decodedEvents)
+//TODO standardize event_type recursively -- currently only handle one level deep
+function standardizeDecodedEvnets(decodedEvents){
+    //console.log(`decodedEvents`, decodedEvents)
     for (let i = 0; i < decodedEvents.length; i++) {
         let dEvent = decodedEvents[i]
-        console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+        //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
         if ((dEvent.type.includes('int'))) {
             if (Array.isArray(dEvent.value)) {
-                console.log(`dEvent.value`, dEvent.value)
+                //console.log(`dEvent.value`, dEvent.value)
                 for (let j = 0; j < dEvent.value.length; j++) {
                     let dEventValJ = dEvent.value[j]
                     console.log(`dEvent.value[${j}]`, dEventValJ)
@@ -2018,9 +2018,11 @@ function standardizeEvnet(){
             }
             //console.log(`new dEvent.value`, dEvent.value)
         }
-        console.log(`updated dEvent[${i}]`, dEvent)
-        //decodedRes.events[i] = dEvent
+        //console.log(`updated dEvent[${i}]`, dEvent)
+        decodedEvents[i] = dEvent
     }
+    //console.log(`standardizeDecodedEvnets`, decodedEvents)
+    return decodedEvents
 }
 
 function decode_log(log, contractABIs, contractABISignatures) {
@@ -2036,29 +2038,13 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
         let decodeStatus = decodedRes.decodeStatus
-        console.log(`decodeStatus=[${decodeStatus}] fingerprintID=${fingerprintID}`, decodedRes)
+        //console.log(`decodeStatus=[${decodeStatus}] fingerprintID=${fingerprintID}`, decodedRes)
         let decodedEvents = decodedRes.events
         //console.log(`decodeStatus=[${decodeStatus}] decodedEvents\n`, JSON.stringify(decodedEvents))
         if (decodedEvents) {
-            console.log(`decodeStatus=[${decodeStatus}] decodedEvents\n`, JSON.stringify(decodedEvents))
-            for (let i = 0; i < decodedEvents.length; i++) {
-                let dEvent = decodedEvents[i]
-                //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
-                if ((dEvent.type.includes('int'))) {
-                    if (Array.isArray(dEvent.value)) {
-                        for (let j = 0; j < dEvent.value.length; j++) {
-                            dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
-                        }
-                    } else if (dEvent.value.substr(0, 2) == '0x') {
-                        dEvent.value = paraTool.dechexToIntStr(dEvent.value)
-                    }
-                    //console.log(`new dEvent.value`, dEvent.value)
-                }
-                console.log(`dEvent[${i}]`, dEvent)
-                decodedRes.events[i] = dEvent
-            }
+            decodedRes.events = standardizeDecodedEvnets(decodedEvents)
         }else{
-            console.log(`decodedEvents empty!`)
+            //console.log(`decodedEvents empty!`)
         }
         return decodedRes
     }
