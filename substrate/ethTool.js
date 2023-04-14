@@ -1447,10 +1447,12 @@ function encodeSelector(f, encodeLen = false) {
 }
 
 function parseAbiSignature(abiStrArr) {
-    var contractABI = JSON.parse(abiStrArr)
-    var intputs = contractABI.filter(e => e.type === "event" || e.type === "function")
     var output = []
-    intputs.forEach(function(e) {
+    try {
+    var contractABI = JSON.parse(abiStrArr)
+    var inputs = contractABI.filter(e => e.type === "event" || e.type === "function")
+    inputs.forEach(function(e) {
+	let stateMutability = e.stateMutability
         let abiType = e.type
         let [signature, topicLen] = getMethodSignature(e)
         let signatureRaw = getMethodSignatureRaw(e)
@@ -1464,6 +1466,7 @@ function parseAbiSignature(abiStrArr) {
         let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
         let abiStr = JSON.stringify([e])
         output.push({
+            stateMutability,
             fingerprint: fingerprint,
             fingerprintID: fingerprintID,
             secondaryID: secondaryID,
@@ -1472,10 +1475,12 @@ function parseAbiSignature(abiStrArr) {
             signature: signature,
             name: firstCharUpperCase(e.name),
             abi: abiStr,
-            abiType: abiType,
+            abiType,
             topicLength: topicLen
         })
     });
+    } catch (err) {
+    }
     return output
 }
 
@@ -1978,7 +1983,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
         let decodedEvents = decodedRes.events
-        if (decodedEvents){
+        if (decodedEvents) {
             for (let i = 0; i < decodedEvents.length; i++) {
                 let dEvent = decodedEvents[i]
                 //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
@@ -2416,14 +2421,14 @@ function computeTableId(abiStruct, fingerprintID) {
     return tableId
 }
 
-function getEVMFlds(schema){
+function getEVMFlds(schema) {
     let flds = []
     let protected_flds = ["chain_id", "evm_chain_id", "contract_address", "_partition", "_table_", "_file_", "_row_timestamp_", "__root__", "_colidentifier",
-    "call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number",
-    "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"
+        "call_success", "call_tx_hash", "call_trace_address", "call_block_time", "call_block_number",
+        "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"
     ]
-    for (const sch of schema){
-        if (!protected_flds.includes(sch.name)){
+    for (const sch of schema) {
+        if (!protected_flds.includes(sch.name)) {
             flds.push(sch.name)
         }
     }

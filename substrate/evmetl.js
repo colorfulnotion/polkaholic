@@ -106,6 +106,34 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
+
+    async loadLabels(chainID = 1, filePath = null) {
+        var labelsData = JSON.parse(fs.readFileSync(filePath));
+        let cnt = 0;
+        let vals = ["contractName", "labels", "chainID", "createDT"];
+        let out = [];
+        for (var address of Object.keys(labelsData)) {
+            if (address && address.length > 0) {
+                let name_labels = labelsData[address];
+                let name = name_labels.name ? name_labels.name : null;
+                let labels = name_labels.labels ? name_labels.labels : null;
+                address = address.toLowerCase();
+                cnt++;
+                if (name && name.length > 128) name = name.substring(0, 128);
+                if (labels && JSON.stringify(labels) > 1024) labels = [labels[0]];
+                out.push(`('${address}', ${mysql.escape(name)}, ${mysql.escape(JSON.stringify(labels))}, ${chainID}, Now() )`);
+            }
+        }
+        await this.upsertSQL({
+            "table": "abirepo",
+            "keys": ["address"],
+            "vals": vals,
+            "data": out,
+            "replace": vals
+        }, true);
+        process.exit(0);
+    }
+
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
         let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
@@ -316,7 +344,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
 
     async reloadABI(targetSQL = null) {
-        let sql = (targetSQL != undefined)? targetSQL :  `select abiType, name, signatureID, abi from contractabi where outdated = 1 order by numContracts desc;`
+        let sql = (targetSQL != undefined) ? targetSQL : `select abiType, name, signatureID, abi from contractabi where outdated = 1 order by numContracts desc;`
         var res = await this.poolREADONLY.query(sql);
         let i = 0;
         let n = 0
@@ -326,7 +354,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             console.log(`currBatch#${n}`, currBatch)
             if (currBatch.length > 0) {
                 let abiABI = []
-                for (const r of currBatch){
+                for (const r of currBatch) {
                     let abiStr = r.abi.toString('utf8')
                     let abi = JSON.parse(abiStr)[0]
                     abiABI.push(abi)
@@ -586,18 +614,18 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0)
     }
 
-    async crawlABIs(chainID = null, renew = false) {
+    async crawlABIs(chainID = null, renew = true) {
         let w = chainID ? ` and chainID = ${chainID}` : ""
-        let sql = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 10 group by to_address having count(*) >= 2 order by numTransactions7d desc limit 100000`;
+        let sql = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 2 and length(method_id) >= 10 group by to_address order by numTransactions7d desc limit 100000`;
         let recs = renew ? await this.execute_bqJob(sql) : [];
         let out = [];
-        let vals = ["chainID", "numTransactions7d", "createDT"];
+        let vals = ["chainID", "numTransactions7d", "status", "createDT"];
         let replace = ["numTransactions7d", "chainID"];
         for (const r of recs) {
             let address = r.to_address;
             if (address) {
                 address = address.toLowerCase();
-                out.push(`('${address}', '${r.chainID}', '${r.numTransactions7d}', Now())`)
+                out.push(`('${address}', '${r.chainID}', '${r.numTransactions7d}', 'Unknown', Now())`)
             }
         }
         await this.upsertSQL({
@@ -688,5 +716,94 @@ module.exports = class EVMETL extends PolkaholicDB {
                 console.log(`*****\nNew Schema #${i} ${tableId}\n`, sch, `\n`)
             }
         }
+    }
+
+    async addContractType(contractType, abiRaw) {
+        let sql = `insert into contractType (contractType, createDT, abiRaw) values ('${contractType}', Now(), ${mysql.escape(abiRaw)}) on duplicate key update abiRaw = values(abiRaw)`
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+    }
+
+    async updateContractTypes(chainID, testAddress = '0x055EA84bfAC8b95Bd7FE78Cec150e4121779d0d5') {
+        testAddress = testAddress.toLowerCase()
+        let contractTypeABIs = await this.poolREADONLY.query('select contractType, CONVERT(abiRaw using utf8) abiRaw from contractType');
+        let viewmethods = {};
+        let methods = [];
+        let knownmethodIDs = [];
+        for (const c of contractTypeABIs) {
+            if (viewmethods[c.contractType] == undefined) {
+                viewmethods[c.contractType] = [];
+            }
+            let a = JSON.parse(c.abiRaw);
+            // get all methodIDs of abi that are perfectly predictive
+            let out = ethTool.parseAbiSignature(c.abiRaw);
+            let functions = []
+            for (const o of out) {
+                if (o.abiType == "function") {
+                    if (o.stateMutability && (o.stateMutability == "view" || o.stateMutability == "pure")) {
+                        // TODO: only if inputless
+                        viewmethods[c.contractType].push(o);
+                    } else {
+                        functions.push(o);
+                    }
+                }
+            }
+            let methodIDs = functions.map((f) => {
+                return `'${f.fingerprintID}'`;
+            });
+            //console.log(c.contractType, methodIDs);
+            knownmethodIDs = knownmethodIDs.concat(methodIDs)
+
+            let inside_set = -Math.log(methodIDs.length); // 1/N chance
+            let outside_set = -Math.log(100); // 1% chance
+            if (methodIDs.length > 0) {
+                methods.push(`sum(if(left(input, 10) in (${methodIDs.join(",")}), ${inside_set}, ${outside_set})) as ${c.contractType}`)
+            }
+        }
+
+
+        // get all the unknown contracts
+        let unknowncontractRecs = await this.poolREADONLY.query(`select address, contractType from abirepo`);
+        let unknowncontracts = {};
+        for (const c of unknowncontractRecs) {
+            unknowncontracts[c.address] = c.contractType;
+        }
+
+        console.log("CURRENT TESTADDRESS contractType", unknowncontracts[testAddress])
+
+        // Now, for the last 7 days with contractaddress-methodID combinations, find the contractAddresses using those methodIDs, computing log likelihood across all contract types
+        let sql = `select to_address, ${methods.join(",")} from \`substrate-etl.evm.transactions\` group by to_address  order by count(*) desc limit 100000`
+        console.log("CATEGORIZER", sql);
+        let recs = await this.execute_bqJob(sql);
+        for (const d of recs) {
+            if (d.to_address) {
+                let address = d.to_address.toLowerCase();
+                let arr = Object.entries(d).filter((x) => {
+                    return (x[0] == "to_address") ? false : true
+                });
+                arr.sort((b, a) => a[1] - b[1]);
+                let diff = arr[0][1] - arr[1][1];
+                let contractType = "Unknown"; //
+                if (address == testAddress) {
+                    console.log(d);
+                }
+                if (diff > 3) {
+                    contractType = arr[0][0];
+                    if (unknowncontracts[address] == "Unknown") {
+                        // if this is unknown, then for all viewmethods, check which  which are the ones we will test with (e.g symbols, decimals), store in JSON field, for now
+                        let sqlout = `update abirepo set contractType = '${contractType}' where address = '${d.to_address}' and contractType = 'Unknown'`
+                        this.batchedSQL.push(sqlout);
+                        console.log(contractType, d.to_address);
+                    }
+                }
+            }
+        }
+        await this.update_batchedSQL();
+
+
+        // show the methodIDs
+        let training_sql = `select method_id, signature, count(distinct to_address) numContracts, min(to_address), max(to_address), count(*) numCalls from \`substrate-etl.evm.transactions\` where length(input) > 2 and chain_id = 1 and method_id not in (${knownmethodIDs.join(",")}) group by method_id, signature having numContracts >= 4 and numCalls >= 4 order by numContracts desc;`
+        console.log(training_sql);
+
     }
 }

@@ -8482,7 +8482,7 @@ module.exports = class Indexer extends AssetManager {
             let tblType = t.tbl_type
             let tableId = t.table_name
             let colName = t.column_name
-            let ordinalIdx = t.ordinal_position-1
+            let ordinalIdx = t.ordinal_position - 1
             let fingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
             if (evmSchemaMap[tableId] == undefined) {
                 evmSchemaMap[tableId] = {};
@@ -8493,9 +8493,9 @@ module.exports = class Indexer extends AssetManager {
                 evmFingerprintMap[fingerprintID].flds = []
                 evmFingerprintMap[fingerprintID].tableId = tableId
             }
-            if (tblType == 'call' && ordinalIdx >= 8){
+            if (tblType == 'call' && ordinalIdx >= 8) {
                 evmFingerprintMap[fingerprintID].flds.push(colName)
-            }else if (tblType == 'evt' && ordinalIdx >= 7){
+            } else if (tblType == 'evt' && ordinalIdx >= 7) {
                 evmFingerprintMap[fingerprintID].flds.push(colName)
             }
             evmSchemaMap[tableId][colName] = t.data_type;
@@ -8516,9 +8516,9 @@ module.exports = class Indexer extends AssetManager {
         return tableID
     }
 
-    getSchemaFlds(fingerprintID){
+    getSchemaFlds(fingerprintID) {
         let flds = false
-        if (this.evmFingerprintMap[fingerprintID] != undefined){
+        if (this.evmFingerprintMap[fingerprintID] != undefined) {
             flds = this.evmFingerprintMap[fingerprintID].flds
         }
         return flds
@@ -8537,7 +8537,7 @@ module.exports = class Indexer extends AssetManager {
             let tableId = schema.tableId
             // add to known mapping
             this.evmSchemaMap[tableId] = {}
-            for (const s of sch){
+            for (const s of sch) {
                 this.evmSchemaMap[tableId][s.name] = s.type
             }
             this.evmFingerprintMap[fingerprintID] = {}
@@ -8571,7 +8571,7 @@ module.exports = class Indexer extends AssetManager {
             })
             return false
         }
-        for (let i = 0; i < decodedEvents.length; i++){
+        for (let i = 0; i < decodedEvents.length; i++) {
             let fldName = flds[i]
             let dEvent = decodedEvents[i]
             if (ethTool.mapABITypeToBqType(dEvent.type) == 'JSON') {
@@ -8615,7 +8615,7 @@ module.exports = class Indexer extends AssetManager {
             })
             return false
         }
-        for (let i = 0; i < decodedParams.length; i++){
+        for (let i = 0; i < decodedParams.length; i++) {
             let fldName = flds[i]
             let dParam = decodedParams[i]
             if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
