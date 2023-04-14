@@ -780,6 +780,7 @@ function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
     try {
+        /*
         let methodID = txInput.slice(0, 10)
         let decodedData = abiDecoder.decodeMethod(txInput);
         if (decodedData != null) {
@@ -800,8 +801,17 @@ function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder
                 return decodedData
             }
         }
+        */
         let decodeNull = {
             decodeStatus: 'null'
+        }
+        let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder)
+        if (isSuccess) {
+            decodedData = {}
+            decodedData.params = decodedDataEtherJS
+            decodedData.decodeStatus = 'success'
+            //console.log(`** decodedData`, decodedData)
+            return decodedData
         }
         return decodeNull
     } catch (e) {
@@ -1257,6 +1267,7 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
     //abiDecoder.addABI(JSON.parse(methodABIStr));
     if (txn.hash == undefined) txn.hash = null
     try {
+        /*
         let txInput = txn.input
         let methodID = txn.input.slice(0, 10)
         let decodedData = abiDecoder.decodeMethod(txInput);
@@ -1279,6 +1290,16 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
                 //console.log(`** decodedData`, decodedData)
                 return decodedData
             }
+        }
+        */
+        let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder)
+        if (isSuccess) {
+            decodedData = {}
+            decodedData.params = decodedDataEtherJS
+            decodedData.decodeStatus = 'success'
+            decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
+            //console.log(`** decodedData`, decodedData)
+            return decodedData
         }
         let decodeNull = {
             decodeStatus: 'null'
@@ -1609,7 +1630,10 @@ function decodeReceipt(r, contractABIs, contractABISignatures) {
     let decodedLogs = []
     if (res.logs) {
         for (const log of res.logs) {
+            let logIndex = log.logIndex
+            //console.log(`+++ decode_log before logIndex=${logIndex}`, log)
             let decodedRes = decode_log(log, contractABIs, contractABISignatures)
+            //console.log(`+++ decode_log after logIndex=${logIndex}`)
             decodedLogs.push(decodedRes)
         }
         delete res.logs
@@ -1864,41 +1888,45 @@ function categorizeTokenTransfers(dLog) {
 function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     var abiDecoder = require('abi-decoder');
     abiDecoder.addABI(eventAbIStr)
+    let transactionLogIndex = (log.transactionLogIndex != undefined)? log.transactionLogIndex: log.transactionIndex
     try {
         let decodedLogs = abiDecoder.decodeLogs([log])
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
         //console.log(`decodedLog`, decodedLog)
-        let res = {
-            decodeStatus: 'success',
-            address: decodedLog.address,
-            transactionLogIndex: log.transactionLogIndex,
-            logIndex: log.logIndex,
-            data: log.data,
-            topics: log.topics,
-            signature: eventSignature,
-            fingerprintID: fingerprintID,
-            events: decodedLog.events
+        if (decodedLog){
+            let res = {
+                decodeStatus: 'success',
+                address: decodedLog.address,
+                transactionLogIndex: transactionLogIndex,
+                logIndex: log.logIndex,
+                data: log.data,
+                topics: log.topics,
+                signature: eventSignature,
+                fingerprintID: fingerprintID,
+                events: decodedLog.events
+            }
+            return res
         }
-        return res
     } catch (e) {
-        abiDecoder.discardNonDecodedLogs()
         let topic0 = log.topics[0]
         let topicLen = log.topics.length
-        console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
+        console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
         console.log(`decodeErr`, e)
-        //console.log(`log`, log)
-        let unknown = {
-            decodeStatus: 'error',
-            address: log.address,
-            transactionLogIndex: log.transactionLogIndex,
-            logIndex: log.logIndex,
-            data: log.data,
-            topics: log.topics,
-            fingerprintID: fingerprintID,
-        }
-        return unknown
     }
+    //console.log(`log`, log)
+    abiDecoder.discardNonDecodedLogs()
+    let unknownLog = {
+        decodeStatus: 'error',
+        address: log.address,
+        transactionLogIndex: transactionLogIndex,
+        logIndex: log.logIndex,
+        data: log.data,
+        topics: log.topics,
+        fingerprintID: fingerprintID,
+    }
+    console.log(`decode_event_fresh unknownLog`, unknownLog)
+    return unknownLog
 }
 
 // for a transfer event the "address" is the contract address
@@ -1906,6 +1934,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
 function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecoder) {
     //var abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(eventAbIStr)
+    let transactionLogIndex = (log.transactionLogIndex != undefined)? log.transactionLogIndex: log.transactionIndex
     try {
         let decodedLogs = abiDecoder.decodeLogs([log])
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
@@ -1913,7 +1942,7 @@ function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecode
         let res = {
             decodeStatus: 'success',
             address: decodedLog.address,
-            transactionLogIndex: log.transactionLogIndex,
+            transactionLogIndex: transactionLogIndex,
             logIndex: log.logIndex,
             data: log.data,
             topics: log.topics,
@@ -1926,7 +1955,7 @@ function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecode
         abiDecoder.discardNonDecodedLogs()
         let topic0 = log.topics[0]
         let topicLen = log.topics.length
-        console.log(`fallback decode txHash=${log.transactionHash} transactionLogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
+        console.log(`fallback decode txHash=${log.transactionHash} transactionLogIndex=${transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         return decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature)
     }
 }
@@ -1970,6 +1999,69 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
     return false
 }
 
+//TODO standardize event_type recursively -- currently only handle one level deep
+function standardizeDecodedEvnets_old(decodedEvents){
+    //console.log(`decodedEvents`, decodedEvents)
+    for (let i = 0; i < decodedEvents.length; i++) {
+        let dEvent = decodedEvents[i]
+        //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+        if ((dEvent.type.includes('int'))) {
+            if (Array.isArray(dEvent.value)) {
+                //console.log(`dEvent.value`, dEvent.value)
+                for (let j = 0; j < dEvent.value.length; j++) {
+                    let dEventValJ = dEvent.value[j]
+                    console.log(`dEvent.value[${j}]`, dEventValJ)
+                    dEvent.value[j] = paraTool.dechexToIntStr(dEventValJ)
+                }
+            } else if (dEvent.value.substr(0, 2) == '0x') {
+                dEvent.value = paraTool.dechexToIntStr(dEvent.value)
+            }
+            //console.log(`new dEvent.value`, dEvent.value)
+        }
+        //console.log(`updated dEvent[${i}]`, dEvent)
+        decodedEvents[i] = dEvent
+    }
+    //console.log(`standardizeDecodedEvnets`, decodedEvents)
+    return decodedEvents
+}
+
+function standardizeDecodedEvnetType(dEventVal, dEventType){
+    let decodedVal = dEventVal
+    if (dEventVal == '0x0000000000000000000000000000000000000000000000000000000000000001'){
+        console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`)
+    }
+    if (dEventType.includes('int') && dEventVal.substr(0,2) == '0x'){
+        decodedVal = paraTool.dechexToIntStr(dEventVal)
+    }else if (dEventType.includes('bool') && typeof dEventVal === 'string'){
+        // some bool are decoded as '0x0000000000000000000000000000000000000000000000000000000000000001'
+        // console.log(`boolean dEventType, dEventVal`, dEventVal)
+        decodedVal = (decodedVal.includes('1'))? true : false
+    }
+    return decodedVal
+}
+
+function standardizeDecodedEvnets(decodedEvents){
+    //console.log(`decodedEvents`, decodedEvents)
+    for (let i = 0; i < decodedEvents.length; i++) {
+        let dEvent = decodedEvents[i]
+        let dEventType = dEvent.type
+        if (Array.isArray(dEvent.value)){
+            //console.log(`dEvent.value`, dEvent.value)
+            for (let j = 0; j < dEvent.value.length; j++) {
+                console.log(`dEvent.value[${j}]`, dEvent.value[j])
+                dEvent.value[j] = standardizeDecodedEvnetType(dEvent.value[j], dEventType)
+            }
+        }else{
+            //do the type checking here
+            dEvent.value = standardizeDecodedEvnetType(dEvent.value, dEventType)
+        }
+        //console.log(`updated dEvent[${i}]`, dEvent)
+        decodedEvents[i] = dEvent
+    }
+    console.log(`standardizeDecodedEvnets`, decodedEvents)
+    return decodedEvents
+}
+
 function decode_log(log, contractABIs, contractABISignatures) {
     let topics = log.topics
     let topicLen = log.topics.length
@@ -1982,25 +2074,16 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let eventABIStr = foundApi.abi
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
+        let decodeStatus = decodedRes.decodeStatus
+        //console.log(`decodeStatus=[${decodeStatus}] fingerprintID=${fingerprintID}`, decodedRes)
         let decodedEvents = decodedRes.events
+        //console.log(`decodeStatus=[${decodeStatus}] decodedEvents\n`, JSON.stringify(decodedEvents))
         if (decodedEvents) {
-            for (let i = 0; i < decodedEvents.length; i++) {
-                let dEvent = decodedEvents[i]
-                //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
-                if ((dEvent.type.includes('int'))) {
-                    if (Array.isArray(dEvent.value)) {
-                        for (let j = 0; j < dEvent.value; j++) {
-                            dEvent.value[j] = paraTool.dechexToIntStr(dEvent.value[j])
-                        }
-                    } else if (dEvent.value.substr(0, 2) == '0x') {
-                        dEvent.value = paraTool.dechexToIntStr(dEvent.value)
-                    }
-                    //console.log(`new dEvent.value`, dEvent.value)
-                }
-                decodedRes.events[i] = dEvent
-            }
+            //decodedRes.events = standardizeDecodedEvnets_old(decodedEvents)
+            decodedRes.events = standardizeDecodedEvnets(decodedEvents)
+        }else{
+            //console.log(`decodedEvents empty!`)
         }
-        //console.log(`decodedRes.events`, decodedRes.events)
         return decodedRes
     }
     //console.log(`[#${log.blockNumber}-${log.transactionIndex}] decode_log: topic not found ${topic0} (topicLen ${topicLen})`)

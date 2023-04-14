@@ -8574,7 +8574,8 @@ module.exports = class Indexer extends AssetManager {
         for (let i = 0; i < decodedEvents.length; i++) {
             let fldName = flds[i]
             let dEvent = decodedEvents[i]
-            if (ethTool.mapABITypeToBqType(dEvent.type) == 'JSON') {
+            let bqColType = ethTool.mapABITypeToBqType(dEvent.type)
+            if (bqColType == 'JSON') {
                 rec[fldName] = JSON.stringify(dEvent.value)
             } else {
                 rec[fldName] = dEvent.value
@@ -8860,11 +8861,11 @@ module.exports = class Indexer extends AssetManager {
                         break;
                     case "transactions":
                         rows = rows_transactions;
-                        console.log(`transactions`, rows_transactions)
+                        //console.log(`transactions`, rows_transactions)
                         break;
                     case "logs":
                         rows = rows_logs;
-                        console.log(`log`, rows_logs)
+                        //console.log(`log`, rows_logs)
                         break;
                 }
                 if (rows && rows.length > 0) {
