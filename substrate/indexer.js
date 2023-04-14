@@ -8574,7 +8574,11 @@ module.exports = class Indexer extends AssetManager {
         for (let i = 0; i < decodedEvents.length; i++){
             let fldName = flds[i]
             let dEvent = decodedEvents[i]
-            rec[fldName] = dEvent.value
+            if (ethTool.mapABITypeToBqType(dEvent.type) == 'JSON') {
+                rec[fldName] = JSON.stringify(dEvent.value)
+            } else {
+                rec[fldName] = dEvent.value
+            }
         }
         /*
         for (const dEvent of decodedEvents) {

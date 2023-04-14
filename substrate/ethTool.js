@@ -1862,6 +1862,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     try {
         let decodedLogs = abiDecoder.decodeLogs([log])
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
+        //console.log(`decodedLog`, decodedLog)
         let res = {
             decodeStatus: 'success',
             address: decodedLog.address,
@@ -1881,7 +1882,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
         console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${log.transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
         console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
         console.log(`decodeErr`, e)
-        console.log(`log`, log)
+        //console.log(`log`, log)
         let unknown = {
             decodeStatus: 'error',
             address: log.address,
@@ -1980,7 +1981,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         if (decodedEvents){
             for (let i = 0; i < decodedEvents.length; i++) {
                 let dEvent = decodedEvents[i]
-                console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
+                //console.log(`[${dEvent.type}] dEvent value`, dEvent.value)
                 if ((dEvent.type.includes('int'))) {
                     if (Array.isArray(dEvent.value)) {
                         for (let j = 0; j < dEvent.value; j++) {
