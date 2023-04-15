@@ -2095,37 +2095,8 @@ module.exports = class Crawler extends Indexer {
         return (false);
     }
 
-    async crawlEVM(chainID) {
-        let chain = await this.getChain(chainID);
-
-        const Web3 = require('web3')
-        const bigquery = this.get_big_query();
-        await this.initEvmSchemaMap()
-        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
-            return (false);
-        }
-        const web3 = new Web3(chain.WSEndpoint);
-        this.web3Api = web3;
-        this.contractABIs = await this.getContractABI();
-        let contractABIs = this.contractABIs;
-        let contractABISignatures = this.contractABISignatures;
-        await this.assetManagerInit()
-
-
-	function connectToWeb3Node() {
-	    web3.eth.net.isListening()
-		.then(() => {
-		    console.log('Web3 connected to node', web3.currentProvider.host);
-		})
-		.catch((err) => {
-		    console.log('Web3 connection failed', err);
-		    setTimeout(() => {
-			connectToWeb3Node();
-		    }, 2000);
-		})
-	}
-	
-        web3.eth.subscribe('newBlockHeaders', async (error, result) => {
+    crawl_evm_core(web3, chainID) {
+	web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
                 console.log(`newBlockHeaders`, result)
                 let blockNumber = result.number;
@@ -2161,12 +2132,12 @@ module.exports = class Crawler extends Indexer {
                         if (!evmReceipts) evmReceipts = [];
                         console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                         var statusesPromise = Promise.all([
-                            ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
-                            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                            ethTool.processTranssctions(block.transactions, this.contractABIs, this.contractABISignatures),
+                            ethTool.processReceipts(evmReceipts, this.contractABIs, this.contractABISignatures)
                         ])
                         let [dTxns, dReceipts] = await statusesPromise
                         let evmTrace = false
-                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, this.contractABIs, this.contractABISignatures)
                     }
                 } catch (err) {
                     console.log(`crawlEvmReceipts err`, err)
@@ -2182,6 +2153,28 @@ module.exports = class Crawler extends Indexer {
                 console.error(error);
             }
         });
+	
+    }
+    
+    async crawlEVM(chainID) {
+        let chain = await this.getChain(chainID);
+        const Web3 = require('web3')
+        await this.initEvmSchemaMap()
+        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
+            return (false);
+        }
+        const web3 = new Web3(new Web3.providers.WebsocketProvider(chain.WSEndpoint, {
+	    reconnect: {
+		auto: true,
+		delay: 2500, // ms
+		maxAttempts: 50000,
+		onTimeout: false
+	    }
+	}));
+        this.web3Api = web3;
+        this.contractABIs = await this.getContractABI();
+        await this.assetManagerInit()
+	this.crawl_evm_core(web3, chainID)
     }
 
     async crawlBlocks(chainID) {
@@ -2189,8 +2182,6 @@ module.exports = class Crawler extends Indexer {
             this.readyToCrawlParachains = true;
         }
         if (chainID == 1 || chainID == 10 || chainID == 56 || chainID == 137 || chainID == 42161 || chainID == 43114) {
-            //console.log("loading evm");
-            //await this.load_calls_events("evm_dev");
             this.crawlEVM(chainID);
             return [null, null, null];
         } else {
