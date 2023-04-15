@@ -1,0 +1,39 @@
+[
+      {
+        "description": "Chain ID",
+        "mode": "REQUIRED",
+        "name": "chain_id",
+        "type": "INTEGER"
+      },
+      {
+        "description": "Address of the contract",
+        "mode": "REQUIRED",
+        "name": "address",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "status",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "contract_type",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "token_name",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "contract_name",
+        "type": "STRING"
+      },
+      {
+        "mode": "NULLABLE",
+        "name": "labels",
+        "type": "STRING"
+      }
+]

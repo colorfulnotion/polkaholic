@@ -6,6 +6,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 
 const ethTool = require("./ethTool");
+const path = require('path');
 
 const fs = require('fs');
 const readline = require('readline');
@@ -503,6 +504,32 @@ module.exports = class EVMETL extends PolkaholicDB {
         } catch (e) {
             // TODO optimization: do not create twice
         }
+    }
+
+    async loadABIRepo() {
+        let tbl = `abirepo`
+	let relayChain = 'evm'
+        let projectID = `substrate-etl`
+        let bqDataset = `evm` 
+        let sql = `select address, chainID, labels, contractType, tokenName, contractName from abirepo`
+        let sqlRecs = await this.poolREADONLY.query(sql);
+        let dir = "/tmp";
+        let fn = path.join(dir, `${tbl}.json`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let NL = "\r\n";
+        sqlRecs.forEach((e) => {
+	    fs.writeSync(f, JSON.stringify({
+                address: e.address,
+                chain_id: e.chainID,
+                token_name: e.tokenName,
+                labels:	e.labels ? JSON.parse(e.labels).join(",") : null,
+                contract_type: e.contractType,
+                contract_name: e.contractName,
+            }) + NL);
+        });
+        fs.closeSync(f);
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/evm/${tbl}.json`;
+        console.log(cmd)
     }
 
     async getAlltables(detasetID = `evm_dev`, projectID = `substrate-etl`) {
