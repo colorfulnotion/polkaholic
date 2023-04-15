@@ -2110,6 +2110,21 @@ module.exports = class Crawler extends Indexer {
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
         await this.assetManagerInit()
+
+
+	function connectToWeb3Node() {
+	    web3.eth.net.isListening()
+		.then(() => {
+		    console.log('Web3 connected to node', web3.currentProvider.host);
+		})
+		.catch((err) => {
+		    console.log('Web3 connection failed', err);
+		    setTimeout(() => {
+			connectToWeb3Node();
+		    }, 2000);
+		})
+	}
+	
         web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
                 console.log(`newBlockHeaders`, result)
