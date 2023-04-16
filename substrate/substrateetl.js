@@ -4446,7 +4446,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log(e);
         }
 
-        // mark crowdloanMetricsStatus as redy or ignore, depending on the result
         if (numSubstrateETLLoadErrors == 0) {
             //first polkadot crowdloan: 2021-11-05
             //first kusama crowdloan: 2021-06-08
@@ -4454,8 +4453,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             if (paraID == 0) {
                 w = `and logDT >= '2021-06-08'`
             }
-            let crowdloanMetricsStatus = (paraID == 0) ? 'Ready' : 'Ignore'
-            let sql = `update blocklog set crowdloanMetricsStatus = '${crowdloanMetricsStatus}' where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
+            // mark crowdloanMetricsStatus as redy or ignore, depending on the result
+            let crowdloanMetricsStatus = (paraID == 0) ? 'Ready' : 'Ignore' // TODO: systematize
+            let sql = `update blocklog set loaded = 1 where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
         }
@@ -4805,7 +4805,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 
         console.log(sqla);
         let r = {}
-        let vals = [` loaded = 1 `];
+        let vals = [];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             let rows = await this.execute_bqJob(sql);

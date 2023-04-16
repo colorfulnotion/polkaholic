@@ -1470,38 +1470,37 @@ function encodeSelector(f, encodeLen = false) {
 function parseAbiSignature(abiStrArr) {
     var output = []
     try {
-    var contractABI = JSON.parse(abiStrArr)
-    var inputs = contractABI.filter(e => e.type === "event" || e.type === "function")
-    inputs.forEach(function(e) {
-	let stateMutability = e.stateMutability
-        let abiType = e.type
-        let [signature, topicLen] = getMethodSignature(e)
-        let signatureRaw = getMethodSignatureRaw(e)
-        let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
-        let fingerprint = getMethodFingureprint(e)
-        /*
-        previous fingerprintID is now secondaryID, which is NOT unique
-        New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
-        */
-        let secondaryID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) // this is NOT Unique
-        let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
-        let abiStr = JSON.stringify([e])
-        output.push({
-            stateMutability,
-            fingerprint: fingerprint,
-            fingerprintID: fingerprintID,
-            secondaryID: secondaryID,
-            signatureID: signatureID,
-            signatureRaw: signatureRaw,
-            signature: signature,
-            name: firstCharUpperCase(e.name),
-            abi: abiStr,
-            abiType,
-            topicLength: topicLen
-        })
-    });
-    } catch (err) {
-    }
+        var contractABI = JSON.parse(abiStrArr)
+        var inputs = contractABI.filter(e => e.type === "event" || e.type === "function")
+        inputs.forEach(function(e) {
+            let stateMutability = e.stateMutability
+            let abiType = e.type
+            let [signature, topicLen] = getMethodSignature(e)
+            let signatureRaw = getMethodSignatureRaw(e)
+            let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
+            let fingerprint = getMethodFingureprint(e)
+            /*
+            previous fingerprintID is now secondaryID, which is NOT unique
+            New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
+            */
+            let secondaryID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) // this is NOT Unique
+            let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
+            let abiStr = JSON.stringify([e])
+            output.push({
+                stateMutability,
+                fingerprint: fingerprint,
+                fingerprintID: fingerprintID,
+                secondaryID: secondaryID,
+                signatureID: signatureID,
+                signatureRaw: signatureRaw,
+                signature: signature,
+                name: firstCharUpperCase(e.name),
+                abi: abiStr,
+                abiType,
+                topicLength: topicLen
+            })
+        });
+    } catch (err) {}
     return output
 }
 
@@ -1559,13 +1558,15 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
         let dReceipt = dReceipts[i]
         let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
         let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
-        if (fTxn.isConnectedCall) {
-            fTxnsConnected.push(fTxn)
-        }
-        fTxns.push(fTxn)
-        if (fTxn.transactionsInternal && fTxn.transactionsInternal.length > 0) {
-            for (let j = 0; j < fTxn.transactionsInternal.length; j++) {
-                fTxnsInternal.push(fTxn.transactionsInternal[j]);
+        if (fTxn) {
+            if (fTxn.isConnectedCall) {
+                fTxnsConnected.push(fTxn)
+            }
+            fTxns.push(fTxn)
+            if (fTxn.transactionsInternal && fTxn.transactionsInternal.length > 0) {
+                for (let j = 0; j < fTxn.transactionsInternal.length; j++) {
+                    fTxnsInternal.push(fTxn.transactionsInternal[j]);
+                }
             }
         }
     }
@@ -1888,12 +1889,12 @@ function categorizeTokenTransfers(dLog) {
 function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
     var abiDecoder = require('abi-decoder');
     abiDecoder.addABI(eventAbIStr)
-    let transactionLogIndex = (log.transactionLogIndex != undefined)? log.transactionLogIndex: log.transactionIndex
+    let transactionLogIndex = (log.transactionLogIndex != undefined) ? log.transactionLogIndex : log.transactionIndex
     try {
         let decodedLogs = abiDecoder.decodeLogs([log])
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
         //console.log(`decodedLog`, decodedLog)
-        if (decodedLog){
+        if (decodedLog) {
             let res = {
                 decodeStatus: 'success',
                 address: decodedLog.address,
@@ -1934,7 +1935,7 @@ function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
 function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecoder) {
     //var abiDecoder = require('abi-decoder');
     //abiDecoder.addABI(eventAbIStr)
-    let transactionLogIndex = (log.transactionLogIndex != undefined)? log.transactionLogIndex: log.transactionIndex
+    let transactionLogIndex = (log.transactionLogIndex != undefined) ? log.transactionLogIndex : log.transactionIndex
     try {
         let decodedLogs = abiDecoder.decodeLogs([log])
         let decodedLog = decodedLogs[0] //successful result should have name, events, address
@@ -2000,7 +2001,7 @@ function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
 }
 
 //TODO standardize event_type recursively -- currently only handle one level deep
-function standardizeDecodedEvnets_old(decodedEvents){
+function standardizeDecodedEvnets_old(decodedEvents) {
     //console.log(`decodedEvents`, decodedEvents)
     for (let i = 0; i < decodedEvents.length; i++) {
         let dEvent = decodedEvents[i]
@@ -2025,33 +2026,33 @@ function standardizeDecodedEvnets_old(decodedEvents){
     return decodedEvents
 }
 
-function standardizeDecodedEvnetType(dEventVal, dEventType){
+function standardizeDecodedEvnetType(dEventVal, dEventType) {
     let decodedVal = dEventVal
-    if (dEventVal == '0x0000000000000000000000000000000000000000000000000000000000000001'){
+    if (dEventVal == '0x0000000000000000000000000000000000000000000000000000000000000001') {
         console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`)
     }
-    if (dEventType.includes('int') && dEventVal.substr(0,2) == '0x'){
+    if (dEventType.includes('int') && dEventVal.substr(0, 2) == '0x') {
         decodedVal = paraTool.dechexToIntStr(dEventVal)
-    }else if (dEventType.includes('bool') && typeof dEventVal === 'string'){
+    } else if (dEventType.includes('bool') && typeof dEventVal === 'string') {
         // some bool are decoded as '0x0000000000000000000000000000000000000000000000000000000000000001'
         // console.log(`boolean dEventType, dEventVal`, dEventVal)
-        decodedVal = (decodedVal.includes('1'))? true : false
+        decodedVal = (decodedVal.includes('1')) ? true : false
     }
     return decodedVal
 }
 
-function standardizeDecodedEvnets(decodedEvents){
+function standardizeDecodedEvnets(decodedEvents) {
     //console.log(`decodedEvents`, decodedEvents)
     for (let i = 0; i < decodedEvents.length; i++) {
         let dEvent = decodedEvents[i]
         let dEventType = dEvent.type
-        if (Array.isArray(dEvent.value)){
+        if (Array.isArray(dEvent.value)) {
             //console.log(`dEvent.value`, dEvent.value)
             for (let j = 0; j < dEvent.value.length; j++) {
                 console.log(`dEvent.value[${j}]`, dEvent.value[j])
                 dEvent.value[j] = standardizeDecodedEvnetType(dEvent.value[j], dEventType)
             }
-        }else{
+        } else {
             //do the type checking here
             dEvent.value = standardizeDecodedEvnetType(dEvent.value, dEventType)
         }
@@ -2081,7 +2082,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         if (decodedEvents) {
             //decodedRes.events = standardizeDecodedEvnets_old(decodedEvents)
             decodedRes.events = standardizeDecodedEvnets(decodedEvents)
-        }else{
+        } else {
             //console.log(`decodedEvents empty!`)
         }
         return decodedRes

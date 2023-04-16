@@ -2096,8 +2096,11 @@ module.exports = class Crawler extends Indexer {
     }
 
     crawl_evm_core(web3, chainID) {
-	web3.eth.subscribe('newBlockHeaders', async (error, result) => {
+        let lastHeaderReceived = this.getCurrentTS();
+
+        web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
+                lastHeaderReceived = this.getCurrentTS();
                 console.log(`newBlockHeaders`, result)
                 let blockNumber = result.number;
                 let block = null;
@@ -2153,9 +2156,14 @@ module.exports = class Crawler extends Indexer {
                 console.error(error);
             }
         });
-	
+
+        setInterval(() => {
+            if (this.getCurrentTS() - lastHeaderReceived > 20) {
+                process.exit(0);
+            }
+        }, 2000);
     }
-    
+
     async crawlEVM(chainID) {
         let chain = await this.getChain(chainID);
         const Web3 = require('web3')
@@ -2163,18 +2171,35 @@ module.exports = class Crawler extends Indexer {
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
-        const web3 = new Web3(new Web3.providers.WebsocketProvider(chain.WSEndpoint, {
-	    reconnect: {
-		auto: true,
-		delay: 2500, // ms
-		maxAttempts: 50000,
-		onTimeout: false
-	    }
-	}));
+        let provider = null
+        const startConnection = () => {
+            provider = new Web3.providers.WebsocketProvider(
+                chain.WSEndpoint, {
+                    clientConfig: {
+                        keepalive: true,
+                        keepaliveInterval: -1
+                    },
+                    reconnect: {
+                        auto: true,
+                        delay: 5000,
+                        maxAttempts: 5,
+                        onTimeout: false
+                    }
+                }
+            );
+
+            provider.connection.addEventListener('close', () => {
+                startConnection()
+            })
+
+        }
+
+        startConnection();
+        const web3 = new Web3(provider);
         this.web3Api = web3;
         this.contractABIs = await this.getContractABI();
         await this.assetManagerInit()
-	this.crawl_evm_core(web3, chainID)
+        this.crawl_evm_core(web3, chainID)
     }
 
     async crawlBlocks(chainID) {

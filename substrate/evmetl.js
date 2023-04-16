@@ -508,9 +508,9 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     async loadABIRepo() {
         let tbl = `abirepo`
-	let relayChain = 'evm'
+        let relayChain = 'evm'
         let projectID = `substrate-etl`
-        let bqDataset = `evm` 
+        let bqDataset = `evm`
         let sql = `select address, chainID, labels, contractType, tokenName, contractName from abirepo`
         let sqlRecs = await this.poolREADONLY.query(sql);
         let dir = "/tmp";
@@ -518,11 +518,11 @@ module.exports = class EVMETL extends PolkaholicDB {
         let f = fs.openSync(fn, 'w', 0o666);
         let NL = "\r\n";
         sqlRecs.forEach((e) => {
-	    fs.writeSync(f, JSON.stringify({
+            fs.writeSync(f, JSON.stringify({
                 address: e.address,
                 chain_id: e.chainID,
                 token_name: e.tokenName,
-                labels:	e.labels ? JSON.parse(e.labels).join(",") : null,
+                labels: e.labels ? JSON.parse(e.labels).join(",") : null,
                 contract_type: e.contractType,
                 contract_name: e.contractName,
             }) + NL);
@@ -530,6 +530,30 @@ module.exports = class EVMETL extends PolkaholicDB {
         fs.closeSync(f);
         let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/evm/${tbl}.json`;
         console.log(cmd)
+    }
+
+    async learnMethod(chainID = 1, address = "") {
+        // sample recent evm transactions + logs
+        if (true) {
+            let sql = `SELECT signature, count(*) numTransactions FROM \`substrate-etl.evm.transactions\` as transactions where transactions.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)   group by signature order by numTransactions desc;`
+            console.log(sql);
+            let recs = await this.execute_bqJob(sql);
+            for (const r of recs) {
+                let sql0 = `update contractabi set numTransactions = '${r.numTransactions}' where signature = '${r.signature}'`
+                console.log(sql0);
+                this.batchedSQL.push(sql0);
+                await this.update_batchedSQL()
+            }
+            return (true);
+            sql = `SELECT signature, count(*) numLogs FROM \`substrate-etl.evm.logs\` as logs  where logs.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)  group by signature order by count(*) desc;`;
+            recs = await this.execute_bqJob(sql);
+            for (const r of recs) {
+                let sql0 = `update contractabi set numLogs = '${r.numLogs}' where signature = '${r.signature}'`
+                console.log(sql0);
+                this.batchedSQL.push(sql0);
+                await this.update_batchedSQL()
+            }
+        }
     }
 
     async getAlltables(detasetID = `evm_dev`, projectID = `substrate-etl`) {
