@@ -792,7 +792,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 others[`${o.chainID}-${o.logTS}`] = true;
             }
             // now out of candidate jobs choose the first one that hasn't been picked
-            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where updateAddressBalanceStatus = "Ready" and
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( updateAddressBalanceStatus = "Ready" or (updateAddressBalanceStatus = 'Ignore' and logDT = date(date_sub(Now(), interval 1 day))) ) and
  ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE )
  or lastUpdateAddressBalancesStartDT is Null  ) and blocklog.logDT >= '${balanceStartDT}' ${w} order by ${orderby}`;
             let jobs = await this.pool.query(sql);
@@ -1388,7 +1388,9 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async getLastKey(chainID, logDT) {
-        let chains = await this.pool.query(`select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 1 hour)`);
+	let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 6 hour)`
+        let chains = await this.pool.query(sql);
+	console.log("getLastKey", sql, chains);
         if (chains.length == 0) {
             return "";
         } else {
@@ -2093,7 +2095,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         if (last_key == "" || (bqlogfn && !fs.existsSync(bqlogfn))) {
             last_key = "";
             await this.clean_bqlogfn(chainID, logDT, startTS);
-            console.log("STARTING CLEAN");
+            console.log("STARTING CLEAN", bqlogfn);
         } else {
             console.log("RESUMING with last_key", last_key)
         }
@@ -2224,7 +2226,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                 // when we come back, we'll pick this one
                 console.log(`EXITING with last key stored:`, last_key.toString());
                 // update lastUpdateAddressBalancesAttempts back to 0
-                let sql = `update blocklog set lastUpdateAddressBalancesAttempts = 1 where logDT = '${logDT}' and chainID = '${chainID}'`;
+                let sql = `update blocklog set lastUpdateAddressBalancesAttempts = 0 where logDT = '${logDT}' and chainID = '${chainID}'`;
                 this.batchedSQL.push(sql1);
                 await this.update_batchedSQL();
                 process.exit(1);
@@ -4446,7 +4448,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log(e);
         }
 
-        // mark crowdloanMetricsStatus as redy or ignore, depending on the result
         if (numSubstrateETLLoadErrors == 0) {
             //first polkadot crowdloan: 2021-11-05
             //first kusama crowdloan: 2021-06-08
@@ -4454,8 +4455,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             if (paraID == 0) {
                 w = `and logDT >= '2021-06-08'`
             }
-            let crowdloanMetricsStatus = (paraID == 0) ? 'Ready' : 'Ignore'
-            let sql = `update blocklog set crowdloanMetricsStatus = '${crowdloanMetricsStatus}' where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
+            // mark crowdloanMetricsStatus as redy or ignore, depending on the result
+            let crowdloanMetricsStatus = (paraID == 0) ? 'Ready' : 'Ignore' // TODO: systematize
+            let sql = `update blocklog set loaded = 1 where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
         }
@@ -4805,7 +4807,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 
         console.log(sqla);
         let r = {}
-        let vals = [` loaded = 1 `];
+        let vals = [];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             let rows = await this.execute_bqJob(sql);
