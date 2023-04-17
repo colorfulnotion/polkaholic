@@ -71,6 +71,9 @@ module.exports = class Indexer extends AssetManager {
     assetholder = {};
     api = false;
     web3Api = false;
+    evmRPC = false;              //
+    evmRPCBlockReceipts = false; // api endpoint that supports eth_getBlockReceipts
+    evmRPCInternal = false;      // api endpoint that supports eth_getBlockReceipts
     contractABIs = false;
     contractABISignatures = {};
     chainID = false;
@@ -8959,32 +8962,117 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    async retryWithDelay(operation, maxRetries = 10, delay = 500, ctx = "") {
+      for (let i = 0; i < maxRetries; i++) {
+        const result = await operation();
+        if (result !== false) {
+          console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
+          return result;
+        }
+        if (i < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+      console.log(`retryWithDelay Failed maxRetries(${maxRetries}) reached`)
+      return false;
+    }
+
+    async crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber, timeoutMS = 20000) {
+        if (!evmRPCBlockReceipts) {
+            return (false);
+        }
+        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceipts)
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0,3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCBlockReceipts}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+        //console.log(`crawlEvmBlockReceipts`, cmd)
+        try {
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd, {
+                maxBuffer: 1024 * 64000
+            });
+            let receiptData = JSON.parse(stdout);
+            if (receiptData.result) {
+                console.log(blockNumber, receiptData.result.length, cmd);
+                return (receiptData.result);
+            }
+            //console.log(`crawlEvmBlockReceipts`, cmd)
+            return (null);
+        } catch (error) {
+            this.logger.warn({
+                "op": "crawlEvmBlockReceipts",
+                "cmd": cmd,
+                "err": error
+            })
+            console.log(error);
+        }
+        return false;
+    }
+
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
-        const Web3 = require('web3')
         const bigquery = this.get_big_query();
         await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
-        const web3 = new Web3(chain.WSEndpoint);
+
+        // TODO: extract this
+        const Web3 = require('web3')
+        let provider = null
+        const startConnection = () => {
+            provider = new Web3.providers.WebsocketProvider(
+                chain.WSEndpoint, {
+                    clientConfig: {
+                        keepalive: true,
+                        keepaliveInterval: -1
+                    },
+                    reconnect: {
+                        auto: true,
+                        delay: 5000,
+                        maxAttempts: 5,
+                        onTimeout: false
+                    }
+                }
+            );
+            provider.connection.addEventListener('close', () => {
+                startConnection()
+            })
+        }
+        startConnection();
+        const web3 = new Web3(provider);
         this.web3Api = web3;
+        if (chain.evmRPCBlockReceipts != undefined){
+            this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
+        }
+        if (chain.evmRPCInternal != undefined){
+            this.evmRPCInternal = chain.evmRPCInternal
+        }
+        if (chain.evmRPC != undefined){
+            this.evmRPC = chain.evmRPC
+        }
         this.contractABIs = await this.getContractABI();
+
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
         await this.assetManagerInit()
+
+        let evmRPCBlockReceipts = this.evmRPCBlockReceipts
+
         let blockNumber = blkNum;
         let block = null;
         let blockHash = null
         let block_tries = 0;
-        do {
-            try {
-                block = await ethTool.crawlEvmBlock(web3, blockNumber);
-                block_tries++;
-            } catch (err) {
-                // console.log("crawlEVM", result, err);
-            }
-        } while (!block && block_tries < 10)
+        let block_retry_max = 10
+        let block_retry_ms = 200
+
+        let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+        let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+        block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+        console.log(`blk #${blockNumber}`, block)
         let numTransactions = block && block.transactions ? block.transactions.length : 0;
         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
         let rows_blocks = [];
@@ -8993,18 +9081,18 @@ module.exports = class Indexer extends AssetManager {
         try {
             blockHash = block.hash
             if (numTransactions > 0) {
-                let log_tries = 0
+                let isParallel = true
+                let log_retry_max = 10
+                let log_retry_ms = 500
                 let evmReceipts = false
-                do {
-                    try {
-                        let isParallel = true
-                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                        log_tries++;
-                    } catch (err) {
-                        console.log(`crawlEVM Failed ${log_tries}`, err);
-                    }
-                } while (!evmReceipts && log_tries < 10)
+
+                let evmReceiptsFunc = (evmRPCBlockReceipts)? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number): ethTool.crawlEvmReceipts(web3, block, isParallel)
+                let evmReceiptsCtx = (evmRPCBlockReceipts)? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})`: `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+
+                evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                if (!evmReceipts) evmReceipts = [];
                 console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+
                 if (!evmReceipts) evmReceipts = [];
                 var statusesPromise = Promise.all([
                     ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),

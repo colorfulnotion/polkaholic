@@ -306,7 +306,6 @@ module.exports = class Crawler extends Indexer {
 
     // crawl_block_trace (used by crawlBackfill) fetches a block using { blockNumber, attempted, crawlTrace } saves in BT with save_block_trace [which updates block${chainID} table]  It does NOT index the block
     async crawl_block_trace(chain, t) {
-
         try {
             let bn = parseInt(t.blockNumber, 10)
             let header = await this.api.rpc.chain.getBlockHash(bn);
@@ -2097,6 +2096,7 @@ module.exports = class Crawler extends Indexer {
 
     crawl_evm_core(web3, chainID) {
         let lastHeaderReceived = this.getCurrentTS();
+        let evmRPCBlockReceipts = this.evmRPCBlockReceipts
 
         web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
@@ -2105,6 +2105,14 @@ module.exports = class Crawler extends Indexer {
                 let blockNumber = result.number;
                 let block = null;
                 let block_tries = 0;
+                let block_retry_max = 10
+                let block_retry_ms = 200
+
+                let evmBlockFunc = web3.eth.getBlock(result.hash, true)
+                let evmBlockCtx = `web3.eth.getBlock(${result.hash}, true)`
+
+                block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+                /*
                 do {
                     try {
                         block = await web3.eth.getBlock(result.hash, true);
@@ -2113,27 +2121,26 @@ module.exports = class Crawler extends Indexer {
                         // console.log("crawlEVM", result, err);
                     }
                 } while (!block && block_tries < 10)
+                */
                 let numTransactions = block && block.transactions ? block.transactions.length : 0;
                 let rows_blocks = [];
                 let rows_transactions = [];
                 let rows_logs = [];
+
                 try {
                     if (numTransactions >= 0) {
                         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                         let isParallel = true
-                        let log_tries = 0
+                        let log_retry_max = 10
+                        let log_retry_ms = 500
                         let evmReceipts = false
-                        do {
-                            try {
-                                evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                                console.log(`[#${block.number}] evmReceipts trial${log_tries}`, )
-                                log_tries++;
-                            } catch (err) {
-                                console.log(`crawlEVM Failed ${log_tries}`, err);
-                            }
-                        } while (!evmReceipts && log_tries < 10)
+
+                        let evmReceiptsFunc = (evmRPCBlockReceipts)? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number): ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = (evmRPCBlockReceipts)? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})`: `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
                         if (!evmReceipts) evmReceipts = [];
                         console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+
                         var statusesPromise = Promise.all([
                             ethTool.processTranssctions(block.transactions, this.contractABIs, this.contractABISignatures),
                             ethTool.processReceipts(evmReceipts, this.contractABIs, this.contractABISignatures)
@@ -2157,8 +2164,10 @@ module.exports = class Crawler extends Indexer {
             }
         });
 
+        let lastHeaderReceivedSecAgoExitThreshold = 40
         setInterval(() => {
-            if (this.getCurrentTS() - lastHeaderReceived > 20) {
+            if (this.getCurrentTS() - lastHeaderReceived > lastHeaderReceivedSecAgoExitThreshold) {
+                console.log(`EXIT: lastHeaderReceivedSecAgo ${this.getCurrentTS() - lastHeaderReceived}`, )
                 process.exit(0);
             }
         }, 2000);
@@ -2166,11 +2175,13 @@ module.exports = class Crawler extends Indexer {
 
     async crawlEVM(chainID) {
         let chain = await this.getChain(chainID);
-        const Web3 = require('web3')
         await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
+
+        // TODO: extract this
+        const Web3 = require('web3')
         let provider = null
         const startConnection = () => {
             provider = new Web3.providers.WebsocketProvider(
@@ -2187,17 +2198,25 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
             );
-
             provider.connection.addEventListener('close', () => {
                 startConnection()
             })
-
         }
-
         startConnection();
+
         const web3 = new Web3(provider);
         this.web3Api = web3;
+        if (chain.evmRPCBlockReceipts != undefined){
+            this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
+        }
+        if (chain.evmRPCInternal != undefined){
+            this.evmRPCInternal = chain.evmRPCInternal
+        }
+        if (chain.evmRPC != undefined){
+            this.evmRPC = chain.evmRPC
+        }
         this.contractABIs = await this.getContractABI();
+
         await this.assetManagerInit()
         this.crawl_evm_core(web3, chainID)
     }
