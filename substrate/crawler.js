@@ -2124,15 +2124,18 @@ module.exports = class Crawler extends Indexer {
                         let isParallel = true
                         let log_tries = 0
                         let evmReceipts = false
+                        let retryMs = 500
                         do {
                             try {
-                                if (evmRPCBlockReceipts){
-                                    evmReceipts = await this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number);
-                                }else{
-                                    evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                                }
-                                console.log(`[#${block.number}] evmReceipts trial${log_tries}`, )
-                                log_tries++;
+                                setInterval(function(){
+                                    if (evmRPCBlockReceipts){
+                                        evmReceipts = await this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number);
+                                    }else{
+                                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                                    }
+                                    console.log(`[#${block.number}] evmReceipts trial${log_tries}`, )
+                                    log_tries++;
+                                }, retryMs)
                             } catch (err) {
                                 console.log(`crawlEVM Failed ${log_tries}`, err);
                             }
@@ -2215,9 +2218,7 @@ module.exports = class Crawler extends Indexer {
         this.contractABIs = await this.getContractABI();
 
         await this.assetManagerInit()
-        console.log(`before crawl_evm_core chainID=${chainID}`)
         this.crawl_evm_core(web3, chainID)
-        console.log(`after crawl_evm_core chainID=${chainID}`)
     }
 
     async crawlBlocks(chainID) {
