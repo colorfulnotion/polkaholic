@@ -2061,7 +2061,7 @@ function standardizeDecodedEvnets(decodedEvents) {
         //console.log(`updated dEvent[${i}]`, dEvent)
         decodedEvents[i] = dEvent
     }
-    console.log(`standardizeDecodedEvnets`, decodedEvents)
+    //console.log(`standardizeDecodedEvnets`, decodedEvents)
     return decodedEvents
 }
 
