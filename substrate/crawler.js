@@ -306,7 +306,6 @@ module.exports = class Crawler extends Indexer {
 
     // crawl_block_trace (used by crawlBackfill) fetches a block using { blockNumber, attempted, crawlTrace } saves in BT with save_block_trace [which updates block${chainID} table]  It does NOT index the block
     async crawl_block_trace(chain, t) {
-
         try {
             let bn = parseInt(t.blockNumber, 10)
             let header = await this.api.rpc.chain.getBlockHash(bn);
@@ -2097,6 +2096,8 @@ module.exports = class Crawler extends Indexer {
 
     crawl_evm_core(web3, chainID) {
         let lastHeaderReceived = this.getCurrentTS();
+        let evmRPCApi = this.evmRPCApi
+        let useBlockReceipts = true
 
         web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
@@ -2117,6 +2118,7 @@ module.exports = class Crawler extends Indexer {
                 let rows_blocks = [];
                 let rows_transactions = [];
                 let rows_logs = [];
+
                 try {
                     if (numTransactions >= 0) {
                         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
@@ -2125,7 +2127,11 @@ module.exports = class Crawler extends Indexer {
                         let evmReceipts = false
                         do {
                             try {
-                                evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                                if (useBlockReceipts && evmRPCApi){
+                                    evmReceipts = await this.crawlEvmBlockReceipts(evmRPCApi, block.number);
+                                }else{
+                                    evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                                }
                                 console.log(`[#${block.number}] evmReceipts trial${log_tries}`, )
                                 log_tries++;
                             } catch (err) {
@@ -2171,6 +2177,8 @@ module.exports = class Crawler extends Indexer {
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
+
+        // TODO: extract this
         let provider = null
         const startConnection = () => {
             provider = new Web3.providers.WebsocketProvider(
@@ -2187,17 +2195,18 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
             );
-
             provider.connection.addEventListener('close', () => {
                 startConnection()
             })
-
         }
-
         startConnection();
         const web3 = new Web3(provider);
         this.web3Api = web3;
+        if (chain.RPCBackfill != undefined){
+            this.evmRPCApi = chain.RPCBackfill
+        }
         this.contractABIs = await this.getContractABI();
+
         await this.assetManagerInit()
         this.crawl_evm_core(web3, chainID)
     }

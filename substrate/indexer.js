@@ -71,6 +71,7 @@ module.exports = class Indexer extends AssetManager {
     assetholder = {};
     api = false;
     web3Api = false;
+    evmRPCApi = false;
     contractABIs = false;
     contractABISignatures = {};
     chainID = false;
@@ -8959,6 +8960,41 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    async crawlEvmBlockReceipts(evmRPCApi, blockNumber, timeoutMS = 20000) {
+        if (!evmRPCApi) {
+            return (false);
+        }
+        console.log(`crawlEvmBlockReceipts evmRPCApi`, evmRPCApi)
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0,3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCApi}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+        //console.log(`crawlEvmBlockReceipts`, cmd)
+        try {
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd, {
+                maxBuffer: 1024 * 64000
+            });
+            let receiptData = JSON.parse(stdout);
+            if (receiptData.result) {
+                console.log(blockNumber, receiptData.result.length, cmd);
+                return (receiptData.result);
+            }
+            //console.log(`crawlEvmBlockReceipts`, cmd)
+            return (null);
+        } catch (error) {
+            this.logger.warn({
+                "op": "crawlEvmBlockReceipts",
+                "cmd": cmd,
+                "err": error
+            })
+            console.log(error);
+        }
+        return false;
+    }
+
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
         const Web3 = require('web3')
@@ -8967,12 +9003,48 @@ module.exports = class Indexer extends AssetManager {
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
+        /*
         const web3 = new Web3(chain.WSEndpoint);
         this.web3Api = web3;
         this.contractABIs = await this.getContractABI();
+        */
+
+        // TODO: extract this
+        let provider = null
+        const startConnection = () => {
+            provider = new Web3.providers.WebsocketProvider(
+                chain.WSEndpoint, {
+                    clientConfig: {
+                        keepalive: true,
+                        keepaliveInterval: -1
+                    },
+                    reconnect: {
+                        auto: true,
+                        delay: 5000,
+                        maxAttempts: 5,
+                        onTimeout: false
+                    }
+                }
+            );
+            provider.connection.addEventListener('close', () => {
+                startConnection()
+            })
+        }
+        startConnection();
+        const web3 = new Web3(provider);
+        this.web3Api = web3;
+        if (chain.RPCBackfill != undefined){
+            this.evmRPCApi = chain.RPCBackfill
+        }
+        this.contractABIs = await this.getContractABI();
+
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
         await this.assetManagerInit()
+
+        let evmRPCApi = this.evmRPCApi
+        let useBlockReceipts = true
+
         let blockNumber = blkNum;
         let block = null;
         let blockHash = null
@@ -8997,8 +9069,12 @@ module.exports = class Indexer extends AssetManager {
                 let evmReceipts = false
                 do {
                     try {
-                        let isParallel = true
-                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                        if (useBlockReceipts && evmRPCApi){
+                            evmReceipts = await this.crawlEvmBlockReceipts(evmRPCApi, blockNumber);
+                        }else{
+                            let isParallel = true
+                            evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
+                        }
                         log_tries++;
                     } catch (err) {
                         console.log(`crawlEVM Failed ${log_tries}`, err);
