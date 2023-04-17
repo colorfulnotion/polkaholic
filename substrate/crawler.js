@@ -2096,8 +2096,7 @@ module.exports = class Crawler extends Indexer {
 
     crawl_evm_core(web3, chainID) {
         let lastHeaderReceived = this.getCurrentTS();
-        let evmRPCApi = this.evmRPCApi
-        let useBlockReceipts = true
+        let evmRPCBlockReceipts = this.evmRPCBlockReceipts
 
         web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
@@ -2127,8 +2126,8 @@ module.exports = class Crawler extends Indexer {
                         let evmReceipts = false
                         do {
                             try {
-                                if (useBlockReceipts && evmRPCApi){
-                                    evmReceipts = await this.crawlEvmBlockReceipts(evmRPCApi, block.number);
+                                if (evmRPCBlockReceipts){
+                                    evmReceipts = await this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number);
                                 }else{
                                     evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
                                 }
@@ -2165,6 +2164,7 @@ module.exports = class Crawler extends Indexer {
 
         setInterval(() => {
             if (this.getCurrentTS() - lastHeaderReceived > 20) {
+                console.log(`EXIT: lastHeaderReceivedTS ${this.getCurrentTS() - lastHeaderReceived}`, )
                 process.exit(0);
             }
         }, 2000);
@@ -2172,13 +2172,13 @@ module.exports = class Crawler extends Indexer {
 
     async crawlEVM(chainID) {
         let chain = await this.getChain(chainID);
-        const Web3 = require('web3')
         await this.initEvmSchemaMap()
         if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
             return (false);
         }
 
         // TODO: extract this
+        const Web3 = require('web3')
         let provider = null
         const startConnection = () => {
             provider = new Web3.providers.WebsocketProvider(
@@ -2200,15 +2200,24 @@ module.exports = class Crawler extends Indexer {
             })
         }
         startConnection();
+
         const web3 = new Web3(provider);
         this.web3Api = web3;
-        if (chain.RPCBackfill != undefined){
-            this.evmRPCApi = chain.RPCBackfill
+        if (chain.evmRPCBlockReceipts != undefined){
+            this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
+        }
+        if (chain.evmRPCInternal != undefined){
+            this.evmRPCInternal = chain.evmRPCInternal
+        }
+        if (chain.evmRPC != undefined){
+            this.evmRPC = chain.evmRPC
         }
         this.contractABIs = await this.getContractABI();
 
         await this.assetManagerInit()
+        console.log(`before crawl_evm_core chainID=${chainID}`)
         this.crawl_evm_core(web3, chainID)
+        console.log(`after crawl_evm_core chainID=${chainID}`)
     }
 
     async crawlBlocks(chainID) {
