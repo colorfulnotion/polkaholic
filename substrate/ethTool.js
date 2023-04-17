@@ -780,28 +780,6 @@ function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder
     //abiDecoder.addABI(methodABIStr)
     //abiDecoder.addABI(JSON.parse(methodABIStr));
     try {
-        /*
-        let methodID = txInput.slice(0, 10)
-        let decodedData = abiDecoder.decodeMethod(txInput);
-        if (decodedData != null) {
-            //success case with {name: 'swapExactTokensForTokens', params: []}
-            decodedData.decodeStatus = 'success'
-            return decodedData
-        } else {
-            //decode null
-            //console.log(`decodeErr input=${txn.input}`)
-            console.log(`abi-decoder failed. Use etherJS methodID=${methodID}\n methodSignature=${methodSignature}`)
-            abiDecoder.discardNonDecodedLogs()
-            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder)
-            if (isSuccess) {
-                decodedData = {}
-                decodedData.params = decodedDataEtherJS
-                decodedData.decodeStatus = 'success'
-                //console.log(`** decodedData`, decodedData)
-                return decodedData
-            }
-        }
-        */
         let decodeNull = {
             decodeStatus: 'null'
         }
@@ -843,7 +821,7 @@ function decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, et
             }
             combinedTxnInputs.push(t)
         }
-        console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
+        //console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
         return [combinedTxnInputs, true]
     } catch (e) {
         console.log(`decode_txn_input_etherjs err`, e)
@@ -1250,7 +1228,7 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
             }
             combinedTxnInputs.push(t)
         }
-        console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
+        //console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
         return [combinedTxnInputs, true]
     } catch (e) {
         console.log(`decode_txn_input_etherjs err`, e)
@@ -1267,31 +1245,6 @@ function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherj
     //abiDecoder.addABI(JSON.parse(methodABIStr));
     if (txn.hash == undefined) txn.hash = null
     try {
-        /*
-        let txInput = txn.input
-        let methodID = txn.input.slice(0, 10)
-        let decodedData = abiDecoder.decodeMethod(txInput);
-        if (decodedData != null) {
-            //success case with {name: 'swapExactTokensForTokens', params: []}
-            decodedData.decodeStatus = 'success'
-            decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
-            return decodedData
-        } else {
-            //decode null
-            //console.log(`decodeErr input=${txn.input}`)
-            console.log(`abi-decoder failed. Use etherJS txHash=${txn.hash} methodID=${methodID}\n methodSignature=${methodSignature}`)
-            abiDecoder.discardNonDecodedLogs()
-            let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder)
-            if (isSuccess) {
-                decodedData = {}
-                decodedData.params = decodedDataEtherJS
-                decodedData.decodeStatus = 'success'
-                decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
-                //console.log(`** decodedData`, decodedData)
-                return decodedData
-            }
-        }
-        */
         let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder)
         if (isSuccess) {
             decodedData = {}

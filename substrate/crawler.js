@@ -2105,6 +2105,14 @@ module.exports = class Crawler extends Indexer {
                 let blockNumber = result.number;
                 let block = null;
                 let block_tries = 0;
+                let block_retry_max = 10
+                let block_retry_ms = 200
+
+                let evmBlockFunc = web3.eth.getBlock(result.hash, true)
+                let evmBlockCtx = `web3.eth.getBlock(${result.hash}, true)`
+
+                block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+                /*
                 do {
                     try {
                         block = await web3.eth.getBlock(result.hash, true);
@@ -2113,6 +2121,7 @@ module.exports = class Crawler extends Indexer {
                         // console.log("crawlEVM", result, err);
                     }
                 } while (!block && block_tries < 10)
+                */
                 let numTransactions = block && block.transactions ? block.transactions.length : 0;
                 let rows_blocks = [];
                 let rows_transactions = [];
@@ -2122,26 +2131,16 @@ module.exports = class Crawler extends Indexer {
                     if (numTransactions >= 0) {
                         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                         let isParallel = true
-                        let log_tries = 0
+                        let log_retry_max = 10
+                        let log_retry_ms = 500
                         let evmReceipts = false
-                        let retryMs = 500
-                        do {
-                            try {
-                                setInterval(function(){
-                                    if (evmRPCBlockReceipts){
-                                        evmReceipts = await this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number);
-                                    }else{
-                                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                                    }
-                                    console.log(`[#${block.number}] evmReceipts trial${log_tries}`, )
-                                    log_tries++;
-                                }, retryMs)
-                            } catch (err) {
-                                console.log(`crawlEVM Failed ${log_tries}`, err);
-                            }
-                        } while (!evmReceipts && log_tries < 10)
+
+                        let evmReceiptsFunc = (evmRPCBlockReceipts)? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number): ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = (evmRPCBlockReceipts)? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})`: `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
                         if (!evmReceipts) evmReceipts = [];
                         console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+
                         var statusesPromise = Promise.all([
                             ethTool.processTranssctions(block.transactions, this.contractABIs, this.contractABISignatures),
                             ethTool.processReceipts(evmReceipts, this.contractABIs, this.contractABISignatures)

@@ -8962,6 +8962,21 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    async retryWithDelay(operation, maxRetries = 10, delay = 500, ctx = "") {
+      for (let i = 0; i < maxRetries; i++) {
+        const result = await operation();
+        if (result !== false) {
+          console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
+          return result;
+        }
+        if (i < maxRetries - 1) {
+          await new Promise((resolve) => setTimeout(resolve, delay));
+        }
+      }
+      console.log(`retryWithDelay Failed maxRetries(${maxRetries}) reached`)
+      return false;
+    }
+
     async crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber, timeoutMS = 20000) {
         if (!evmRPCBlockReceipts) {
             return (false);
@@ -9051,15 +9066,12 @@ module.exports = class Indexer extends AssetManager {
         let block = null;
         let blockHash = null
         let block_tries = 0;
-        do {
-            try {
-                block = await ethTool.crawlEvmBlock(web3, blockNumber);
-                console.log(`blk #${blockNumber}`, block)
-                block_tries++;
-            } catch (err) {
-                // console.log("crawlEVM", result, err);
-            }
-        } while (!block && block_tries < 10)
+        let block_retry_max = 10
+        let block_retry_ms = 200
+
+        let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+        let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+        block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
         console.log(`blk #${blockNumber}`, block)
         let numTransactions = block && block.transactions ? block.transactions.length : 0;
         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
@@ -9069,22 +9081,18 @@ module.exports = class Indexer extends AssetManager {
         try {
             blockHash = block.hash
             if (numTransactions > 0) {
-                let log_tries = 0
+                let isParallel = true
+                let log_retry_max = 10
+                let log_retry_ms = 500
                 let evmReceipts = false
-                do {
-                    try {
-                        if (evmRPCBlockReceipts){
-                            evmReceipts = await this.crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber);
-                        }else{
-                            let isParallel = true
-                            evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel);
-                        }
-                        log_tries++;
-                    } catch (err) {
-                        console.log(`crawlEVM Failed ${log_tries}`, err);
-                    }
-                } while (!evmReceipts && log_tries < 10)
+
+                let evmReceiptsFunc = (evmRPCBlockReceipts)? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number): ethTool.crawlEvmReceipts(web3, block, isParallel)
+                let evmReceiptsCtx = (evmRPCBlockReceipts)? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})`: `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+
+                evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                if (!evmReceipts) evmReceipts = [];
                 console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+
                 if (!evmReceipts) evmReceipts = [];
                 var statusesPromise = Promise.all([
                     ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
