@@ -39,6 +39,7 @@ const {
     createKeyMulti,
     sortAddresses
 } = require('@polkadot/util-crypto');
+const appsConfig = require("@polkadot/apps-config")
 
 const keyring = new Keyring({
     type: "sr25519",
@@ -94,6 +95,19 @@ async function initPolkadotAPI() {
     console.log(`initiated polkadotjs api`)
 }
 */
+
+function getOverrideBundleDefinition(projectId){
+    let appsConfigTypeBundleSpec = appsConfig.typesBundle['spec']
+    let typesBundleDef = appsConfigTypeBundleSpec[projectId]
+    if (typesBundleDef == undefined){
+        console.log(`project ${projectId} NOT Found`)
+        return false
+    }
+    var OverrideBundleDefinition = {spec: {}}
+    OverrideBundleDefinition.spec[projectId] = typesBundleDef
+    console.log(`OverrideBundleDefinition projectId`, OverrideBundleDefinition)
+    return OverrideBundleDefinition
+}
 
 function isNumeric(str) {
     if (typeof str != "string") return false // we only process strings!
@@ -1470,7 +1484,7 @@ module.exports = {
     chainIDMoonbeam: 2004,
     chainIDAstar: 2006,
     chainIDKapex: 2007,
-    //chainIDCrust: 2008,
+    chainIDCrust: 2008,
     chainIDEquilibrium: 2011,
     chainIDParallel: 2012,
     chainIDLitentry: 2013,
@@ -2142,6 +2156,8 @@ module.exports = {
             errorType: 'NA',
             errorDesc: errorDesc,
         }
-    }
-
+    },
+    getOverrideBundleDefinition: function(projectId) {
+        return getOverrideBundleDefinition(projectId)
+    },
 };
