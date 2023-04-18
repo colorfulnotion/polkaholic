@@ -1333,8 +1333,6 @@ from chain where chainID = '${chainID}' limit 1`);
             api = await ApiPromise.create({
                 provider,
                 typesBundle: OverrideBundleDefinition,
-                //types:OverrideBundleDefinition.types,
-                //signedExtensions: OverrideBundleDefinition.signedExtensions,
             });
             console.log(`You are connected to ENCOINTER chain ${chainID} endpoint=${endpoint} with types but not rpc`);
 
