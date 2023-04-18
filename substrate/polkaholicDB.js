@@ -30,6 +30,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 const fs = require('fs');
 const os = require("os");
+const appsConfig = require("@polkadot/apps-config")
 
 // Imports the Google Cloud client library for Bunyan
 const {
@@ -1072,6 +1073,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 types: typesDef.default.types
             });
             */
+            /*
             const OverrideBundleDefinition = {
               "spec": {
                 "encointer-parachain": {
@@ -1330,11 +1332,11 @@ from chain where chainID = '${chainID}' limit 1`);
                 }
               }
             }
+            */
+            const OverrideBundleDefinition = appsConfig.typesBundle['spec']['encointer-parachain']
             api = await ApiPromise.create({
                 provider,
                 typesBundle: OverrideBundleDefinition,
-                //types:OverrideBundleDefinition.types,
-                //signedExtensions: OverrideBundleDefinition.signedExtensions,
             });
             console.log(`You are connected to ENCOINTER chain ${chainID} endpoint=${endpoint} with types but not rpc`);
 
