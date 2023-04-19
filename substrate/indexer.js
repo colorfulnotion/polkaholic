@@ -8022,7 +8022,7 @@ module.exports = class Indexer extends AssetManager {
       pv: '101052848337458791'
     }
     */
-    async processTraceFromAuto(blockTS, blockNumber, blockHash, chainID, autoTraces, traceType, api, finalized = false) {
+    async processTraceFromAuto(blockTS, blockNumber, blockHash, chainID, autoTraces, traceType, api, finalized = false, isTip = false) {
         // setParserContext
         this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
 
@@ -8208,7 +8208,7 @@ module.exports = class Indexer extends AssetManager {
             idx++;
         }
 
-        if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0) || (traces.length > 0))) {
+        if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0) || (traces.length > 0)) && isTip) {
             const bigquery = this.get_big_query();
             let tables = ["balanceupdates", "assetupdates", "traces", "tokentransfer"];
             for (const t of tables) {
@@ -8410,7 +8410,7 @@ module.exports = class Indexer extends AssetManager {
                         console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto already covered len=${r.autotrace.length}`, isFinalized);
                         autoTraces = r.autotrace;
                     }
-                    await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api, isFinalized); // use result from rawtrace to decorate
+                    await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api, isFinalized, isTip); // use result from rawtrace to decorate
                 }
                 let processTraceTS = (new Date().getTime() - processTraceStartTS) / 1000
                 //console.log(`index_chain_block_row: processTrace`, processTraceTS);

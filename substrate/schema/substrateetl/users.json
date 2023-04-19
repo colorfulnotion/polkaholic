@@ -1,0 +1,22 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "ss58_address",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "evm_address",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "account_pubkey",
+    "type": "STRING"
+  }
+]

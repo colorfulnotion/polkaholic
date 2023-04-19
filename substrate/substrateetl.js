@@ -609,7 +609,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     // redo in runs of 3
                     for (let n = bn - 1; n <= bn + 1; n++) {
                         let rowId = paraTool.blockNumberToHex(n);
-                        tableChain.row(rowId).delete();
+                        //tableChain.row(rowId).delete();
                         let sql = `update block${f.chainID} set crawlBlock=1, attempted = 0 where blockNumber = '${n}' and attempted < 100;`;
                         console.log("DELETED:", rowId, " recrawling", sql, `./polkaholic indexblock ${f.chainID} ${n}`);
                         this.batchedSQL.push(sql);
@@ -4113,7 +4113,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     if (r.fork) console.log("FORK!!!! DELETE ", bn, rowId);
                     if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
                     if (logDT != logDT0) console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
-                    await tableChain.row(rowId).delete();
+                    //await tableChain.row(rowId).delete();
                     continue;
                 }
                 found[hdr.number] = true;

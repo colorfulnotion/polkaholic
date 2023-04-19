@@ -2381,7 +2381,7 @@ module.exports = class Crawler extends Indexer {
                                 let isTracesPresent = success // true here
 
                                 let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
-                                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
+                                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized, true); // use result from rawtrace to decorate
 
                                 //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
                                 let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, false, isTip, isTracesPresent);
@@ -2496,7 +2496,7 @@ module.exports = class Crawler extends Indexer {
 
                                 let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
 
-                                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized); // use result from rawtrace to decorate
+                                await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized, true); // use result from rawtrace to decorate
 
                                 //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
                                 let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, false, false, false, [], isFinalized, false, isTip, isTracesPresent);
