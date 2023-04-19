@@ -3143,7 +3143,6 @@ module.exports = class ChainParser {
         }
         let outgoingXcmPallet = []
         let xcmMsgHashCandidates = this.processPolkadotXcmV3MsgCandidates(extrinsic)
-        console.log(`xcmMsgHashCandidates`, xcmMsgHashCandidates)
         try {
             //let module_section = extrinsic.section;
             //let module_method = extrinsic.method;
@@ -3167,7 +3166,7 @@ module.exports = class ChainParser {
                 //let a = extrinsic.params;
                 let a = args
                 let assetAndAmountSents = [];
-                console.log(`${extrinsic.extrinsicID} arg`, a)
+                console.log(`${extrinsic.extrinsicHash} args`, a)
                 // !!!! beneficiary processing + dest processing MUST happen before asset
                 // beneficiary processing -- TODO: check that fromAddress is in beneficiary
                 if (a.beneficiary !== undefined) {
@@ -3268,7 +3267,6 @@ module.exports = class ChainParser {
                     }
                 } else if ((dest.v2 !== undefined) && (dest.v2.interior !== undefined)){
                     // xcmV3 here
-                    if (this.debugLevel >= paraTool.debugErrorOnly) console.log("xcmV3 dest v2 int unk = ", JSON.stringify(dest.v2.interior));
                     let destV2Interior = dest.v2.interior
                     if (destV2Interior.x1 !== undefined) {
                         [paraIDDest, chainIDDest] = this.processDestV0X1(destV2Interior.x1, relayChain)
@@ -3280,7 +3278,7 @@ module.exports = class ChainParser {
                         paraIDDest = 0
                         chainIDDest = paraTool.getChainIDFromParaIDAndRelayChain(0, relayChain)
                     } else {
-                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v2 int unk = ", JSON.stringify(dest.v2.interior));
+                        if (this.debugLevel >= paraTool.debugInfo) console.log("xcmV3 dest v2 int unk = ", JSON.stringify(dest.v2.interior));
                         chainIDDest = false
                     }
                 }
@@ -3358,9 +3356,9 @@ module.exports = class ChainParser {
                     } else if (assets.v2 !== undefined && Array.isArray(assets.v2) && assets.v2.length > 0){
                         // xcmV3 here
                         if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`[${extrinsic.extrinsicHash}] xcmV3 polkadotXcm assets.v2 case`)
-                        let assetsv1 = assets.v2
+                        let assetsv2 = assets.v2
                         let transferIndex = 0
-                        for (const asset of assetsv1) {
+                        for (const asset of assetsv2) {
                             // 0x2374aae493ae96e44954bcb4f242a049f2578d490bc382eae113fd5893dfd297
                             // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
@@ -3377,7 +3375,7 @@ module.exports = class ChainParser {
                                 }
                                 assetAndAmountSents.push(aa)
                             } else {
-                                //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("polkadotXcm asset v1 unknown", asset);
+                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("polkadotXcm asset v2 unknown", asset);
                                 asset = false;
                             }
                             transferIndex++
@@ -3394,15 +3392,12 @@ module.exports = class ChainParser {
                             let msgHash =  '0x'
                             let xcmIndex = extrinsic.xcmIndex
                             if (xcmMsgHashCandidates.length > 0){
-                                console.log(`xcmMsgHashCandidates ~~`, xcmMsgHashCandidates)
-                                if (xcmMsgHashCandidates.length - 1 >= xcmIndex && xcmMsgHashCandidates[xcmIndex] != undefined){
+                                if ((xcmMsgHashCandidates.length - 1 >= xcmIndex) && xcmMsgHashCandidates[xcmIndex] != undefined){
                                     msgHash = xcmMsgHashCandidates[xcmIndex]
-                                    console.log(`Found xcmV3 ${feed.extrinsicHash} via event: msgHash`)
+                                    if (this.debugLevel >= paraTool.debugInfo) console.log(`Found xcmV3 ${feed.extrinsicHash} via event: ${msgHash}`)
                                 }
                             }
-
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
-
                             let r = {
                                 sectionMethod: section_method,
                                 extrinsicHash: feed.extrinsicHash,
@@ -3489,6 +3484,7 @@ module.exports = class ChainParser {
             //let module_section = extrinsic.section;
             //let module_method = extrinsic.method;
             //let section_method = `${module_section}:${module_method}`
+            let xcmMsgHashCandidates = this.processPolkadotXcmV3MsgCandidates(extrinsic)
 
             //0x22729316af52c146e6a0773bd6e119efa51f5dda1f678b2891b53a8f2e5a2521 xcmPallet:reserveTransferAssets
             let known_section_methods = [
@@ -3544,6 +3540,24 @@ module.exports = class ChainParser {
                         } else {
                             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v1 unknown case`, beneficiary.v1)
                         }
+                    } else if (beneficiary.v2 !== undefined) {
+                        //console.log(`beneficiary.v1 case`, JSON.stringify(beneficiary.v1, null, 2))
+                        //console.log("beneficiary v1=", JSON.stringify(a.beneficiary.v1));
+                        //0xfda47f26aa64e7824f6791162bfa87de83bfaa67c57f614299b5e1b687eb13b2
+                        //0x3a47436114ee38a5d93cb3f248127464dd1be797cdf174f8759bfcbf6503952c
+                        if (beneficiary.v2.interior !== undefined) {
+                            let beneficiaryV2Interior = beneficiary.v2.interior;
+                            // dest for relaychain
+                            if (beneficiaryV2Interior.x1 !== undefined) {
+                                [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiaryV2Interior.x1, relayChain)
+                            } else if (beneficiaryV1Interior.x2 !== undefined) {
+                                [paraIDDest, chainIDDest, destAddress] = this.processX2(beneficiaryV2Interior.x2, relayChain)
+                            } else {
+                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v2.interior unknown case`, beneficiaryV2Interior)
+                            }
+                        } else {
+                            if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`beneficiary.v2 unknown case`, beneficiary.v2)
+                        }
                     } else if (beneficiary.x1 !== undefined) {
                         //0x2cfbeb75fe9a1e13a3a6cf700c27d1afd53c7f164c127e60763c2e27b959e195
                         [paraIDDest, chainIDDest, destAddress] = this.processX1(beneficiary.x1, relayChain)
@@ -3585,6 +3599,20 @@ module.exports = class ChainParser {
                         [paraIDDest, chainIDDest, _d] = this.processX2(destV1Interior.x2, relayChain)
                     } else {
                         //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v1 int unk = ", JSON.stringify(dest.v1.interior));
+                        chainIDDest = false
+                    }
+                } else if ((dest.v2 !== undefined) && (dest.v2.interior !== undefined)) {
+                    // xcmPallet dest.v1.interior does not have id?
+                    let destV2Interior = dest.v2.interior
+                    if (destV2Interior.x1 !== undefined) {
+                        //[paraIDDest, chainIDDest, destAddress] = this.processX1(destV2Interior.x1, relayChain)
+                        [paraIDDest, chainIDDest] = this.processDestV0X1(destV2Interior.x1, relayChain)
+                    } else if (destV1Interior.x2 !== undefined) {
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`potental error case destV2Interior.x2`, destV2Interior.x2)
+                        // dest for parachain, add 20000 for kusama-relay
+                        [paraIDDest, chainIDDest, _d] = this.processX2(destV2Interior.x2, relayChain)
+                    } else {
+                        //if (this.debugLevel >= paraTool.debugErrorOnly) console.log("dest v2 int unk = ", JSON.stringify(dest.v2.interior));
                         chainIDDest = false
                     }
                 }
@@ -3631,28 +3659,6 @@ module.exports = class ChainParser {
                         let assetsv1 = assets.v1
                         let transferIndex = 0
                         for (const asset of assetsv1) {
-                            // 0x2374aae493ae96e44954bcb4f242a049f2578d490bc382eae113fd5893dfd297
-                            // {"id":{"concrete":{"parents":0,"interior":{"here":null}}},"fun":{"fungible":10324356190528}}
-                            /*
-                            "assets": {
-                                "v1": [
-                                {
-                                  "id": {
-                                    "concrete": {
-                                      "parents": 0,
-                                      "interior": {
-                                      "here": null
-                                    }
-                                  }
-                                },
-                                "fun": {
-                                    "fungible": 102000000000
-                                  }
-                                }
-                              ]
-                            },
-                            "fee_asset_item": 0
-                            */
                             if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
                                 let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
                                 let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXcmPallet ${section_method}`, asset)
@@ -3671,6 +3677,30 @@ module.exports = class ChainParser {
                             }
                             transferIndex++
                         }
+                    } else if (assets.v2 !== undefined && Array.isArray(assets.v2) && assets.v2.length > 0) {
+                        // todo: extract this
+                        if (this.debugLevel >= paraTool.debugVerbose) console.log(`[${extrinsic.extrinsicHash}] xcmPallet assets.v2 case`)
+                        let assetsv2 = assets.v2
+                        let transferIndex = 0
+                        for (const asset of assetsv2) {
+                            if (asset.fun !== undefined && asset.fun.fungible !== undefined) {
+                                let [targetedSymbol, targetedRelayChain, targetedXcmInteriorKey0] = this.processV1ConcreteFungible(indexer, asset)
+                                let targetedXcmInteriorKey = indexer.check_refintegrity_xcm_symbol(targetedSymbol, targetedRelayChain, chainID, chainIDDest, "processV1ConcreteFungible", `processOutgoingXcmPallet ${section_method}`, asset)
+                                if (targetedXcmInteriorKey == false) targetedXcmInteriorKey = targetedXcmInteriorKey0
+                                let aa = {
+                                    xcmInteriorKey: targetedXcmInteriorKey,
+                                    xcmSymbol: targetedSymbol,
+                                    amountSent: paraTool.dechexToInt(asset.fun.fungible),
+                                    transferIndex: transferIndex,
+                                    isFeeItem: (transferIndex == feeAssetIndex) ? 1 : 0,
+                                }
+                                assetAndAmountSents.push(aa)
+                            } else {
+                                if (this.debugLevel >= paraTool.debugErrorOnly) console.log("asset v2 unknown", asset);
+                                asset = false;
+                            }
+                            transferIndex++
+                        }
                     }
 
                     for (const assetAndAmountSent of assetAndAmountSents) {
@@ -3682,7 +3712,14 @@ module.exports = class ChainParser {
                         if (assetAndAmountSent != undefined && paraTool.validAmount(amountSent) && (chainIDDest || chainIDDest == paraTool.chainIDPolkadot)) {
                             let incomplete = this.extract_xcm_incomplete(extrinsic.events, extrinsic.extrinsicID);
                             if (extrinsic.xcms == undefined) extrinsic.xcms = []
+                            let msgHash =  '0x'
                             let xcmIndex = extrinsic.xcmIndex
+                            if (xcmMsgHashCandidates.length > 0){
+                                if ((xcmMsgHashCandidates.length - 1 >= xcmIndex) && xcmMsgHashCandidates[xcmIndex] != undefined){
+                                    msgHash = xcmMsgHashCandidates[xcmIndex]
+                                    if (this.debugLevel >= paraTool.debugInfo) console.log(`Found xcmV3 ${feed.extrinsicHash} via event: ${msgHash}`)
+                                }
+                            }
                             let r = {
                                 sectionMethod: section_method,
                                 extrinsicHash: feed.extrinsicHash,
@@ -3701,7 +3738,7 @@ module.exports = class ChainParser {
                                 amountSent: amountSent,
                                 incomplete: incomplete,
                                 isFeeItem: isFeeItem,
-                                msgHash: '0x',
+                                msgHash: msgHash,
                                 sentAt: this.parserWatermark,
                                 xcmSymbol: targetedSymbol,
                                 xcmInteriorKey: targetedXcmInteriorKey,
