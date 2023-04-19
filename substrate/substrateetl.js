@@ -581,6 +581,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let wstr = (w.length > 0) ? ` and ${w.join(" and ")}` : "";
         // 1. find problematic periods with a small number of records (
         let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${wstr} order by chainID, monthDT`
+	console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
         for (const f of recs) {
@@ -622,10 +623,11 @@ module.exports = class SubstrateETL extends AssetManager {
 
     }
 
-    async audit_blocks(chainID = null, fix = true) {
+    async audit_blocks(chainID = null, monthDT = null, fix = true) {
         // 1. find problematic periods with a small number of records (
         let w = chainID != null ? ` and chainID = ${chainID}` : " and (auditDT is Null or auditDT < date_sub(Now(), interval 6 hour)) "
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where (( monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' ) ) or monthDT = LAST_DAY(Now()) ) ${w} order by auditDT`
+	if ( monthDT ) w += ` and monthDT = '${monthDT}'`;
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where ((( monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' ) ) or monthDT = LAST_DAY(Now()) )) ${w} order by auditDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
