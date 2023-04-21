@@ -89,6 +89,8 @@ module.exports = class Indexer extends AssetManager {
     evmSchemaMap = {}; //by tableId
     evmFingerprintMap = {}; //by fingerprintID
     evmUnknownFingerprintMap = {};
+    labels = {}
+
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -5787,6 +5789,25 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    // TWO ways to call this in EVM: (1) when new contracts are created (2) when candidate labels are ???
+    async update_account_labels(address, candidate_labels, ts, assetType = null) {
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        const filter = [{
+            column: {
+                cellLimit: 1
+            },
+            families: ["realtime", "labels"],
+        }];
+        [row] = await tblRealtime.row(address).get({
+            filter
+        });
+        // TODO: (1) get_btTableRealtime, attempt row read
+        // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
+        //    await tblRealtime.insert(rows);
+        // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
+    }
+
+
     async process_evm_contract_create(tx, chainID, finalized = false, isTip = false) {
         // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
         let web3Api = this.web3Api
@@ -6228,7 +6249,7 @@ module.exports = class Indexer extends AssetManager {
         if (ethTool.isTxContractCreate(tx)) {
             // Contract Creates
             contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
-            //console.log("CONTRACT CREATE", contractType);
+            console.log("CONTRACT CREATE", contractType);
         }
 
         if (ethTool.isTxNativeTransfer(tx)) {
@@ -8477,7 +8498,81 @@ module.exports = class Indexer extends AssetManager {
         console.log(transactionsInternal);
     }
 
+    async initLabels() {
+        let sql = `select label, fingerprintID, contractAddress, evmchainID, labelType, name, labelID, signature, signatureID, signatureRaw, abi, abiType, description from label`
+        var labelRecs = await this.poolREADONLY.query(sql);
+        let labels = {};
+        for (const l of labelRecs) {
+            let lrec = {
+                label: (l.label)? l.label: null,
+                fingerprintID: (l.fingerprintID)? `${l.fingerprintID}`: null,
+                contractAddress: (l.contractAddress)? `${l.contractAddress.toLowerCase()}`: null,
+                evmchainID: (l.evmchainID)? l.evmchainID: null,
+                name: (l.name)? `${l.name}`: null,
+                signature: (l.signature)? `${l.signature}`: null,
+                signatureID: (l.signatureID)? `${l.signatureID}`: null,
+                signatureRaw: (l.signatureRaw)? `${l.signatureRaw}`: null,
+                abi: (l.abi)? `${l.abi}`: null,
+                abiType: (l.abiType)? `${l.abiType}`: null,
+                description: (l.description)? `${l.description}`: null,
+                fullKey: null,
+                labelID: (l.labelID)? `${l.labelID}`: null,
+                labelID_full: null,
+                labelID_generic: null,
+            }
+            //console.log(`lrec`, lrec)
+            let evmChainID = lrec.evmchainID
+            let contractAddress = lrec.contractAddress
+            let signatureID = lrec.signatureID
+            let modifiedFingerprintID = lrec.fingerprintID
+            if (modifiedFingerprintID && modifiedFingerprintID.length == 21){
+                modifiedFingerprintID = signatureID
+            }else if (modifiedFingerprintID && modifiedFingerprintID.length == 79){
+                modifiedFingerprintID = modifiedFingerprintID.substr(0,68)
+            }
+
+            // create full key (modifiedFingerprintID_evmChainID_contractAddress) if possible
+            if (modifiedFingerprintID && contractAddress && evmChainID){
+                let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
+                let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
+                lrec.fullKey = fullKey
+                lrec.labelID_full =  `${paraTool.sha1_4bytes(modifiedFingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
+                lrec.labelID_unique = `${paraTool.sha1_4bytes(lrec.fingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
+                lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
+                console.log(`fullKey***`, lrec)
+                labels[fullKey] = lrec
+            }
+
+            // create generic key
+            if (modifiedFingerprintID){
+                labels[modifiedFingerprintID] = lrec;
+                lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
+            }
+            // TODO: handle case when either evmChainID or contractAddress is missing
+        }
+        this.labels = labels
+        console.log(`labels`, this.labels)
+    }
+
+    getLabel(modifiedFingerprintID, evmChainID='', contractAddress=''){
+        let label = false
+        let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
+        let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
+        if (this.labels[fullKey] != undefined){
+            let fullKeyLabel = this.labels[fullKey]
+            console.log(`getLabel fullkey ${fullKey}`, fullKeyLabel)
+            return fullKeyLabel
+        }
+        if (this.lable[modifiedFingerprintID] != undefined){
+            let genricLabel = this.labels[modifiedFingerprintID]
+            console.log(`getLabel generic ${modifiedFingerprintID}`, genricLabel)
+            return genricLabel
+        }
+        return false
+    }
+
     async initEvmSchemaMap() {
+        await this.initLabels();
         let evmDataset = this.evmDatasetID
         let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
 
@@ -8598,6 +8693,8 @@ module.exports = class Indexer extends AssetManager {
         return bqRec
     }
 
+    //evt_ClientData_0x095e66fa4dd6a6f7b43fb8444a7bd0edb870508c7abf639bc216efb0bcff9779_1
+    //call_safeTransferFrom_0xb88d4fde
     generateCallBqRec(tableId, fingerprintID, evmTx) {
         let decodedParams = JSON.parse(evmTx.params)
         let rec = {
