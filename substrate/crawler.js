@@ -180,7 +180,10 @@ module.exports = class Crawler extends Indexer {
                 "params": [blockHash, "state", "", "Put"]
             }
             if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality")) {
-                chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
+		chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
+                if ( chain.onfinalityConfig && chain.onfinalityConfig.length > 5 ) {
+		    chain.RPCBackfill = chain.onfinalityConfig;
+                } 
                 console.log("BACKFILL", chain.RPCBackfill);
             }
             if (!chain.RPCBackfill || chain.RPCBackfill.length == 0) {

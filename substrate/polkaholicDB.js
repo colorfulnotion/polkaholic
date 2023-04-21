@@ -648,18 +648,18 @@ module.exports = class PolkaholicDB {
         let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, chain.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
 unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,
 valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, chain.relayChain, chain.paraID, totalIssuance, lastUpdateChainAssetsTS,
-onfinalityID, onfinalityStatus, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, xcmasset.priceUSD, xcmasset.priceUSDPercentChange, 0 as numHolders
+onfinalityID, onfinalityStatus, onfinalityConfig, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, xcmasset.priceUSD, xcmasset.priceUSDPercentChange, 0 as numHolders
 from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteriorKey where crawling = ${crawling} order by ${orderBy}`);
         return (chains);
     }
 
     async getChainsForAdmin(crawling = 1) {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, symbol, iconUrl, relayChain, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, paraID from chain where crawling = ${crawling} order by chainID`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, symbol, iconUrl, relayChain, onfinalityID, onfinalityStatus, onfinalityConfig, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, paraID from chain where crawling = ${crawling} order by chainID`);
         return (chains);
     }
 
     async getChainForAdmin(chainID = 0) {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, symbol, iconUrl, relayChain, onfinalityID, onfinalityStatus, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, paraID from chain where chainID = ${chainID} order by chainID`);
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chain.chainName, symbol, iconUrl, relayChain, onfinalityID, onfinalityStatus, onfinalityConfig, isEVM, asset, WSEndpoint, WSEndpoint2, WSEndpoint3, paraID from chain where chainID = ${chainID} order by chainID`);
         if (chains.length == 0) return (false);
         return (chains[0]);
     }
@@ -675,7 +675,7 @@ from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteri
     }
 
     async getChain(chainID, withSpecVersions = false) {
-        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpointArchive, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmRPC, evmRPCInternal, evmRPCBlockReceipts, evmChainID, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus, etherscanAPIURL,
+        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpointArchive, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmRPC, evmRPCInternal, evmRPCBlockReceipts, evmChainID, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, onfinalityConfig, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus, etherscanAPIURL,
 numExtrinsics, numExtrinsics7d, numExtrinsics30d,
 numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
 numTransfers, numTransfers7d, numTransfers30d,
@@ -714,7 +714,7 @@ from chain where chainID = '${chainID}' limit 1`);
         return chain;
     }
     async getChainWithVersion(chainID, withSpecVersions = false) {
-        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmChainID, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus,
+        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmChainID, evmRPC, evmRPCInternal, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, onfinalityConfig, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus,
 numExtrinsics, numExtrinsics7d, numExtrinsics30d,
 numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
 numTransfers, numTransfers7d, numTransfers30d,
