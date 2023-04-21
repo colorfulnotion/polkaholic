@@ -95,7 +95,7 @@ module.exports = class Indexer extends AssetManager {
     numXCMMessagesOut = {};
 
 
-    evmDatasetID = "evm_dev"; /*** FOR DEVELOPEMENT: change to evm_test ***/
+    evmDatasetID = "evm_test"; /*** FOR DEVELOPEMENT: change to evm_test ***/
 
     xcmMeta = []; //this should be removed after every block
 
