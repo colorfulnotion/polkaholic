@@ -4241,17 +4241,19 @@ module.exports = class Indexer extends AssetManager {
             encodedCalls.push(opaqueCall)
         }
         try {
-            for (let i = 0; i < argsDef.length; i++) {
-                let argsDef_i = argsDef[i]
-                let argsDef_i_type = argsDef_i.type
-                let argsDef_i_name = argsDef_i.name
-                //console.log(`argsDef_i`, argsDef_i)
-                //console.log(`argsDef_i_type`, argsDef_i_type)
-                if (extrinsic_args_conversion_list.includes(argsDef_i_type)) {
-                    let arg_val = exos.method.args[argsDef_i_name]
-                    exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
-                }
-            }
+            if ( argsDef ) {
+		for (let i = 0; i < argsDef.length; i++) {
+                    let argsDef_i = argsDef[i]
+                    let argsDef_i_type = argsDef_i.type
+                    let argsDef_i_name = argsDef_i.name
+                    //console.log(`argsDef_i`, argsDef_i)
+                    //console.log(`argsDef_i_type`, argsDef_i_type)
+                    if (extrinsic_args_conversion_list.includes(argsDef_i_type)) {
+			let arg_val = exos.method.args[argsDef_i_name]
+			exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
+                    }
+		}
+	    }
         } catch (argsDefErr) {
             console.log(`decode_s_extrinsic argsDefErr`, argsDefErr)
         }
