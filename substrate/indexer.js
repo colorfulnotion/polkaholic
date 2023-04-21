@@ -91,6 +91,7 @@ module.exports = class Indexer extends AssetManager {
     evmUnknownFingerprintMap = {};
     labels = {}
 
+    addressLabelCandidates = {};
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -432,6 +433,13 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    updateAddressLabelCandidates(address, label, recBT){
+        if (this.addressLabelCandidates[address] == undefined) this.addressLabelCandidates[address] = {}
+        let labelID = (label.labelID_full)? label.labelID_full : label.labelID_generic
+        if (labelID && this.addressLabelCandidates[address][labelID] == undefined){
+            this.addressLabelCandidates[address][labelID] = recBT
+        }
+    }
 
     updateAddressExtrinsicStorage(address, extrinsicID, extrinsicHash, family, rec, ts, finalized) {
         if (address == undefined || typeof address != "string") {
@@ -5789,25 +5797,6 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    // TWO ways to call this in EVM: (1) when new contracts are created (2) when candidate labels are ???
-    async update_account_labels(address, candidate_labels, ts, assetType = null) {
-        let [tblName, tblRealtime] = this.get_btTableRealtime()
-        const filter = [{
-            column: {
-                cellLimit: 1
-            },
-            families: ["realtime", "labels"],
-        }];
-        [row] = await tblRealtime.row(address).get({
-            filter
-        });
-        // TODO: (1) get_btTableRealtime, attempt row read
-        // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
-        //    await tblRealtime.insert(rows);
-        // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
-    }
-
-
     async process_evm_contract_create(tx, chainID, finalized = false, isTip = false) {
         // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
         let web3Api = this.web3Api
@@ -8517,8 +8506,8 @@ module.exports = class Indexer extends AssetManager {
                 description: (l.description)? `${l.description}`: null,
                 fullKey: null,
                 labelID: (l.labelID)? `${l.labelID}`: null,
-                labelID_full: null,
                 labelID_generic: null,
+                labelID_full: null,
             }
             //console.log(`lrec`, lrec)
             let evmChainID = lrec.evmchainID
@@ -8554,18 +8543,18 @@ module.exports = class Indexer extends AssetManager {
         console.log(`labels`, this.labels)
     }
 
-    getLabel(modifiedFingerprintID, evmChainID='', contractAddress=''){
+    getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID='', contractAddress=''){
         let label = false
         let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
         let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
         if (this.labels[fullKey] != undefined){
             let fullKeyLabel = this.labels[fullKey]
-            console.log(`getLabel fullkey ${fullKey}`, fullKeyLabel)
+            console.log(`[${acctAddr}] getLabel fullkey ${fullKey}`, fullKeyLabel)
             return fullKeyLabel
         }
-        if (this.lable[modifiedFingerprintID] != undefined){
+        if (this.labels[modifiedFingerprintID] != undefined){
             let genricLabel = this.labels[modifiedFingerprintID]
-            console.log(`getLabel generic ${modifiedFingerprintID}`, genricLabel)
+            console.log(`[${acctAddr}] getLabel generic ${modifiedFingerprintID}`, genricLabel)
             return genricLabel
         }
         return false
@@ -8649,7 +8638,7 @@ module.exports = class Indexer extends AssetManager {
         return schemaInfo
     }
 
-    generateEventBqRec(tableId, fingerprintID, evmLog) {
+    generateEventBqRec(tableId, fingerprintID, evmLog, acctAddr) {
         let decodedEvents = JSON.parse(evmLog.events)
         let rec = {
             chain_id: evmLog.id, //string
@@ -8660,6 +8649,23 @@ module.exports = class Indexer extends AssetManager {
             evt_block_time: evmLog.block_timestamp,
             evt_block_number: evmLog.block_number,
         }
+
+        // used for labels
+        let recBT = {
+            chain_id: evmLog.id, //string
+            evm_chain_id: evmLog.chain_id, //integer
+            contract_address: evmLog.address,
+            tx_hash: evmLog.transaction_hash,
+            block_time: evmLog.block_timestamp,
+            block_number: evmLog.block_number,
+        }
+
+        let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
+        if (eventLabel){
+            console.log(`generateEventBqRec eventLabel ***`, eventLabel)
+            this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
+        }
+
         let flds = this.getSchemaFlds(fingerprintID)
         if (flds.length != decodedEvents.length) {
             this.logger.error({
@@ -8695,7 +8701,7 @@ module.exports = class Indexer extends AssetManager {
 
     //evt_ClientData_0x095e66fa4dd6a6f7b43fb8444a7bd0edb870508c7abf639bc216efb0bcff9779_1
     //call_safeTransferFrom_0xb88d4fde
-    generateCallBqRec(tableId, fingerprintID, evmTx) {
+    generateCallBqRec(tableId, fingerprintID, evmTx, acctAddr) {
         let decodedParams = JSON.parse(evmTx.params)
         let rec = {
             chain_id: evmTx.id, //string
@@ -8706,8 +8712,24 @@ module.exports = class Indexer extends AssetManager {
             call_block_time: evmTx.block_timestamp,
             call_block_number: evmTx.block_number,
         }
-        let flds = this.getSchemaFlds(fingerprintID)
 
+        // used for labels
+        let recBT = {
+            chain_id: evmTx.id, //string
+            evm_chain_id: evmTx.chain_id, //integer
+            contract_address: evmTx.to_address,
+            tx_hash: evmTx.hash,
+            block_time: evmTx.block_timestamp,
+            block_number: evmTx.block_number,
+        }
+
+        let callLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
+        if (callLabel){
+            console.log(`generateCallBqRec callLabel ***`, callLabel)
+            this.updateAddressLabelCandidates(acctAddr, callLabel, recBT)
+        }
+
+        let flds = this.getSchemaFlds(fingerprintID)
         if (flds.length != decodedParams.length) {
             this.logger.error({
                 op: "generateCallBqRec",
@@ -8743,6 +8765,69 @@ module.exports = class Indexer extends AssetManager {
         return bqRec
     }
 
+    async process_evm_flush(ts){
+        await this.flush_evm_label_candidates(ts)
+    }
+
+    // TWO ways to call this in EVM: (1) when new contracts are created (2) when candidate labels are ???
+    async update_account_labels(address, candidate_labels_map, ts, assetType = null) {
+
+        // TODO: (1) get_btTableRealtime, attempt row read
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        const filter = [{
+            column: {
+                cellLimit: 1
+            },
+            families: ["realtime", "label"],
+        }];
+        let isRowFound = true
+        try {
+            const [row] = await tblRealtime.row(address).get({
+                filter
+            });
+            let rowData = row.data;
+            console.log(`**** address ${address} rowData`, rowData)
+        } catch (err){
+            let errorStr = err.toString()
+            if (errorStr.includes("RowError: Unknown row:")){
+                isRowFound = false
+            }
+            console.log(`err`,  err.toString())
+        }
+        let btLabelRowsToInsert = []
+        // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
+        if (!isRowFound){
+            console.log(`address [${address}] labels missing`)
+            let hres = {
+                key: address.toLowerCase(),
+                data: {
+                    label: {}
+                }
+            }
+            for (const candidate_label of Object.keys(candidate_labels_map)){
+                let btRec = candidate_labels_map[candidate_label]
+                hres['data']['label'][candidate_label] = {
+                    value: JSON.stringify(btRec),
+                    timestamp: ts * 1000000
+                }
+            }
+            console.log(`address ${address} hres***`, hres)
+            btLabelRowsToInsert.push(hres)
+        }else{
+            // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
+        }
+        //await tblRealtime.insert(btLabelRowsToInsert);
+    }
+
+    async flush_evm_label_candidates(ts){
+        let addressLabelCandidates = this.addressLabelCandidates
+        for (const address of Object.keys(addressLabelCandidates)){
+            let candidate_labels_map = addressLabelCandidates[address]
+            console.log(`flush_evm_label_candidates [${address}] candidate_labels_map`, candidate_labels_map)
+            await this.update_account_labels(address, candidate_labels_map, ts)
+        }
+        this.addressLabelCandidates = {}
+    }
 
     async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
         const {
@@ -8764,6 +8849,7 @@ module.exports = class Indexer extends AssetManager {
         //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
         let evm_chain_id = chainID
         let evm_blk_num = block.number
+        let blockTS = block.timestamp
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8842,18 +8928,19 @@ module.exports = class Indexer extends AssetManager {
                     // write specific call_ table
                     // try to find tableID
                     if (methodID != null) { //skip nativeTransfer
+                        let acctAddr = tx.from.toLowerCase() // signer of the tx
                         let tableID = this.getTableIDFromFingerprintID(methodID)
                         let bqCall = false
                         let isNewSchema = false
                         let schemaInfo = false
                         if (tableID) {
-                            bqCall = this.generateCallBqRec(tableID, methodID, evmTx)
+                            bqCall = this.generateCallBqRec(tableID, methodID, evmTx, acctAddr)
 
                         } else {
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
                             if (schemaInfo) {
                                 tableID = schemaInfo.schema.tableId
-                                bqCall = this.generateCallBqRec(tableID, methodID, evmTx)
+                                bqCall = this.generateCallBqRec(tableID, methodID, evmTx, acctAddr)
                                 isNewSchema = true
                             } else {
                                 //shouldn't get here?
@@ -8910,19 +8997,20 @@ module.exports = class Indexer extends AssetManager {
                     // write specific evt_ table
                     if (eSig) {
                         // try to find tableID
+                        let acctAddr = tx.from.toLowerCase() // signer of the tx
                         let tableID = this.getTableIDFromFingerprintID(eFingerprintID)
                         let bqEvent = false
                         let isNewSchema = false
                         let schemaInfo = false
                         if (tableID) {
-                            bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog)
+                            bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog, acctAddr)
                         } else {
                             //do the abi lookup
                             schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
                             if (schemaInfo) {
                                 isNewSchema = true
                                 tableID = schemaInfo.schema.tableId
-                                bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog)
+                                bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog, acctAddr)
                                 if (auto_evm_rows_map[tableID] == undefined) {
                                     auto_evm_rows_map[tableID] = []
                                 }
@@ -8951,6 +9039,10 @@ module.exports = class Indexer extends AssetManager {
             this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
         }
 
+        //TODO: update bt after process process_evm_transaction
+        await this.process_evm_flush(blockTS)
+
+        process.exit(0)
         // stream into blocks, transactions
         try {
             let dataset = "evm";
