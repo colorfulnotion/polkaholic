@@ -177,6 +177,22 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('projects')
+        .action(async (address, storageSlot, opt) => {
+            var evmetl = new EVMETL();
+	    await evmetl.modelProjects();
+            process.exit(0);
+        });
+
+    program.command('project')
+	.option('-a, --abiType <abiType>', "event")
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+	    let abiType = opt.abiType ? opt.abiType : "event";
+	    await evmetl.enrich_projectcontractabi(abiType);
+            process.exit(0);
+        });
+
     await program.parseAsync(process.argv);
 }
 

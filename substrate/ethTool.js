@@ -293,27 +293,48 @@ async function getTokenTotalSupply(web3Api, contractAddress, bn = 'latest', deci
 //return symbol, name, deciaml, totalSupply
 async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest') {
     let checkSumContractAddr = web3.utils.toChecksumAddress(contractAddress)
-    let erc20Contract = initContract(web3Api, erc20ABI, checkSumContractAddr)
+    let erc20Contract = initContract(web3Api, swapABI, checkSumContractAddr)
     if (bn == 'latest') {
         bn = await web3Api.eth.getBlockNumber()
     }
     try {
-        var [name, symbol, decimals, totalSupply] = await Promise.all([
+        var [name, symbol, decimals, totalSupply, token0, token1] = await Promise.all([
             erc20Contract.methods.name().call({}, bn),
             erc20Contract.methods.symbol().call({}, bn),
             erc20Contract.methods.decimals().call({}, bn),
-            erc20Contract.methods.totalSupply().call({}, bn)
+            erc20Contract.methods.totalSupply().call({}, bn),
+            erc20Contract.methods.token0().call({}, bn),
+            erc20Contract.methods.token1().call({}, bn)
         ]);
         // for a contract to be erc20, {name, symbol, decimals, totalSupply} call return successful
         let tokenInfo = {
             blockNumber: bn,
-            tokenAddress: checkSumContractAddr,
             tokenType: 'ERC20',
-            name: name,
-            symbol: symbol,
-            decimal: decimals,
-            totalSupply: totalSupply / 10 ** decimals,
-            numHolders: 0
+            name,
+            symbol,
+            decimals,
+            totalSupply
+        }
+        if (token0 && token1) {
+            try {
+                let erc20Contract0 = initContract(web3Api, erc20ABI, web3.utils.toChecksumAddress(token0))
+                let erc20Contract1 = initContract(web3Api, erc20ABI, web3.utils.toChecksumAddress(token1))
+                var [token0Symbol, token0Decimals, token1Symbol, token1Decimals] = await Promise.all([
+                    erc20Contract0.methods.symbol().call({}, bn),
+                    erc20Contract0.methods.decimals().call({}, bn),
+                    erc20Contract1.methods.symbol().call({}, bn),
+                    erc20Contract1.methods.decimals().call({}, bn)
+                ]);
+                tokenInfo.tokenType = 'ERC20LP';
+                tokenInfo.token0 = token0;
+                tokenInfo.token1 = token1;
+                tokenInfo.token0Symbol = token0Symbol;
+                tokenInfo.token1Symbol = token1Symbol;
+                tokenInfo.token0Decimals = token0Decimals;
+                tokenInfo.token1Decimals = token1Decimals;
+            } catch (err) {
+                console.log("T01", err);
+            }
         }
         return tokenInfo
     } catch (err) {
@@ -390,7 +411,7 @@ async function getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn = 'la
         }
 
     } catch (err) {
-        console.log(`warning ${contractAddress} does not implement DOMAIN_SEPARATOR and/or PERMIT_TYPEHASH`)
+        //console.log(`warning ${contractAddress} does not implement DOMAIN_SEPARATOR and/or PERMIT_TYPEHASH`)
         //return false
     }
 
@@ -1511,7 +1532,7 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
         let dReceipt = dReceipts[i]
         let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
         let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
-        if (fTxn){
+        if (fTxn) {
             fTxns.push(fTxn)
             //write connected txn
             if (fTxn.isConnectedCall) {
@@ -2602,6 +2623,7 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
     }
 }
 
+// this works for both project-specific tables (call_project_..., evt_project_) and general tables (call_, evt_) since the last 1-2 components are positioned the same way 
 function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3') {
     let fingerprintID = false
     if (tableID.substr(0, 5) == 'call_') {

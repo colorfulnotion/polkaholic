@@ -1,0 +1,146 @@
+[
+  {
+    "mode": "REQUIRED",
+    "name": "relay_chain",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "para_id",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Event ID for the transfer",
+    "mode": "REQUIRED",
+    "name": "event_id",
+    "type": "STRING"
+  },
+  {
+    "description": "Section/Pallet for the event",
+    "mode": "REQUIRED",
+    "name": "section",
+    "type": "STRING"
+  },
+  {
+    "description": "Event method",
+    "mode": "REQUIRED",
+    "name": "method",
+    "type": "STRING"
+  },
+  {
+    "description": "Extrinsic ID of the extrinsic which includes the event",
+    "mode": "REQUIRED",
+    "name": "extrinsic_id",
+    "type": "STRING"
+  },
+  {
+    "description": "Extrinsic Hash of the extrinsic which includes the event",
+    "mode": "REQUIRED",
+    "name": "extrinsic_hash",
+    "type": "STRING"
+  },
+  {
+    "description": "Block time of the block which includes the event",
+    "mode": "REQUIRED",
+    "name": "block_time",
+    "policyTags": {
+      "names": [
+        "projects/substrate-etl/locations/us-central1/taxonomies/2510662045358922601/policyTags/3610299865473213954"
+      ]
+    },
+    "type": "TIMESTAMP"
+  },
+  {
+    "description": "Block number of the block which includes the event",
+    "mode": "REQUIRED",
+    "name": "block_number",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Block hash of the block which includes the event",
+    "mode": "REQUIRED",
+    "name": "block_hash",
+    "type": "STRING"
+  },
+  {
+    "description": "SS58 Encoded address of the origin of the transfer",
+    "mode": "REQUIRED",
+    "name": "from_ss58",
+    "type": "STRING"
+  },
+  {
+    "description": "Pub key of the origin of the transfer",
+    "mode": "REQUIRED",
+    "name": "from_pub_key",
+    "type": "STRING"
+  },
+  {
+    "description": "SS58 Encoded address of the recipient of the transfer",
+    "mode": "REQUIRED",
+    "name": "to_ss58",
+    "type": "STRING"
+  },
+  {
+    "description": "Pub key of the recipient of the transfer",
+    "mode": "REQUIRED",
+    "name": "to_pub_key",
+    "type": "STRING"
+  },
+  {
+    "description": "String representation of the transfer",
+    "mode": "NULLABLE",
+    "name": "asset",
+    "type": "STRING"
+  },
+  {
+    "description": "Estimated USD value of 1 token of the transfer",
+    "mode": "NULLABLE",
+    "name": "price_usd",
+    "policyTags": {
+      "names": [
+        "projects/substrate-etl/locations/us-central1/taxonomies/2510662045358922601/policyTags/3610299865473213954"
+      ]
+    },
+    "type": "FLOAT"
+  },
+  {
+    "description": "Estimated value of the transfer in USD",
+    "mode": "NULLABLE",
+    "name": "amount_usd",
+    "policyTags": {
+      "names": [
+        "projects/substrate-etl/locations/us-central1/taxonomies/2510662045358922601/policyTags/3610299865473213954"
+      ]
+    },
+    "type": "FLOAT"
+  },
+  {
+    "description": "Symbol of the asset, if available",
+    "mode": "NULLABLE",
+    "name": "symbol",
+    "type": "STRING"
+  },
+  {
+    "description": "Decimals of the asset, if available",
+    "mode": "NULLABLE",
+    "name": "decimals",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Decimalized version of the asset",
+    "mode": "NULLABLE",
+    "name": "amount",
+    "type": "FLOAT"
+  },
+  {
+    "description": "Raw (non-decimalized) version of the amount of the asset being transferred",
+    "mode": "REQUIRED",
+    "name": "raw_amount",
+    "type": "NUMERIC"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "id",
+    "type": "STRING"
+  }
+]

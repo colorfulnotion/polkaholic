@@ -1388,9 +1388,9 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async getLastKey(chainID, logDT) {
-	let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 6 hour)`
+        let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 6 hour)`
         let chains = await this.pool.query(sql);
-	console.log("getLastKey", sql, chains);
+        console.log("getLastKey", sql, chains);
         if (chains.length == 0) {
             return "";
         } else {
