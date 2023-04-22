@@ -8816,7 +8816,7 @@ module.exports = class Indexer extends AssetManager {
         }else{
             // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
         }
-        //await tblRealtime.insert(btLabelRowsToInsert);
+        await tblRealtime.insert(btLabelRowsToInsert);
     }
 
     async flush_evm_label_candidates(ts){
