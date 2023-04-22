@@ -581,6 +581,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let wstr = (w.length > 0) ? ` and ${w.join(" and ")}` : "";
         // 1. find problematic periods with a small number of records (
         let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${wstr} order by chainID, monthDT`
+	console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
         for (const f of recs) {
@@ -609,7 +610,7 @@ module.exports = class SubstrateETL extends AssetManager {
                     // redo in runs of 3
                     for (let n = bn - 1; n <= bn + 1; n++) {
                         let rowId = paraTool.blockNumberToHex(n);
-                        tableChain.row(rowId).delete();
+                        //tableChain.row(rowId).delete();
                         let sql = `update block${f.chainID} set crawlBlock=1, attempted = 0 where blockNumber = '${n}' and attempted < 100;`;
                         console.log("DELETED:", rowId, " recrawling", sql, `./polkaholic indexblock ${f.chainID} ${n}`);
                         this.batchedSQL.push(sql);
@@ -622,10 +623,11 @@ module.exports = class SubstrateETL extends AssetManager {
 
     }
 
-    async audit_blocks(chainID = null, fix = true) {
+    async audit_blocks(chainID = null, monthDT = null, fix = true) {
         // 1. find problematic periods with a small number of records (
         let w = chainID != null ? ` and chainID = ${chainID}` : " and (auditDT is Null or auditDT < date_sub(Now(), interval 6 hour)) "
-        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where (( monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' ) ) or monthDT = LAST_DAY(Now()) ) ${w} order by auditDT`
+	if ( monthDT ) w += ` and monthDT = '${monthDT}'`;
+        let sql = `select chainID, monthDT, startBN, endBN, startDT, endDT from blocklogstats where ((( monthDT >= last_day(date_sub(Now(), interval 90 day)) and audited in ( 'Unknown', 'Failure' ) ) or monthDT = LAST_DAY(Now()) )) ${w} order by auditDT`
         console.log(sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return (false);
@@ -4113,7 +4115,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     if (r.fork) console.log("FORK!!!! DELETE ", bn, rowId);
                     if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
                     if (logDT != logDT0) console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
-                    await tableChain.row(rowId).delete();
+                    //await tableChain.row(rowId).delete();
                     continue;
                 }
                 found[hdr.number] = true;
@@ -5411,6 +5413,83 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         }
     }
 
+    async enrich_swaps() {
+	let sql = `select * from substrate-etl.polkadot_enterprise.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
+        let rows = await this.execute_bqJob(sql);
+	for ( const r of rows ) {
+	    let call_args = r.call_args;
+	    let call_args_def = r.call_args_def;
+	    /* 
+{"amountIn":"0","amountOutMin":"0","amount_in":4750000000000,"amount_out_min":606498765584157,"deadline":8888888,"path":[{"assetIndex":516,"assetType":2,"chainId":2001},{"assetIndex":0,"assetType":0,"chainId":2001}],"recipient":{"id":"h1yYHpzqqUB5bos3teCg2QRiLWSQZv1MgwywM1tW2zdjVo7"}} 
+	    Basic strategy: there are some fields of type "AssetId" (amountIn) and other fields of type "Balance" (amount_in)
+	    Swap enrichment is:
+	    For every section/method in calls, map the calls' assetIds into canonical "swap" form
+              tokenIn_{symbol,decimal,name}
+              tokenOut_{symbol,decimal,name}
+              amountIn{_float, price_usd, value_usd}
+              amountOut{_float, price_usd, value_usd}
+	    */
+	    console.log(call_args, call_args_def);
+	}
+    }
+    
+    async generate_xcmgar_udfs() {
+	let url = "https://raw.githubusercontent.com/colorfulnotion/xcm-global-registry/main/metadata/xcmgar.json";
+        const axios = require("axios");
+	let NL = "\r\n";
+        try {
+            const resp = await axios.get(url);
+	    let funcs = ["name", "symbol", "decimals"];
+	    let assets = resp.data.assets;
+	    for (const func of funcs) {
+		let udf_template = "CREATE FUNCTION \`substrate-etl.polkadot_enterprise.currencyID_to__FUNCTION_\`(r STRING, p STRING, c STRING) " + NL + "RETURNS JSON " + NL + "LANGUAGE js " + NL + 
+" " + NL +"AS r\"\"\"" + NL + "___RULES___" + NL + "  return null;" + NL + "\"\"\";" + NL
+
+		let RULES = [];
+		for ( const relayChain of Object.keys(assets) ) {
+		    let rcassets = assets[relayChain];
+		    for ( const c of rcassets ) {
+			let paraID = c.paraID;
+			let id = c.id;
+			let chain_assets = c.data;
+			for ( const a of chain_assets ) {
+			    let currencyID = typeof a.currencyID == "string" ? a.currencyID : null;
+			    if ( currencyID == null && typeof a.asset == "object" ) {
+				currencyID = JSON.stringify(a.asset);
+			    }
+			    
+			    let name = a.name;
+			    let symbol = a.symbol;
+			    let decimals = a.decimals;
+			    switch (func) {
+			    case "symbol":
+				RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return "${symbol}"`);
+				break;
+			    case "name":
+				RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return "${name}"`);
+				break;
+			    case "decimals":
+				RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return "${decimals}"`);
+				break;
+			    case "value":
+				RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return " (val / 10**${decimals})"`);
+				break;
+			    case "price_usd": // TODO: 
+			    case "value_usd": // TODO: 
+				break;
+			    }
+			}
+		    }
+		}
+		let out = udf_template.replace("___RULES___", RULES.join("\n")).replace("_FUNCTION_", func);
+		console.log(out);
+	    }
+	    console.log(funcs);
+	} catch (err) {
+	    console.log("ERROR", err);
+	}
+    }
+    
     lookup_runtime_type(runtime, type_id) {
         let lookup = runtime.lookup;
         if (runtime.lookup && runtime.lookup.types) {
@@ -5422,4 +5501,5 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         }
     }
 
+    
 }

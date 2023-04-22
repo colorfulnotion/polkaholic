@@ -122,6 +122,14 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('xcmgarudf')
+        .description("Generate XCM GAR UDFs")
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.generate_xcmgar_udfs();
+            process.exit(0);
+        });
+    
     program.command('trace')
         .description("Stream trace data out to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
@@ -500,9 +508,10 @@ async function main() {
         .description("Set up crawlBackfill workload for the results of an audit for a specific chain")
         .usage("-c 2004")
         .option('-c, --chainID <chainID>', 'ChainID', myParseInt, null)
+        .option('-m, --monthDT <monthDT>', 'MonthDT', null)
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
-            await substrateetl.audit_fix(opt.chainID);
+            await substrateetl.audit_fix(opt.chainID, opt.monthDT);
             process.exit(0);
         })
 
@@ -510,9 +519,10 @@ async function main() {
         .description("Audit blocks")
         .usage("-c 2004")
         .option('-c, --chainID <chainID>', 'ChainID', myParseInt, null)
+        .option('-m, --monthDT <monthDT>', 'ChainID', null)
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
-            await substrateetl.audit_blocks(opt.chainID);
+            await substrateetl.audit_blocks(opt.chainID, opt.monthDT);
             process.exit(0);
         })
 
