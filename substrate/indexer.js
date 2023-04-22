@@ -98,7 +98,7 @@ module.exports = class Indexer extends AssetManager {
     numXCMMessagesOut = {};
 
 
-    evmDatasetID = "evm_test"; /*** FOR DEVELOPEMENT: change to evm_test ***/
+    evmDatasetID = "evm_dev"; /*** FOR DEVELOPEMENT: change to evm_test ***/
 
     xcmMeta = []; //this should be removed after every block
 
@@ -8530,6 +8530,7 @@ module.exports = class Indexer extends AssetManager {
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
                 console.log(`fullKey***`, lrec)
                 labels[fullKey] = lrec
+                labels[lrec.labelID_unique] = lrec
             }
 
             // create generic key
@@ -8537,6 +8538,7 @@ module.exports = class Indexer extends AssetManager {
                 labels[modifiedFingerprintID] = lrec;
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
             }
+            labels[lrec.labelID_generic] = lrec
             // TODO: handle case when either evmChainID or contractAddress is missing
         }
         this.labels = labels
@@ -9042,7 +9044,6 @@ module.exports = class Indexer extends AssetManager {
         //TODO: update bt after process process_evm_transaction
         await this.process_evm_flush(blockTS)
 
-        process.exit(0)
         // stream into blocks, transactions
         try {
             let dataset = "evm";
