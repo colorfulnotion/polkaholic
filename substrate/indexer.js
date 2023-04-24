@@ -8545,53 +8545,34 @@ module.exports = class Indexer extends AssetManager {
     }
 
     generateEventBqRec(tableId, projectTableInfo, fingerprintID, evmLog, acctAddr) {
-        let decodedEvents = JSON.parse(evmLog.events)
-        let rec = {
-            chain_id: evmLog.id, //string
-            evm_chain_id: evmLog.chain_id, //integer
-            contract_address: evmLog.address,
-            evt_tx_hash: evmLog.transaction_hash,
-            evt_index: evmLog.log_index,
-            evt_block_time: evmLog.block_timestamp,
-            evt_block_number: evmLog.block_number,
-        }
-
-        // used for labels
-        let recBT = {
-            chain_id: evmLog.id, //string
-            evm_chain_id: evmLog.chain_id, //integer
-            contract_address: evmLog.address,
-            tx_hash: evmLog.transaction_hash,
-            block_time: evmLog.block_timestamp,
-            block_number: evmLog.block_number,
-        }
-
-        let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
-        if (eventLabel){
-            console.log(`generateEventBqRec eventLabel ***`, eventLabel)
-            this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
-        }
-
-        let flds = this.getSchemaFlds(fingerprintID)
-        if (flds.length != decodedEvents.length) {
-            this.logger.error({
-                op: "generateEventBqRec",
-                tableId: `${tableId}`,
-                error: `flds mismatch`,
-                flds: flds,
-                params: decodedEvents,
-            })
-            return [null, null];
-        }
-        for (let i = 0; i < decodedEvents.length; i++) {
-            let fldName = flds[i]
-            let dEvent = decodedEvents[i]
-            let bqColType = ethTool.mapABITypeToBqType(dEvent.type)
-            if (bqColType == 'JSON') {
-                rec[fldName] = JSON.stringify(dEvent.value)
-            } else {
-                rec[fldName] = dEvent.value
+        try {
+            let decodedEvents = JSON.parse(evmLog.events)
+            let rec = {
+                chain_id: evmLog.id, //string
+                evm_chain_id: evmLog.chain_id, //integer
+                contract_address: evmLog.address,
+                evt_tx_hash: evmLog.transaction_hash,
+                evt_index: evmLog.log_index,
+                evt_block_time: evmLog.block_timestamp,
+                evt_block_number: evmLog.block_number,
             }
+
+            // used for labels
+            let recBT = {
+                chain_id: evmLog.id, //string
+                evm_chain_id: evmLog.chain_id, //integer
+                contract_address: evmLog.address,
+                tx_hash: evmLog.transaction_hash,
+                block_time: evmLog.block_timestamp,
+                block_number: evmLog.block_number,
+            }
+
+            let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
+            if (eventLabel){
+                console.log(`generateEventBqRec eventLabel ***`, eventLabel)
+                this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
+            }
+
             let flds = this.getSchemaFlds(fingerprintID)
             if (flds.length != decodedEvents.length) {
                 this.logger.error({
@@ -8637,10 +8618,10 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    //evt_ClientData_0x095e66fa4dd6a6f7b43fb8444a7bd0edb870508c7abf639bc216efb0bcff9779_1
-    //call_safeTransferFrom_0xb88d4fde
+
     generateCallBqRec(tableId, projectTableInfo, fingerprintID, evmTx, acctAddr) {
-        let decodedParams = JSON.parse(evmTx.params)
+    try {
+        let decodedParams = evmTx.params ? JSON.parse(evmTx.params) : [];
         let rec = {
             chain_id: evmTx.id, //string
             evm_chain_id: evmTx.chain_id, //integer
@@ -8668,6 +8649,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         let flds = this.getSchemaFlds(fingerprintID)
+
         if (flds.length != decodedParams.length) {
             this.logger.error({
                 op: "generateCallBqRec",
@@ -8686,43 +8668,36 @@ module.exports = class Indexer extends AssetManager {
             } else {
                 rec[fldName] = dParam.value
             }
-            for (let i = 0; i < decodedParams.length; i++) {
-                let fldName = flds[i]
-                let dParam = decodedParams[i]
-                if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
-                    rec[fldName] = JSON.stringify(dParam.value)
-                } else {
-                    rec[fldName] = dParam.value
-                }
-            }
-            /*
-              for (const dParam of decodedParams) {
-              if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
-              rec[dParam.name] = JSON.stringify(dParam.value)
-              } else {
-              rec[dParam.name] = dParam.value
-              }
-              }
-            */
-            let bqRec = {
-                insertId: `${tableId}_${evmTx.hash}`,
+        }
+        /*
+          for (const dParam of decodedParams) {
+          if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+          rec[dParam.name] = JSON.stringify(dParam.value)
+          } else {
+          rec[dParam.name] = dParam.value
+          }
+          }
+        */
+        let bqRec = {
+            insertId: `${tableId}_${evmTx.hash}`,
+            json: rec
+        }
+        let bqRec2 = null
+        if (projectTableInfo) {
+            let subtableId = projectTableInfo.subtableId;
+            bqRec2 = {
+                insertId: `${subtableId}_${evmTx.hash}`,
                 json: rec
             }
-            let bqRec2 = null
-            if (projectTableInfo) {
-                let subtableId = projectTableInfo.subtableId;
-                bqRec2 = {
-                    insertId: `${subtableId}_${evmTx.hash}`,
-                    json: rec
-                }
-            }
-            return [bqRec, bqRec2];
-        } catch (err) {
-            console.log("generateCallBqRec", err);
-            return [null, null];
         }
-
+        return [bqRec, bqRec2];
+    } catch (err) {
+        console.log("generateCallBqRec", err);
+        return [null, null];
     }
+
+}
+
 
     async process_evm_flush(ts){
         await this.flush_evm_label_candidates(ts)
