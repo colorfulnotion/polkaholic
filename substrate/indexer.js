@@ -8715,23 +8715,30 @@ module.exports = class Indexer extends AssetManager {
             families: ["realtime", "label"],
         }];
         let isRowFound = true
+        let isStoredLabelFlound = false
+        let rowData = false
+        let storedLabels = false
+
         try {
             const [row] = await tblRealtime.row(address).get({
                 filter
             });
-            let rowData = row.data;
-            console.log(`**** address ${address} rowData`, rowData)
+            rowData = row.data;
+            //console.log(`**** address ${address} rowData`, rowData)
+            if (rowData.label != undefined){
+                storedLabels = rowData.label
+                isStoredLabelFlound = true
+            }
         } catch (err) {
             let errorStr = err.toString()
             if (errorStr.includes("RowError: Unknown row:")) {
                 isRowFound = false
             }
-            console.log(`err`, err.toString())
         }
         let btLabelRowsToInsert = []
         // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
-        if (!isRowFound) {
-            console.log(`address [${address}] labels missing`)
+        if (!isRowFound || !isStoredLabelFlound) {
+            console.log(`address [${address}] isRowFound=${isRowFound}, isStoredLabelFlound=${isStoredLabelFlound}`)
             let hres = {
                 key: address.toLowerCase(),
                 data: {
@@ -8745,12 +8752,52 @@ module.exports = class Indexer extends AssetManager {
                     timestamp: ts * 1000000
                 }
             }
-            console.log(`address ${address} hres***`, hres)
+            //console.log(`address ${address} hres***`, hres)
             btLabelRowsToInsert.push(hres)
-        } else {
+        } else if (Array.isArray(Object.keys(storedLabels))){
             // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
+            let hres = {
+                key: address.toLowerCase(),
+                data: {
+                    label: {}
+                }
+            }
+            let labelMap = []
+            let knownLabels = Object.keys(storedLabels)
+            let duplicateLabels = []
+            let newLabelFound = false
+            console.log(`address [${address}] knownLabels`, knownLabels)
+            for (const candidate_label of Object.keys(candidate_labels_map)){
+                let storedLabel = storedLabels[candidate_label]
+                if (storedLabel == undefined){
+                    let btRec = candidate_labels_map[candidate_label]
+                    hres['data']['label'][candidate_label] = {
+                        value: JSON.stringify(btRec),
+                        timestamp: ts * 1000000
+                    }
+                    newLabelFound = true
+                }else{
+                    //console.log(`existing storedLabel`, storedLabel)
+                    if (storedLabel.timestamp/1000000 > ts){
+                        /*
+                        TODO: we have found new candidate label with earlier timestamp.
+                        This likely happens due to us indexing the evm blocks in random order,
+                        Should we update the label with earliest observed ts possible?
+                        */
+                    }
+                    duplicateLabels.push(candidate_label)
+                }
+            }
+            if (newLabelFound){
+                console.log(`address ${address} new labels ***`, hres)
+                btLabelRowsToInsert.push(hres)
+            }else{
+                //console.log(`address ${address} duplicateLabels`, duplicateLabels)
+            }
         }
-        await tblRealtime.insert(btLabelRowsToInsert);
+        if (btLabelRowsToInsert.length > 0){
+            await tblRealtime.insert(btLabelRowsToInsert);
+        }
     }
 
     async flush_evm_label_candidates(ts) {
