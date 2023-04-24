@@ -2138,8 +2138,8 @@ module.exports = class Crawler extends Indexer {
                         let log_retry_ms = 500
                         let evmReceipts = false
 
-                        let evmReceiptsFunc = (evmRPCBlockReceipts)? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number): ethTool.crawlEvmReceipts(web3, block, isParallel)
-                        let evmReceiptsCtx = (evmRPCBlockReceipts)? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})`: `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        let evmReceiptsFunc = (evmRPCBlockReceipts) ? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number) : ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = (evmRPCBlockReceipts) ? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})` : `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
                         evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
                         if (!evmReceipts) evmReceipts = [];
                         console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
@@ -2151,6 +2151,7 @@ module.exports = class Crawler extends Indexer {
                         let [dTxns, dReceipts] = await statusesPromise
                         let evmTrace = false
                         await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, this.contractABIs, this.contractABISignatures)
+
                     }
                 } catch (err) {
                     console.log(`crawlEvmReceipts err`, err)
@@ -2209,13 +2210,13 @@ module.exports = class Crawler extends Indexer {
 
         const web3 = new Web3(provider);
         this.web3Api = web3;
-        if (chain.evmRPCBlockReceipts != undefined){
+        if (chain.evmRPCBlockReceipts != undefined) {
             this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
         }
-        if (chain.evmRPCInternal != undefined){
+        if (chain.evmRPCInternal != undefined) {
             this.evmRPCInternal = chain.evmRPCInternal
         }
-        if (chain.evmRPC != undefined){
+        if (chain.evmRPC != undefined) {
             this.evmRPC = chain.evmRPC
         }
         this.contractABIs = await this.getContractABI();

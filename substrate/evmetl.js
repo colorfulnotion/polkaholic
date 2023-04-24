@@ -344,6 +344,162 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log("function - signature types", f_typeCnt);
     }
 
+    async enrich_projectcontractabi(abiType = "event") {
+        // load projectcontractabi by signature
+        var signatureRecs = await this.poolREADONLY.query(`SELECT address, fingerprintID, CONVERT(signature using utf8) signature, projectName from projectcontractabi where abiType = '${abiType}'`);
+
+        let signatures = {};
+        for (const s of signatureRecs) {
+            if (signatures[s.address] == undefined) {
+                signatures[s.address] = {};
+            }
+            signatures[s.address][s.signature] = s;
+        }
+        let hits = {};
+        if (abiType == "function") {
+            let sql = `SELECT * FROM \`substrate-etl.evm.transactions\` as transactions where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`
+            let recs = await this.execute_bqJob(sql);
+            for (const r of recs) {
+                if (r.to_address) {
+                    let a = r.to_address.toLowerCase();
+                    if (signatures[a] && signatures[a][r.signature]) {
+                        let projectName = signatures[a][r.signature].projectName
+                        if (hits[projectName] == undefined) {
+                            hits[projectName] = 0;
+                        }
+                        hits[projectName]++;
+                        //console.log(abiType, projectName);
+                    }
+                }
+            }
+        } else if (abiType == "event") {
+            let sql = `SELECT * FROM \`substrate-etl.evm.logs\` as logs  where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`;
+            let recs = await this.execute_bqJob(sql);
+            console.log(recs.length, abiType);
+            for (const r of recs) {
+                if (r.address) {
+                    let a = r.address.toLowerCase();
+                    if (signatures[a] && signatures[a][r.signature]) {
+                        let projectName = signatures[a][r.signature].projectName
+                        if (hits[projectName] == undefined) {
+                            hits[projectName] = 0;
+                        }
+                        hits[projectName]++;
+                        //console.log(abiType, projectName);
+                    }
+                }
+            }
+
+        }
+        console.log(hits);
+
+    }
+
+    async modelProjects() {
+        let cmd = `ls ./projects/*/discovered.json`
+        let {
+            stdout,
+            stderr
+        } = await exec(cmd)
+        let addresses = [];
+        let signatures = {};
+        let res = stdout.split("\n");
+        for (const fn of res) {
+            let fna = fn.split("/");
+            if (fna.length == 4) {
+                try {
+                    let project_name = fna[2];
+                    let discoveredRaw = await fs.readFileSync(fn, "utf8");
+                    let discovered = JSON.parse(discoveredRaw);
+                    let chainID = 1;
+                    let contracts = {};
+                    // newly discovered projects
+                    for (const c of discovered.contracts) {
+                        let chainID = 1;
+                        let address = c.address.toLowerCase();
+                        let sql = `insert into abirepo ( address, chainID, createDT, projectName, contractName ) values ( ${mysql.escape(address)}, '${chainID}', Now(), ${mysql.escape(project_name)}, ${mysql.escape(c.name)} ) on duplicate key update projectName = values(projectName), contractName = values(contractName) `;
+                        contracts[address] = c.name;
+                        //this.batchedSQL.push(sql);
+                        //await this.update_batchedSQL();
+                    }
+                    // for all the abis
+                    if (discovered.abis) {
+                        for (const a of Object.keys(discovered.abis)) {
+                            let address = a.toLowerCase();
+                            let abis = discovered.abis[a];
+                            for (const abi of abis) {
+                                if (signatures[abi] == undefined) {
+                                    signatures[abi] = {};
+                                }
+                                if (signatures[abi][project_name] == undefined) {
+                                    signatures[abi][project_name] = {};
+                                }
+                                if (signatures[abi][project_name][address] == undefined) {
+                                    signatures[abi][project_name][address] = contracts[address];
+                                }
+                            }
+
+                        }
+                    }
+
+                } catch (err) {
+                    console.log(err);
+                }
+
+            }
+        }
+        /*
+mysql> desc projectcontractabi;
++---------------+-------------+------+-----+---------+-------+
+| Field         | Type        | Null | Key | Default | Extra |
++---------------+-------------+------+-----+---------+-------+
+| address       | varchar(67) | NO   | PRI | NULL    |       |
+| fingerprintID | varchar(96) | NO   | PRI | NULL    |       |
+| projectName   | varchar(32) | YES  |     | NULL    |       |
+| secondaryID   | varchar(96) | YES  |     | NULL    |       |
+| signatureID   | varchar(70) | NO   |     | NULL    |       |
+| signatureRaw  | blob        | YES  |     | NULL    |       |
+| signature     | blob        | YES  | MUL | NULL    |       |
+| abi           | blob        | YES  |     | NULL    |       |
+| abiType       | varchar(16) | YES  |     | NULL    |       |
+| addDT         | datetime    | YES  |     | NULL    |       |
++---------------+-------------+------+-----+---------+-------+
+*/
+        let cnt = 0,
+            skip = 0,
+            fails = 0;
+        for (const abi of Object.keys(signatures)) {
+            for (const project_name of Object.keys(signatures[abi])) {
+                for (const address of Object.keys(signatures[abi][project_name])) {
+                    if (abi.includes("constructor") || abi.includes("error") || abi.includes("pure") || abi.includes("view")) {
+                        skip++;
+                    } else {
+                        let s = this.abi_to_signature(abi)
+                        let sql = `select signatureID, abiType, fingerprintID, secondaryID, CONVERT(signatureRaw using utf8) signatureRaw, CONVERT(abi using utf8) abi, abiType from contractabi where signature = ${mysql.escape(s)}`
+                        let check = await this.poolREADONLY.query(sql);
+                        if (check.length == 0) {
+                            fails++; // do NOT add unless we have a good signature match..
+                        } else {
+                            let c = check[0];
+                            let sql2 = `insert into projectcontractabi (address, fingerprintID, secondaryID, signatureID, signatureRaw, signature, abi, abiType, projectName, addDT) values (${mysql.escape(address)}, ${mysql.escape(c.fingerprintID)}, ${mysql.escape(c.secondaryID)}, ${mysql.escape(c.signatureID)}, ${mysql.escape(c.signatureRaw)}, ${mysql.escape(s)}, ${mysql.escape(c.abi)}, ${mysql.escape(c.abiType)}, ${mysql.escape(project_name)}, Now()) on duplicate key update projectName = values(projectName) `
+                            this.batchedSQL.push(sql2);
+                            await this.update_batchedSQL();
+                            cnt++;
+                        }
+                    }
+                }
+            }
+        }
+
+    }
+    abi_to_signature(abi) {
+        let s = abi.replace("event ", "").replace("function ", "").replace(" payable", "").trim();
+        if (s.includes("returns ")) {
+            let sa = s.split(" returns");
+            s = s[0];
+        }
+        return s;
+    }
     async reloadABI(targetSQL = null) {
         let sql = (targetSQL != undefined) ? targetSQL : `select abiType, name, signatureID, abi from contractabi where outdated = 1 order by numContracts desc;`
         var res = await this.poolREADONLY.query(sql);
@@ -665,7 +821,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0)
     }
 
-    async crawlABIs(chainID = null, renew = true) {
+    async crawlABIs(chainID = null, renew = false) {
         let w = chainID ? ` and chainID = ${chainID}` : ""
         let sql = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 2 and length(method_id) >= 10 group by to_address order by numTransactions7d desc limit 100000`;
         let recs = renew ? await this.execute_bqJob(sql) : [];
@@ -686,7 +842,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             "data": out,
             "replace": replace
         });
-        sql = `select address, chainID from abirepo where status = 'Unknown' and ( lastAttemptDT is null or lastAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and numTransactions7d > 3 ${w} order by numTransactions7d desc, chainID asc limit 1000`;
+        sql = `select address, chainID from abirepo where status = 'Unknown' and ( lastAttemptDT is null or lastAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and projectName is not null ${w} order by numTransactions7d desc, chainID asc limit 1000`;
         var res = await this.poolREADONLY.query(sql);
         for (const r of res) {
             console.log(r.address, r.chainID)

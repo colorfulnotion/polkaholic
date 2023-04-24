@@ -1390,9 +1390,9 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async getLastKey(chainID, logDT) {
-	let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 6 hour)`
+        let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 6 hour)`
         let chains = await this.pool.query(sql);
-	console.log("getLastKey", sql, chains);
+        console.log("getLastKey", sql, chains);
         if (chains.length == 0) {
             return "";
         } else {
@@ -5419,8 +5419,8 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 	for ( const r of rows ) {
 	    let call_args = r.call_args;
 	    let call_args_def = r.call_args_def;
-	    /* 
-{"amountIn":"0","amountOutMin":"0","amount_in":4750000000000,"amount_out_min":606498765584157,"deadline":8888888,"path":[{"assetIndex":516,"assetType":2,"chainId":2001},{"assetIndex":0,"assetType":0,"chainId":2001}],"recipient":{"id":"h1yYHpzqqUB5bos3teCg2QRiLWSQZv1MgwywM1tW2zdjVo7"}} 
+	    /*
+{"amountIn":"0","amountOutMin":"0","amount_in":4750000000000,"amount_out_min":606498765584157,"deadline":8888888,"path":[{"assetIndex":516,"assetType":2,"chainId":2001},{"assetIndex":0,"assetType":0,"chainId":2001}],"recipient":{"id":"h1yYHpzqqUB5bos3teCg2QRiLWSQZv1MgwywM1tW2zdjVo7"}}
 	    Basic strategy: there are some fields of type "AssetId" (amountIn) and other fields of type "Balance" (amount_in)
 	    Swap enrichment is:
 	    For every section/method in calls, map the calls' assetIds into canonical "swap" form
@@ -5432,7 +5432,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 	    console.log(call_args, call_args_def);
 	}
     }
-    
+
     async generate_xcmgar_udfs() {
 	let url = "https://raw.githubusercontent.com/colorfulnotion/xcm-global-registry/main/metadata/xcmgar.json";
         const axios = require("axios");
@@ -5442,7 +5442,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 	    let funcs = ["name", "symbol", "decimals"];
 	    let assets = resp.data.assets;
 	    for (const func of funcs) {
-		let udf_template = "CREATE FUNCTION \`substrate-etl.polkadot_enterprise.currencyID_to__FUNCTION_\`(r STRING, p STRING, c STRING) " + NL + "RETURNS JSON " + NL + "LANGUAGE js " + NL + 
+		let udf_template = "CREATE FUNCTION \`substrate-etl.polkadot_enterprise.currencyID_to__FUNCTION_\`(r STRING, p STRING, c STRING) " + NL + "RETURNS JSON " + NL + "LANGUAGE js " + NL +
 " " + NL +"AS r\"\"\"" + NL + "___RULES___" + NL + "  return null;" + NL + "\"\"\";" + NL
 
 		let RULES = [];
@@ -5457,7 +5457,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 			    if ( currencyID == null && typeof a.asset == "object" ) {
 				currencyID = JSON.stringify(a.asset);
 			    }
-			    
+
 			    let name = a.name;
 			    let symbol = a.symbol;
 			    let decimals = a.decimals;
@@ -5474,8 +5474,8 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 			    case "value":
 				RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return " (val / 10**${decimals})"`);
 				break;
-			    case "price_usd": // TODO: 
-			    case "value_usd": // TODO: 
+			    case "price_usd": // TODO:
+			    case "value_usd": // TODO:
 				break;
 			    }
 			}
@@ -5489,7 +5489,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
 	    console.log("ERROR", err);
 	}
     }
-    
+
     lookup_runtime_type(runtime, type_id) {
         let lookup = runtime.lookup;
         if (runtime.lookup && runtime.lookup.types) {
@@ -5501,5 +5501,4 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         }
     }
 
-    
 }
