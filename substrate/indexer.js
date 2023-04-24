@@ -93,6 +93,7 @@ module.exports = class Indexer extends AssetManager {
 
     addressLabelCandidates = {};
     crawlErcToken = {}; // by tokenAddress
+    ercTokenList = {}; // by tokenAddress
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
@@ -5854,7 +5855,7 @@ module.exports = class Indexer extends AssetManager {
                 if (tokenInfo && tokenInfo.symbol) {
                     this.ercTokenList[cAddress] = tokenInfo;
                     if (tokenInfo.tokenType == "ERC20LP") {
-                        console.log(cAddress, tokenInfo);
+                        //console.log(cAddress, tokenInfo);
                     }
                     // add cell with tokenInfo to metadata
                     let r = {
@@ -5884,50 +5885,77 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async process_token_address(tokenAddress, chainID, tokenID = null) {
-        // 1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
-        // 2. mark that the assetholder balances have to be fetched
-        let cAddress = tokenAddress.toLowerCase();
-        if (this.ercTokenList[cAddress]) {
-            return this.ercTokenList[cAddress] // note: totalSupply is not accurate here
-        }
-        // if we have marked it for crawl already, then don't do anything
-        if (this.crawlErcToken[cAddress]) return null;
-
-        // read metadata from btAccountRealtime
-        let [tblName, tblRealtime] = this.get_btTableRealtime()
         try {
-            const filter = [{
-                column: {
-                    cellLimit: 1
-                },
-                families: ["metadata"],
-                limit: 1
-            }];
-            let row = null;
-            [row] = await tblRealtime.row(cAddress).get({
-                filter
-            });
-            let rowData = row.data;
-            let metadata = rowData["metadata"];
-            if (metadata) {
-                for (const chainID of Object.keys(metadata)) {
-                    let tokenInfo = JSON.parse(metadata[chainID.toString()][0].value);
-                    if (tokenInfo.decimals) {
-                        return tokenInfo;
-                    } else {
-                        this.crawlErcToken[cAddress] = tokenID;
+            // 1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
+            // 2. mark that the assetholder balances have to be fetched
+            let cAddress = tokenAddress.toLowerCase();
+            console.log("-----", cAddress);
+            if (this.ercTokenList[cAddress]) {
+                console.log(" 11111 returning ", cAddress);
+                return this.ercTokenList[cAddress] // note: totalSupply is not accurate here
+            }
+            // if we have marked it for crawl already, then don't do anything
+            if (this.crawlErcToken[cAddress] !== undefined) {
+                console.log(" 00000 ***marked ", cAddress);
+                return null;
+            }
+
+            // read metadata from btAccountRealtime
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            try {
+                const filter = [{
+                    column: {
+                        cellLimit: 1
+                    },
+                    families: ["metadata", "pricefeed"],
+                    limit: 1
+                }];
+                let row = null;
+                [row] = await tblRealtime.row(cAddress).get({
+                    filter
+                });
+                let rowData = row.data;
+                let pricefeed = rowData["pricefeed"];
+                let usd = null
+                if (pricefeed) {
+                    for (const chainID of Object.keys(pricefeed)) {
+                        let pf = JSON.parse(pricefeed["coingecko"][0].value);
+                        if (pf.usd) usd = pf.usd;
                     }
                 }
+
+                let metadata = rowData["metadata"];
+                if (metadata) {
+                    for (const chainID of Object.keys(metadata)) {
+                        let tokenInfo = JSON.parse(metadata[chainID.toString()][0].value);
+                        if (tokenInfo.decimals) {
+                            if (usd) {
+                                tokenInfo.usd = usd;
+                            }
+                            console.log("!!! FOUND", cAddress);
+                            this.ercTokenList[cAddress] = tokenInfo;
+                            return tokenInfo;
+                        } else {
+                            console.log("--- not FOUND... setting up crawl", cAddress);
+                            this.crawlErcToken[cAddress] = tokenID;
+                            return null;
+                        }
+                    }
+                }
+                return null;
+            } catch (err) {
+                if (err && (err.code == 404)) {
+                    console.log(" 99999 **marking", tokenAddress, chainID)
+                    // we should only do this on a 404
+                    this.crawlErcToken[cAddress] = tokenID;
+                } else {
+                    console.log(err);
+                }
             }
-        } catch (err) {
-            if (err.code && (err.code == 404)) {
-                console.log("process_token_address MISS", tokenAddress, chainID)
-                // we should only do this on a 404
-                this.crawlErcToken[cAddress] = tokenID;
-            } else {
-                console.log(err);
-            }
+        } catch (e2) {
+            console.log(e2);
         }
+        return null;
     }
 
     async process_erc20_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
@@ -6066,8 +6094,25 @@ module.exports = class Indexer extends AssetManager {
             token1In,
             token0Out
         }
-        console.log("process_evmtx_swapV2", r, lpTokenInfo);
-        // TODO: token{0/1}{price_usd, value_usd}
+        if (lpTokenInfo.token0 && lpTokenInfo.token1) {
+            let t0 = lpTokenInfo.token0.toLowerCase();
+            let t1 = lpTokenInfo.token1.toLowerCase();
+            let tok0 = await this.process_token_address(t0, chainID);
+            if (tok0) {
+                r.token0price_usd = tok0.usd;
+                r.token0value_usd = tok0.usd * token0In;
+            } else {
+                console.log("***** SWP MISS on ", t0);
+            }
+            let tok1 = await this.process_token_address(t1, chainID);
+            if (tok1) {
+                r.token1price_usd = tok1.usd;
+                r.token1value_usd = tok1.usd * token1In;
+            } else {
+                console.log("***** SWP MISS on ", t1);
+            }
+            console.log("process_evmtx_swapV2", r, lpTokenInfo);
+        }
     }
 
     async process_evmtx_syncV2(syncEvent, chainID, lpTokenInfo) {
@@ -6082,8 +6127,27 @@ module.exports = class Indexer extends AssetManager {
             lp1,
             rat: lp0 / lp1
         }
-        console.log("process_evmtx_syncV2", r, lpTokenInfo);
-        // TODO: token{0/1}{price_usd, value_usd}
+        if (lpTokenInfo.token0 && lpTokenInfo.token1) {
+
+            let t0 = lpTokenInfo.token0.toLowerCase();
+            let t1 = lpTokenInfo.token1.toLowerCase();
+            let tok0 = await this.process_token_address(t0, chainID);
+            if (tok0) {
+                r.token0price_usd = tok0.usd;
+                r.token0tvl = lp0 * tok0.usd;
+            } else {
+                console.log("*** process_evmtx_syncV2 MISS", t0);
+            }
+            let tok1 = await this.process_token_address(t1, chainID);
+            if (tok1) {
+                r.token1price_usd = tok1.usd;
+                r.token1tvl = lp1 * tok1.usd;
+            } else {
+                console.log("*** process_evmtx_syncV2 MISS", t1);
+            }
+            console.log("process_evmtx_syncV2", r, lpTokenInfo);
+        }
+
     }
 
     // For all evm txs in evmFullBlock, we wish to be able to at least:
@@ -8397,7 +8461,7 @@ module.exports = class Indexer extends AssetManager {
                 lrec.labelID_full = `${paraTool.sha1_4bytes(modifiedFingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
                 lrec.labelID_unique = `${paraTool.sha1_4bytes(lrec.fingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
-                console.log(`fullKey***`, lrec)
+                //console.log(`fullKey***`, lrec)
                 labels[fullKey] = lrec
                 labels[lrec.labelID_unique] = lrec
             }
@@ -8411,7 +8475,7 @@ module.exports = class Indexer extends AssetManager {
             // TODO: handle case when either evmChainID or contractAddress is missing
         }
         this.labels = labels
-        console.log(`labels`, this.labels)
+        //console.log(`labels`, this.labels)
     }
 
     getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID = '', contractAddress = '') {
@@ -8425,7 +8489,7 @@ module.exports = class Indexer extends AssetManager {
         }
         if (this.labels[modifiedFingerprintID] != undefined) {
             let genricLabel = this.labels[modifiedFingerprintID]
-            console.log(`[${acctAddr}] getLabel generic ${modifiedFingerprintID}`, genricLabel)
+            //console.log(`[${acctAddr}] getLabel generic ${modifiedFingerprintID}`, genricLabel)
             return genricLabel
         }
         return false
@@ -8569,7 +8633,7 @@ module.exports = class Indexer extends AssetManager {
 
             let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
             if (eventLabel) {
-                console.log(`generateEventBqRec eventLabel ***`, eventLabel)
+                //console.log(`generateEventBqRec eventLabel ***`, eventLabel)
                 this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
             }
 
@@ -8644,7 +8708,7 @@ module.exports = class Indexer extends AssetManager {
 
             let callLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
             if (callLabel) {
-                console.log(`generateCallBqRec callLabel ***`, callLabel)
+                //console.log(`generateCallBqRec callLabel ***`, callLabel)
                 this.updateAddressLabelCandidates(acctAddr, callLabel, recBT)
             }
 
@@ -8720,18 +8784,18 @@ module.exports = class Indexer extends AssetManager {
                 filter
             });
             let rowData = row.data;
-            console.log(`**** address ${address} rowData`, rowData)
+            //console.log(`**** address ${address} rowData`, rowData)
         } catch (err) {
-            let errorStr = err.toString()
-            if (errorStr.includes("RowError: Unknown row:")) {
+            if (err && err.code == 404) {
                 isRowFound = false
+            } else {
+                console.log(`err`, err.toString())
             }
-            console.log(`err`, err.toString())
         }
         let btLabelRowsToInsert = []
         // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
         if (!isRowFound) {
-            console.log(`address [${address}] labels missing`)
+            //console.log(`address [${address}] labels missing`)
             let hres = {
                 key: address.toLowerCase(),
                 data: {
@@ -8745,7 +8809,7 @@ module.exports = class Indexer extends AssetManager {
                     timestamp: ts * 1000000
                 }
             }
-            console.log(`address ${address} hres***`, hres)
+            // console.log(`address ${address} hres***`, hres)
             btLabelRowsToInsert.push(hres)
         } else {
             // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
@@ -8757,7 +8821,7 @@ module.exports = class Indexer extends AssetManager {
         let addressLabelCandidates = this.addressLabelCandidates
         for (const address of Object.keys(addressLabelCandidates)) {
             let candidate_labels_map = addressLabelCandidates[address]
-            console.log(`flush_evm_label_candidates [${address}] candidate_labels_map`, candidate_labels_map)
+            //console.log(`flush_evm_label_candidates [${address}] candidate_labels_map`, candidate_labels_map)
             await this.update_account_labels(address, candidate_labels_map, ts)
         }
         this.addressLabelCandidates = {}

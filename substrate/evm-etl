@@ -62,13 +62,21 @@ async function main() {
 	    process.exit(0);
         });
 
-    program.command('learnmethod')
-        .description(`Learn method`)
-        .option('-c, --chainID <chainID>', 'ChainID to pick examples from', myParseInt, null)
-        .option('-a, --address <address>', 'Address to pick examples from', "")
-        .action(async (abistr, opt) => {
-	    let evmetl = new EVMETL();
-	    await evmetl.learnMethod(opt.chainID, opt.address);
+    program.command('asset_platforms')
+        .description(`Fetch Asset Platforms (from coingecko)`)
+        .action(async (opt) => {
+	    var PriceManager = require("./priceManager");
+	    let pm = new PriceManager();
+	    await pm.update_coingecko_asset_platforms();
+	    process.exit(0);
+        });
+
+    program.command('priceusd')
+        .description(`Fetch Price USD (from coingecko)`)
+        .action(async (opt) => {
+	    var PriceManager = require("./priceManager");
+	    let pm = new PriceManager();
+	    await pm.update_coingecko_token_price_usd();
 	    process.exit(0);
         });
 
