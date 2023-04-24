@@ -433,10 +433,10 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    updateAddressLabelCandidates(address, label, recBT){
+    updateAddressLabelCandidates(address, label, recBT) {
         if (this.addressLabelCandidates[address] == undefined) this.addressLabelCandidates[address] = {}
-        let labelID = (label.labelID_full)? label.labelID_full : label.labelID_generic
-        if (labelID && this.addressLabelCandidates[address][labelID] == undefined){
+        let labelID = (label.labelID_full) ? label.labelID_full : label.labelID_generic
+        if (labelID && this.addressLabelCandidates[address][labelID] == undefined) {
             this.addressLabelCandidates[address][labelID] = recBT
         }
     }
@@ -4251,19 +4251,19 @@ module.exports = class Indexer extends AssetManager {
             encodedCalls.push(opaqueCall)
         }
         try {
-            if ( argsDef ) {
-		for (let i = 0; i < argsDef.length; i++) {
+            if (argsDef) {
+                for (let i = 0; i < argsDef.length; i++) {
                     let argsDef_i = argsDef[i]
                     let argsDef_i_type = argsDef_i.type
                     let argsDef_i_name = argsDef_i.name
                     //console.log(`argsDef_i`, argsDef_i)
                     //console.log(`argsDef_i_type`, argsDef_i_type)
                     if (extrinsic_args_conversion_list.includes(argsDef_i_type)) {
-			let arg_val = exos.method.args[argsDef_i_name]
-			exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
+                        let arg_val = exos.method.args[argsDef_i_name]
+                        exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
                     }
-		}
-	    }
+                }
+            }
         } catch (argsDefErr) {
             console.log(`decode_s_extrinsic argsDefErr`, argsDefErr)
         }
@@ -5778,7 +5778,7 @@ module.exports = class Indexer extends AssetManager {
         let bn = tx.blockNumber
         let contractAddress = tx.creates
         // ethTool rpccall (4)
-	// TODO: generate labels with ethTool.detect_contract_labels(web3api, address)
+        // TODO: generate labels with ethTool.detect_contract_labels(web3api, address)
         let erc20TokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
         if (erc20TokenInfo) {
             // store in ercTokenList + tallyAsset, flushed in flushShort/flusTokens
@@ -8362,19 +8362,19 @@ module.exports = class Indexer extends AssetManager {
         let labels = {};
         for (const l of labelRecs) {
             let lrec = {
-                label: (l.label)? l.label: null,
-                fingerprintID: (l.fingerprintID)? `${l.fingerprintID}`: null,
-                contractAddress: (l.contractAddress)? `${l.contractAddress.toLowerCase()}`: null,
-                evmchainID: (l.evmchainID)? l.evmchainID: null,
-                name: (l.name)? `${l.name}`: null,
-                signature: (l.signature)? `${l.signature}`: null,
-                signatureID: (l.signatureID)? `${l.signatureID}`: null,
-                signatureRaw: (l.signatureRaw)? `${l.signatureRaw}`: null,
-                abi: (l.abi)? `${l.abi}`: null,
-                abiType: (l.abiType)? `${l.abiType}`: null,
-                description: (l.description)? `${l.description}`: null,
+                label: (l.label) ? l.label : null,
+                fingerprintID: (l.fingerprintID) ? `${l.fingerprintID}` : null,
+                contractAddress: (l.contractAddress) ? `${l.contractAddress.toLowerCase()}` : null,
+                evmchainID: (l.evmchainID) ? l.evmchainID : null,
+                name: (l.name) ? `${l.name}` : null,
+                signature: (l.signature) ? `${l.signature}` : null,
+                signatureID: (l.signatureID) ? `${l.signatureID}` : null,
+                signatureRaw: (l.signatureRaw) ? `${l.signatureRaw}` : null,
+                abi: (l.abi) ? `${l.abi}` : null,
+                abiType: (l.abiType) ? `${l.abiType}` : null,
+                description: (l.description) ? `${l.description}` : null,
                 fullKey: null,
-                labelID: (l.labelID)? `${l.labelID}`: null,
+                labelID: (l.labelID) ? `${l.labelID}` : null,
                 labelID_generic: null,
                 labelID_full: null,
             }
@@ -8383,18 +8383,18 @@ module.exports = class Indexer extends AssetManager {
             let contractAddress = lrec.contractAddress
             let signatureID = lrec.signatureID
             let modifiedFingerprintID = lrec.fingerprintID
-            if (modifiedFingerprintID && modifiedFingerprintID.length == 21){
+            if (modifiedFingerprintID && modifiedFingerprintID.length == 21) {
                 modifiedFingerprintID = signatureID
-            }else if (modifiedFingerprintID && modifiedFingerprintID.length == 79){
-                modifiedFingerprintID = modifiedFingerprintID.substr(0,68)
+            } else if (modifiedFingerprintID && modifiedFingerprintID.length == 79) {
+                modifiedFingerprintID = modifiedFingerprintID.substr(0, 68)
             }
 
             // create full key (modifiedFingerprintID_evmChainID_contractAddress) if possible
-            if (modifiedFingerprintID && contractAddress && evmChainID){
+            if (modifiedFingerprintID && contractAddress && evmChainID) {
                 let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
                 let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
                 lrec.fullKey = fullKey
-                lrec.labelID_full =  `${paraTool.sha1_4bytes(modifiedFingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
+                lrec.labelID_full = `${paraTool.sha1_4bytes(modifiedFingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
                 lrec.labelID_unique = `${paraTool.sha1_4bytes(lrec.fingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
                 console.log(`fullKey***`, lrec)
@@ -8403,7 +8403,7 @@ module.exports = class Indexer extends AssetManager {
             }
 
             // create generic key
-            if (modifiedFingerprintID){
+            if (modifiedFingerprintID) {
                 labels[modifiedFingerprintID] = lrec;
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
             }
@@ -8414,16 +8414,16 @@ module.exports = class Indexer extends AssetManager {
         console.log(`labels`, this.labels)
     }
 
-    getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID='', contractAddress=''){
+    getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID = '', contractAddress = '') {
         let label = false
         let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
         let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
-        if (this.labels[fullKey] != undefined){
+        if (this.labels[fullKey] != undefined) {
             let fullKeyLabel = this.labels[fullKey]
             console.log(`[${acctAddr}] getLabel fullkey ${fullKey}`, fullKeyLabel)
             return fullKeyLabel
         }
-        if (this.labels[modifiedFingerprintID] != undefined){
+        if (this.labels[modifiedFingerprintID] != undefined) {
             let genricLabel = this.labels[modifiedFingerprintID]
             console.log(`[${acctAddr}] getLabel generic ${modifiedFingerprintID}`, genricLabel)
             return genricLabel
@@ -8568,7 +8568,7 @@ module.exports = class Indexer extends AssetManager {
             }
 
             let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
-            if (eventLabel){
+            if (eventLabel) {
                 console.log(`generateEventBqRec eventLabel ***`, eventLabel)
                 this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
             }
@@ -8620,86 +8620,86 @@ module.exports = class Indexer extends AssetManager {
 
 
     generateCallBqRec(tableId, projectTableInfo, fingerprintID, evmTx, acctAddr) {
-    try {
-        let decodedParams = evmTx.params ? JSON.parse(evmTx.params) : [];
-        let rec = {
-            chain_id: evmTx.id, //string
-            evm_chain_id: evmTx.chain_id, //integer
-            contract_address: evmTx.to_address,
-            call_success: true, //TODO
-            call_tx_hash: evmTx.hash,
-            call_block_time: evmTx.block_timestamp,
-            call_block_number: evmTx.block_number,
-        }
-
-        // used for labels
-        let recBT = {
-            chain_id: evmTx.id, //string
-            evm_chain_id: evmTx.chain_id, //integer
-            contract_address: evmTx.to_address,
-            tx_hash: evmTx.hash,
-            block_time: evmTx.block_timestamp,
-            block_number: evmTx.block_number,
-        }
-
-        let callLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
-        if (callLabel){
-            console.log(`generateCallBqRec callLabel ***`, callLabel)
-            this.updateAddressLabelCandidates(acctAddr, callLabel, recBT)
-        }
-
-        let flds = this.getSchemaFlds(fingerprintID)
-
-        if (flds.length != decodedParams.length) {
-            this.logger.error({
-                op: "generateCallBqRec",
-                tableId: `${tableId}`,
-                error: `flds mismatch`,
-                flds: flds,
-                params: decodedParams,
-            })
-            return [null, null];
-        }
-        for (let i = 0; i < decodedParams.length; i++) {
-            let fldName = flds[i]
-            let dParam = decodedParams[i]
-            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
-                rec[fldName] = JSON.stringify(dParam.value)
-            } else {
-                rec[fldName] = dParam.value
+        try {
+            let decodedParams = evmTx.params ? JSON.parse(evmTx.params) : [];
+            let rec = {
+                chain_id: evmTx.id, //string
+                evm_chain_id: evmTx.chain_id, //integer
+                contract_address: evmTx.to_address,
+                call_success: true, //TODO
+                call_tx_hash: evmTx.hash,
+                call_block_time: evmTx.block_timestamp,
+                call_block_number: evmTx.block_number,
             }
-        }
-        /*
-          for (const dParam of decodedParams) {
-          if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
-          rec[dParam.name] = JSON.stringify(dParam.value)
-          } else {
-          rec[dParam.name] = dParam.value
-          }
-          }
-        */
-        let bqRec = {
-            insertId: `${tableId}_${evmTx.hash}`,
-            json: rec
-        }
-        let bqRec2 = null
-        if (projectTableInfo) {
-            let subtableId = projectTableInfo.subtableId;
-            bqRec2 = {
-                insertId: `${subtableId}_${evmTx.hash}`,
+
+            // used for labels
+            let recBT = {
+                chain_id: evmTx.id, //string
+                evm_chain_id: evmTx.chain_id, //integer
+                contract_address: evmTx.to_address,
+                tx_hash: evmTx.hash,
+                block_time: evmTx.block_timestamp,
+                block_number: evmTx.block_number,
+            }
+
+            let callLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
+            if (callLabel) {
+                console.log(`generateCallBqRec callLabel ***`, callLabel)
+                this.updateAddressLabelCandidates(acctAddr, callLabel, recBT)
+            }
+
+            let flds = this.getSchemaFlds(fingerprintID)
+
+            if (flds.length != decodedParams.length) {
+                this.logger.error({
+                    op: "generateCallBqRec",
+                    tableId: `${tableId}`,
+                    error: `flds mismatch`,
+                    flds: flds,
+                    params: decodedParams,
+                })
+                return [null, null];
+            }
+            for (let i = 0; i < decodedParams.length; i++) {
+                let fldName = flds[i]
+                let dParam = decodedParams[i]
+                if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+                    rec[fldName] = JSON.stringify(dParam.value)
+                } else {
+                    rec[fldName] = dParam.value
+                }
+            }
+            /*
+              for (const dParam of decodedParams) {
+              if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+              rec[dParam.name] = JSON.stringify(dParam.value)
+              } else {
+              rec[dParam.name] = dParam.value
+              }
+              }
+            */
+            let bqRec = {
+                insertId: `${tableId}_${evmTx.hash}`,
                 json: rec
             }
+            let bqRec2 = null
+            if (projectTableInfo) {
+                let subtableId = projectTableInfo.subtableId;
+                bqRec2 = {
+                    insertId: `${subtableId}_${evmTx.hash}`,
+                    json: rec
+                }
+            }
+            return [bqRec, bqRec2];
+        } catch (err) {
+            console.log("generateCallBqRec", err);
+            return [null, null];
         }
-        return [bqRec, bqRec2];
-    } catch (err) {
-        console.log("generateCallBqRec", err);
-        return [null, null];
+
     }
 
-}
 
-
-    async process_evm_flush(ts){
+    async process_evm_flush(ts) {
         await this.flush_evm_label_candidates(ts)
     }
 
@@ -8721,16 +8721,16 @@ module.exports = class Indexer extends AssetManager {
             });
             let rowData = row.data;
             console.log(`**** address ${address} rowData`, rowData)
-        } catch (err){
+        } catch (err) {
             let errorStr = err.toString()
-            if (errorStr.includes("RowError: Unknown row:")){
+            if (errorStr.includes("RowError: Unknown row:")) {
                 isRowFound = false
             }
-            console.log(`err`,  err.toString())
+            console.log(`err`, err.toString())
         }
         let btLabelRowsToInsert = []
         // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
-        if (!isRowFound){
+        if (!isRowFound) {
             console.log(`address [${address}] labels missing`)
             let hres = {
                 key: address.toLowerCase(),
@@ -8738,7 +8738,7 @@ module.exports = class Indexer extends AssetManager {
                     label: {}
                 }
             }
-            for (const candidate_label of Object.keys(candidate_labels_map)){
+            for (const candidate_label of Object.keys(candidate_labels_map)) {
                 let btRec = candidate_labels_map[candidate_label]
                 hres['data']['label'][candidate_label] = {
                     value: JSON.stringify(btRec),
@@ -8747,15 +8747,15 @@ module.exports = class Indexer extends AssetManager {
             }
             console.log(`address ${address} hres***`, hres)
             btLabelRowsToInsert.push(hres)
-        }else{
+        } else {
             // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
         }
         await tblRealtime.insert(btLabelRowsToInsert);
     }
 
-    async flush_evm_label_candidates(ts){
+    async flush_evm_label_candidates(ts) {
         let addressLabelCandidates = this.addressLabelCandidates
-        for (const address of Object.keys(addressLabelCandidates)){
+        for (const address of Object.keys(addressLabelCandidates)) {
             let candidate_labels_map = addressLabelCandidates[address]
             console.log(`flush_evm_label_candidates [${address}] candidate_labels_map`, candidate_labels_map)
             await this.update_account_labels(address, candidate_labels_map, ts)
@@ -9000,7 +9000,7 @@ module.exports = class Indexer extends AssetManager {
             this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
         }
 
-            if (blockTS) {
+        if (blockTS) {
             // crawl any token addresses, write to btRealtime
             await this.crawl_erc_tokens(evm_blk_num, blockTS, chainID);
             await this.process_evm_flush(blockTS)

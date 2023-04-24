@@ -1962,7 +1962,7 @@ module.exports = {
     },
     sha1_4bytes: function(s) {
         let hex = sha1(s)
-        return hex.substr(0,8)
+        return hex.substr(0, 8)
     },
     parseSectionMethod: function(e) {
         return parseSectionMethod(e)
