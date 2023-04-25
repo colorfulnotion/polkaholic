@@ -129,7 +129,7 @@ async function main() {
             await substrateetl.generate_xcmgar_udfs();
             process.exit(0);
         });
-    
+
     program.command('trace')
         .description("Stream trace data out to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")

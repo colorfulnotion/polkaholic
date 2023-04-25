@@ -75,7 +75,6 @@ module.exports = class PriceManager extends Query {
         }
         return (false);
     }
-
     isXCAsset(asset, chainID) {
         let assetChain = paraTool.makeAssetChain(asset, chainID);
         if (this.assetInfo[assetChain]) {
@@ -794,6 +793,108 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         let lookbackDaysRanges = [1, 7, 30];
         for (const lookbackDays of lookbackDaysRanges) {
             await this.update_fees_apy(chainID, lookbackDays, true);
+        }
+    }
+
+    async update_coingecko_asset_platforms() {
+        const axios = require("axios");
+        try {
+            let url = "https://api.coingecko.com/api/v3/asset_platforms";
+            console.log("update_coingecko_asset_platforms URL", url)
+            var headers = {
+                "accept": "application/json"
+            };
+            const resp = await axios.get(url, {
+                headers: headers
+            });
+            for (const p of resp.data) {
+                if (p.chain_identifier) {
+                    let chainID = p.chain_identifier;
+                    let id = p.id;
+                    let chainName = p.name;
+                    let sql = `insert into chain ( chainID, evmChainID, id, chainName, isEVM ) values ('${chainID}', '${chainID}', '${id}', ${mysql.escape(chainName)}, 1 ) on duplicate key update evmChainID = values(evmChainID), isEVM = values(isEVM)`;
+                    try {
+                        console.log(sql);
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL();
+                    } catch (err) {
+                        console.log(err)
+                    }
+                }
+            }
+        } catch (err) {
+            console.log(err);
+        }
+    }
+
+    async update_coingecko_token_price_usd(chainID = 1, renew = false) {
+        if (renew) {
+            let sql = `SELECT  address,  COUNT(*) numLogs FROM  \`substrate-etl.evm.logs\` WHERE block_timestamp >= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 day) AND chain_id = 1 and signature in ('Transfer(index_topic_1 address from, index_topic_2 address to, uint256 value)', 'Transfer(index_topic_1 address from, index_topic_2 address to, index_topic_3 uint256 tokenId)', 'Approval(index_topic_1 address owner, index_topic_2 address spender, uint256 value)') group by address ORDER BY  numLogs desc  LIMIT 20000`
+            let recs = await this.execute_bqJob(sql);
+            let cnt = 0;
+            for (const r of recs) {
+                let address = r.address;
+                let numLogs = r.numLogs;
+                let sql2 = `insert into token ( chainID, address, addDT, numLogs ) values ('${chainID}', '${address.toLowerCase()}', Now(), '${numLogs}' ) on duplicate key update numLogs = values(numLogs)`
+                this.batchedSQL.push(sql2);
+                await this.update_batchedSQL();
+                console.log(cnt, sql2);
+                cnt++;
+            }
+        }
+
+        let sql = `SELECT address, symbol, name from token where usd is not null and chainID = '${chainID}' order by last_updated_at asc limit 100000`
+        let coingeckoRecs = await this.poolREADONLY.query(sql);
+        let addresses = [];
+        let chains = await this.poolREADONLY.query(`SELECT WSEndpoint from chain where  chainID = '${chainID}'`)
+        let chain = chains[0]
+        const Web3 = require('web3')
+        let provider = new Web3.providers.WebsocketProvider(chain.WSEndpoint)
+        const web3 = new Web3(provider);
+        this.web3Api = web3;
+        for (const r of coingeckoRecs) {
+            if (r.symbol == null) {
+                //let tokenInfo = await ethTool.getERC20TokenInfo(this.web3Api, r.address);
+                //console.log(r, tokenInfo);
+            }
+            addresses.push(r.address);
+        }
+        const axios = require("axios");
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        let i = 0;
+        while (i < addresses.length) {
+            let x = addresses.slice(i, i + 10).join("%2C");
+            let url = "https://api.coingecko.com/api/v3/simple/token_price/ethereum?vs_currencies=usd&include_market_cap=true&include_24hr_vol=true&include_24hr_change=true&include_last_updated_at=true&contract_addresses=" + x;
+            try {
+                console.log(url);
+                let rows = []
+                const resp = await axios.get(url);
+                for (const address of Object.keys(resp.data)) {
+                    let p = resp.data[address];
+                    let sql = `update token set usd = '${p.usd}', usd_market_cap = ${p.usd_market_cap}, usd_24h_vol = ${p.usd_24h_vol}, usd_24h_change = ${p.usd_24h_change}, last_updated_at = ${p.last_updated_at} where address = '${address}'`
+                    console.log(sql);
+                    this.batchedSQL.push(sql);
+                    await this.update_batchedSQL();
+                    // add cell with tokenInfo to metadata
+                    let r = {
+                        key: address,
+                        data: {
+                            pricefeed: {}
+                        }
+                    }
+                    r.data.pricefeed["coingecko"] = {
+                        value: JSON.stringify(p),
+                        timestamp: p.last_updated_at * 1000000
+                    }
+                    rows.push(r);
+                }
+                i += 10;
+                await this.insertBTRows(tblRealtime, rows, tblName);
+                await this.sleep(1000);
+            } catch (err) {
+                console.log(err);
+                await this.sleep(5000);
+            }
         }
     }
 
