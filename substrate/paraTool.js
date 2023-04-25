@@ -99,7 +99,7 @@ async function initPolkadotAPI() {
 }
 */
 
-function sqrtPriceX96ToPriceWithDicimals(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
+function sqrtPriceX96ToPriceWithDecimals(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
     var sqrtPriceX96BN = new Big(toIntegerStr(sqrtPriceX96))
     var sqar2X96BN = new Big('79228162514264337593543950336')
     var sqar2X192BN = new Big('6277101735386680763835789423207666416102355444464034512896')
@@ -123,6 +123,16 @@ function sqrtPriceX96ToPriceWithDicimals(sqrtPriceX96, token0Decimals = 18, toke
     var price_token0_in_token1 = sqrtPriceX96_decimal.pow(2)
     var decimalsAdj = new Big(10).pow(token0Decimals).div(new Big(10).pow(token1Decimals))
     return price_token0_in_token1.mul(decimalsAdj).toFixed()
+}
+
+function tickToPriceWithDecimals(tick, token0Decimals = 18, token1Decimals = 18) {
+    let base = new Decimal(1.0001);
+    let tickDecimal = new Decimal(tick);
+    let decimalsDifference = new Decimal(token0Decimals - token1Decimals);
+    let base10 = new Decimal(10);
+    let decimalsAdj = base10.pow(decimalsDifference)
+    let price = base.pow(tickDecimal).mul(decimalsAdj);
+    return price.toFixed();
 }
 
 function isNumeric(str) {
@@ -1665,8 +1675,11 @@ module.exports = {
         return res.isValid;
 
     },
-    sqrtPriceX96ToPriceWithDicimals: function(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
-        return sqrtPriceX96ToPriceWithDicimals(sqrtPriceX96, token0Decimals, token1Decimals)
+    sqrtPriceX96ToPriceWithDecimals: function(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
+        return sqrtPriceX96ToPriceWithDecimals(sqrtPriceX96, token0Decimals, token1Decimals)
+    },
+    tickToPriceWithDecimals: function(tick, token0Decimals = 18, token1Decimals = 18) {
+        return tickToPriceWithDecimals(tick, token0Decimals, token1Decimals)
     },
     dechexToInt: function(number) {
         return dechexToInt(number);
