@@ -5778,7 +5778,7 @@ module.exports = class Indexer extends AssetManager {
         let bn = tx.blockNumber
         let contractAddress = tx.creates
         // ethTool rpccall (4)
-        // TODO: generate labels with ethTool.detect_contract_labels(web3api, address)
+        // TODO: generate labels with ethTool.detect_contract_labels(web3api, address, bn)
         let erc20TokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
         if (erc20TokenInfo) {
             // store in ercTokenList + tallyAsset, flushed in flushShort/flusTokens
@@ -5850,6 +5850,7 @@ module.exports = class Indexer extends AssetManager {
         for (const contractAddress of Object.keys(this.crawlErcToken)) {
             try {
                 let cAddress = contractAddress.toLowerCase();
+                //TODO: want to classify contractAddress
                 let tokenInfo = await ethTool.getERC20TokenInfo(this.web3Api, cAddress, bn)
                 if (tokenInfo && tokenInfo.symbol) {
                     this.ercTokenList[cAddress] = tokenInfo;
@@ -6117,6 +6118,10 @@ module.exports = class Indexer extends AssetManager {
                 if (lpTokenInfo) {
                     if (s.type == "swapV2") {
                         this.process_evmtx_swapV2(s, chainID, lpTokenInfo)
+                    }
+                    if (s.type == "swapV3") {
+                        //TODO
+                        //this.process_evmtx_swapV3(s, chainID, lpTokenInfo)
                     }
                 }
             }
@@ -8411,7 +8416,7 @@ module.exports = class Indexer extends AssetManager {
             // TODO: handle case when either evmChainID or contractAddress is missing
         }
         this.labels = labels
-        console.log(`labels`, this.labels)
+        //console.log(`labels`, this.labels)
     }
 
     getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID = '', contractAddress = '') {

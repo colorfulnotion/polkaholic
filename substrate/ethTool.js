@@ -1693,11 +1693,13 @@ function categorizeTokenSwaps(dLog) {
     if (dLog.decodeStatus == "success") {
         let dSig = dLog.signature
         let dEvents = dLog.events
+        let fingerprintID = dLog.fingerprintID
 
         // swap xxx (token0) for yyy (token1) [sender='taker', to='maker']
-        switch (dSig) {
+        switch (fingerprintID) {
             //0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822-3-0x1cdd7c22 (uniswamp v2), 6 args
-            case 'Swap(index_topic_1 address sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, index_topic_2 address to)':
+            //'Swap(index_topic_1 address sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, index_topic_2 address to)'
+            case '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822-3':
                 /*
                 {
                     "decodeStatus": "success",
@@ -1757,12 +1759,74 @@ function categorizeTokenSwaps(dLog) {
                 return uniswapV2
                 break;
 
+            //Swap(index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
+            case '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67-3':
+                /*
+                {
+                  decodeStatus: 'success',
+                  address: '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640',
+                  transactionLogIndex: '0x1c',
+                  logIndex: '0x91',
+                  data: '0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffddc5c8a0f0000000000000000000000000000000000000000000000004563918244f400000000000000000000000000000000000000005b1a5205020bff95ddfd32673db4000000000000000000000000000000000000000000000001191b54426751a66600000000000000000000000000000000000000000000000000000000000311c1',
+                  topics: [
+                    '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67',
+                    '0x000000000000000000000000ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b',
+                    '0x00000000000000000000000021bd72a7e219b836680201c25b61a4aa407f7bfd'
+                  ],
+                  signature: 'Swap(index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)',
+                  fingerprintID: '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67-3',
+                  events: [
+                    {
+                      name: 'sender',
+                      type: 'address',
+                      value: '0xef1c6e67703c7bd7107eed8303fbe6ec2554bf6b'
+                    },
+                    {
+                      name: 'recipient',
+                      type: 'address',
+                      value: '0x21bd72a7e219b836680201c25b61a4aa407f7bfd'
+                    },
+                    { name: 'amount0', type: 'int256', value: '-9187849713' },
+                    { name: 'amount1', type: 'int256', value: '5000000000000000000' },
+                    {
+                      name: 'sqrtPriceX96',
+                      type: 'uint160',
+                      value: '1847784589982773393746294154411444'
+                    },
+                    {
+                      name: 'liquidity',
+                      type: 'uint128',
+                      value: '20255876393206916710'
+                    },
+                    { name: 'tick', type: 'int24', value: '201153' }
+                  ]
+                }
+                */
+                let amount0 = dEvents[2].value
+                let amount1 = dEvents[3].value
+                //convert to uniswapV2 style
+                let uniswapV3 = {
+                    type: 'swapV3',
+                    maker: dEvents[0].value, //sender
+                    taker: dEvents[1].value, //recipient
+                    amount0In: (amount0 > 0)? amount0 : 0,
+                    amount1In: (amount1 > 0)? amount1 : 0,
+                    amount0Out:(amount0 < 0)? amount0 : 0,
+                    amount1Out:(amount1 < 0)? amount1 : 0,
+                    sqrtPriceX96: dEvents[4].value,
+                    path: (amount0 > '0' && amount1 < '0') ? 'token0 -> token1' : 'token1 -> token0',
+                    lpTokenAddress: dLog.address
+                }
+                console.log(`categorizeTokenSwaps uniswapV3`, uniswapV3)
+                return uniswapV3
+                break;
             default:
                 break;
         }
     }
     return false
 }
+
 
 function categorizeTokenTransfers(dLog) {
     if (dLog.decodeStatus == "success") {
@@ -2623,7 +2687,7 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
     }
 }
 
-// this works for both project-specific tables (call_project_..., evt_project_) and general tables (call_, evt_) since the last 1-2 components are positioned the same way 
+// this works for both project-specific tables (call_project_..., evt_project_) and general tables (call_, evt_) since the last 1-2 components are positioned the same way
 function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3') {
     let fingerprintID = false
     if (tableID.substr(0, 5) == 'call_') {
@@ -2635,6 +2699,10 @@ function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf5
         fingerprintID = `${topic0}-${topicLen}`
     }
     return fingerprintID
+}
+
+async function detect_contract_labels(web3Api, contractAddress, bn){
+
 }
 
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
@@ -2688,8 +2756,11 @@ module.exports = {
     crawlEvmReceipts: async function(web3Api, blk, isParallel = true) {
         return crawl_evm_receipts(web3Api, blk, isParallel)
     },
-    getERC20TokenInfo: async function(web3Api, contractAddress, bn) {
-        return getERC20TokenInfo(web3Api, contractAddress, bn)
+    detect_contract_labels: async function(web3Api, blk, isParallel = true) {
+        return crawl_evm_receipts(web3Api, blk, isParallel)
+    },
+    detectContractLabels: async function(web3Api, contractAddress, bn) {
+        return detect_contract_labels(web3Api, contractAddress, bn)
     },
     getTokenTotalSupply: async function(web3Api, contractAddress, bn) {
         return getTokenTotalSupply(web3Api, contractAddress, bn)
