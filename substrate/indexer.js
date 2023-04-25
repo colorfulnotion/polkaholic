@@ -5847,12 +5847,13 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async crawl_erc_tokens(bn, blockTS, chainID) {
+        let RPCBackfill = null // TODO
         let rows = [];
         for (const contractAddress of Object.keys(this.crawlErcToken)) {
             try {
                 let cAddress = contractAddress.toLowerCase();
                 //TODO: want to classify contractAddress
-                let tokenInfo = await ethTool.getERC20TokenInfo(this.web3Api, cAddress, bn)
+                let tokenInfo = await ethTool.getERC20TokenInfo(this.web3Api, cAddress, bn, RPCBackfill)
                 if (tokenInfo && tokenInfo.symbol) {
                     this.ercTokenList[cAddress] = tokenInfo;
                     if (tokenInfo.tokenType == "ERC20LP") {
@@ -5877,7 +5878,7 @@ module.exports = class Indexer extends AssetManager {
         }
         this.crawlErcToken = {};
         let [tblName, tblRealtime] = this.get_btTableRealtime()
-        console.log("CRAWL_ERC_TOKENS", rows.length);
+        console.log("-------> CRAWL_ERC_TOKENS", rows.length);
         try {
             await this.insertBTRows(tblRealtime, rows, tblName);
         } catch (err) {
@@ -5890,34 +5891,25 @@ module.exports = class Indexer extends AssetManager {
             // 1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
             // 2. mark that the assetholder balances have to be fetched
             let cAddress = tokenAddress.toLowerCase();
-            console.log("-----", cAddress);
+
             if (this.ercTokenList[cAddress]) {
-                console.log(" 11111 returning ", cAddress);
                 return this.ercTokenList[cAddress] // note: totalSupply is not accurate here
             }
             // if we have marked it for crawl already, then don't do anything
             if (this.crawlErcToken[cAddress] !== undefined) {
-                console.log(" 00000 ***marked ", cAddress);
                 return null;
             }
 
             // read metadata from btAccountRealtime
             let [tblName, tblRealtime] = this.get_btTableRealtime()
             try {
-                const filter = [{
-                    column: {
-                        cellLimit: 1
-                    },
-                    families: ["metadata", "pricefeed"],
-                    limit: 1
-                }];
                 let row = null;
-                [row] = await tblRealtime.row(cAddress).get({
-                    filter
-                });
+
+                [row] = await tblRealtime.row(cAddress).get();
                 let rowData = row.data;
                 let pricefeed = rowData["pricefeed"];
                 let usd = null
+
                 if (pricefeed) {
                     for (const chainID of Object.keys(pricefeed)) {
                         let pf = JSON.parse(pricefeed["coingecko"][0].value);
@@ -5933,16 +5925,13 @@ module.exports = class Indexer extends AssetManager {
                             if (usd) {
                                 tokenInfo.usd = usd;
                             }
-                            console.log("!!! FOUND", cAddress);
                             this.ercTokenList[cAddress] = tokenInfo;
                             return tokenInfo;
-                        } else {
-                            console.log("--- not FOUND... setting up crawl", cAddress);
-                            this.crawlErcToken[cAddress] = tokenID;
-                            return null;
                         }
                     }
                 }
+
+                this.crawlErcToken[cAddress] = tokenID;
                 return null;
             } catch (err) {
                 if (err && (err.code == 404)) {
@@ -5954,7 +5943,7 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         } catch (e2) {
-            console.log(e2);
+            console.log("jjjjjj", e2);
         }
         return null;
     }
@@ -8794,7 +8783,7 @@ module.exports = class Indexer extends AssetManager {
             });
             rowData = row.data;
             //console.log(`**** address ${address} rowData`, rowData)
-            if (rowData.label != undefined){
+            if (rowData.label != undefined) {
                 storedLabels = rowData.label
                 isStoredLabelFlound = true
             }
@@ -8824,7 +8813,7 @@ module.exports = class Indexer extends AssetManager {
             }
             //console.log(`address ${address} hres***`, hres)
             btLabelRowsToInsert.push(hres)
-        } else if (Array.isArray(Object.keys(storedLabels))){
+        } else if (Array.isArray(Object.keys(storedLabels))) {
             // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
             let hres = {
                 key: address.toLowerCase(),
@@ -8837,18 +8826,18 @@ module.exports = class Indexer extends AssetManager {
             let duplicateLabels = []
             let newLabelFound = false
             console.log(`address [${address}] knownLabels`, knownLabels)
-            for (const candidate_label of Object.keys(candidate_labels_map)){
+            for (const candidate_label of Object.keys(candidate_labels_map)) {
                 let storedLabel = storedLabels[candidate_label]
-                if (storedLabel == undefined){
+                if (storedLabel == undefined) {
                     let btRec = candidate_labels_map[candidate_label]
                     hres['data']['label'][candidate_label] = {
                         value: JSON.stringify(btRec),
                         timestamp: ts * 1000000
                     }
                     newLabelFound = true
-                }else{
+                } else {
                     //console.log(`existing storedLabel`, storedLabel)
-                    if (storedLabel.timestamp/1000000 > ts){
+                    if (storedLabel.timestamp / 1000000 > ts) {
                         /*
                         TODO: we have found new candidate label with earlier timestamp.
                         This likely happens due to us indexing the evm blocks in random order,
@@ -8858,14 +8847,14 @@ module.exports = class Indexer extends AssetManager {
                     duplicateLabels.push(candidate_label)
                 }
             }
-            if (newLabelFound){
+            if (newLabelFound) {
                 console.log(`address ${address} new labels ***`, hres)
                 btLabelRowsToInsert.push(hres)
-            }else{
+            } else {
                 //console.log(`address ${address} duplicateLabels`, duplicateLabels)
             }
         }
-        if (btLabelRowsToInsert.length > 0){
+        if (btLabelRowsToInsert.length > 0) {
             await tblRealtime.insert(btLabelRowsToInsert);
         }
     }

@@ -99,10 +99,10 @@ async function initPolkadotAPI() {
 }
 */
 
-function sqrtPriceX96ToPriceWithDicimals(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18){
-    var sqrtPriceX96BN = new Big (toIntegerStr(sqrtPriceX96))
-    var sqar2X96BN = new Big ('79228162514264337593543950336')
-    var sqar2X192BN = new Big ('6277101735386680763835789423207666416102355444464034512896')
+function sqrtPriceX96ToPriceWithDicimals(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
+    var sqrtPriceX96BN = new Big(toIntegerStr(sqrtPriceX96))
+    var sqar2X96BN = new Big('79228162514264337593543950336')
+    var sqar2X192BN = new Big('6277101735386680763835789423207666416102355444464034512896')
 
     /*
     Method 1:
@@ -1665,7 +1665,7 @@ module.exports = {
         return res.isValid;
 
     },
-    sqrtPriceX96ToPriceWithDicimals: function(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18){
+    sqrtPriceX96ToPriceWithDicimals: function(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
         return sqrtPriceX96ToPriceWithDicimals(sqrtPriceX96, token0Decimals, token1Decimals)
     },
     dechexToInt: function(number) {

@@ -290,21 +290,23 @@ async function getTokenTotalSupply(web3Api, contractAddress, bn = 'latest', deci
 }
 
 
-//return symbol, name, deciaml, totalSupply
-async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest') {
+//return symbol, name, decimal, totalSupply
+async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest', RPCBackfill = null) {
+    let x = RPCBackfill ? get_proxy_address(contractAddress, chainID, RPCBackfill) : null;
+    if (x) {
+        contractAddress = x;
+    }
     let checkSumContractAddr = web3.utils.toChecksumAddress(contractAddress)
-    let erc20Contract = initContract(web3Api, swapABI, checkSumContractAddr)
+    let erc20Contract = initContract(web3Api, erc20ABI, checkSumContractAddr)
     if (bn == 'latest') {
         bn = await web3Api.eth.getBlockNumber()
     }
     try {
-        var [name, symbol, decimals, totalSupply, token0, token1] = await Promise.all([
+        var [name, symbol, decimals, totalSupply] = await Promise.all([
             erc20Contract.methods.name().call({}, bn),
             erc20Contract.methods.symbol().call({}, bn),
             erc20Contract.methods.decimals().call({}, bn),
             erc20Contract.methods.totalSupply().call({}, bn),
-            erc20Contract.methods.token0().call({}, bn),
-            erc20Contract.methods.token1().call({}, bn)
         ]);
         // for a contract to be erc20, {name, symbol, decimals, totalSupply} call return successful
         let tokenInfo = {
@@ -315,8 +317,13 @@ async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest') {
             decimals,
             totalSupply
         }
-        if (token0 && token1) {
-            try {
+        try {
+            let swapContract = initContract(web3Api, swapABI, checkSumContractAddr)
+            var [token0, token1] = await Promise.all([
+                swapContract.methods.token0().call({}, bn),
+                swapContract.methods.token1().call({}, bn)
+            ]);
+            if (token0 && token1) {
                 let erc20Contract0 = initContract(web3Api, erc20ABI, web3.utils.toChecksumAddress(token0))
                 let erc20Contract1 = initContract(web3Api, erc20ABI, web3.utils.toChecksumAddress(token1))
                 var [token0Symbol, token0Decimals, token1Symbol, token1Decimals] = await Promise.all([
@@ -332,13 +339,13 @@ async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest') {
                 tokenInfo.token1Symbol = token1Symbol;
                 tokenInfo.token0Decimals = token0Decimals;
                 tokenInfo.token1Decimals = token1Decimals;
-            } catch (err) {
-                console.log("T01", err);
             }
+        } catch (err) {
+            //console.log("T01", err);
         }
         return tokenInfo
     } catch (err) {
-        //console.log(`getERC20TokenInfo ERROR ${checkSumContractAddr}`, err)
+        //console.log(err);
         return false
     }
 }
@@ -579,6 +586,24 @@ async function getTokenHoldersRawBalances(web3Api, contractAddress, holders, tok
     return res
 }
 
+
+function get_address_from_storage_value(storageVal) {
+    return storageVal.length < 40 ? storageVal : "0x" + storageVal.slice(-40);
+}
+
+async function get_proxy_address(address, chainID, RPCBackfill) {
+    // https://eips.ethereum.org/EIPS/eip-1967
+    const contract = new ethers.Contract(address, [], new ethers.providers.JsonRpcProvider(RPCBackfill));
+    let logicValue = await contract.provider.getStorageAt(address, "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc", RPCBackfill);
+    let beaconValue = await contract.provider.getStorageAt(address, "0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50", RPCBackfill);
+    if (logicValue != "0x0000000000000000000000000000000000000000000000000000000000000000") {
+        return get_address_from_storage_value(logicValue);
+    }
+    if (beaconValue != "0x0000000000000000000000000000000000000000000000000000000000000000") {
+        return get_address_from_storage_value(beaconValue);
+    }
+    return (false);
+}
 
 // this function decorates and generate a "full" txn using decodedTxn and decodedReceipts
 function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
@@ -1759,7 +1784,7 @@ function categorizeTokenSwaps(dLog) {
                 return uniswapV2
                 break;
 
-            //Swap(index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
+                //Swap(index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
             case '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67-3':
                 /*
                 {
@@ -1809,10 +1834,10 @@ function categorizeTokenSwaps(dLog) {
                     type: 'swapV3',
                     maker: dEvents[0].value, //sender
                     taker: dEvents[1].value, //recipient
-                    amount0In: (amount0 > 0)? amount0 : 0,
-                    amount1In: (amount1 > 0)? amount1 : 0,
-                    amount0Out:(amount0 < 0)? amount0 : 0,
-                    amount1Out:(amount1 < 0)? amount1 : 0,
+                    amount0In: (amount0 > 0) ? amount0 : 0,
+                    amount1In: (amount1 > 0) ? amount1 : 0,
+                    amount0Out: (amount0 < 0) ? amount0 : 0,
+                    amount1Out: (amount1 < 0) ? amount1 : 0,
                     sqrtPriceX96: dEvents[4].value,
                     path: (amount0 > '0' && amount1 < '0') ? 'token0 -> token1' : 'token1 -> token0',
                     lpTokenAddress: dLog.address
@@ -2701,7 +2726,7 @@ function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf5
     return fingerprintID
 }
 
-async function detect_contract_labels(web3Api, contractAddress, bn){
+async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
 
@@ -2761,6 +2786,9 @@ module.exports = {
     },
     detectContractLabels: async function(web3Api, contractAddress, bn) {
         return detect_contract_labels(web3Api, contractAddress, bn)
+    },
+    getERC20TokenInfo: async function(web3Api, contractAddress, bn) {
+        return getERC20TokenInfo(web3Api, contractAddress, bn)
     },
     getTokenTotalSupply: async function(web3Api, contractAddress, bn) {
         return getTokenTotalSupply(web3Api, contractAddress, bn)
