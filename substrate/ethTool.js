@@ -2507,6 +2507,13 @@ function mapABITypeToBqType(typ) {
     switch (typ) {
         case "address":
             return "STRING";
+        case "int128":
+        case "uint128":
+            return "STRING";
+        case "int160":
+        case "uint160":
+            return "STRING";
+        case "int256":
         case "uint256":
             return "STRING";
         case "string":
@@ -2532,8 +2539,16 @@ function mapABITypeToBqType(typ) {
         case "tuple":
             return "JSON";
             break;
+        /*
         default:
             return "JSON";
+        */
+    }
+    if (typ.includes('int') && !typ.includes('(') && !typ.includes(')')){
+        //this exclude tuple type like (address from, address to, uint256 value, uint256 gas, uint256 nonce, bytes data)
+        return "STRING"
+    }else{
+        return "JSON";
     }
 }
 

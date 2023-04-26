@@ -8721,6 +8721,8 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < decodedParams.length; i++) {
                 let fldName = flds[i]
                 let dParam = decodedParams[i]
+                //console.log(`dParam[${i}]`, dParam)
+                //TODO: parse tuple type
                 if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
                     rec[fldName] = JSON.stringify(dParam.value)
                 } else {
