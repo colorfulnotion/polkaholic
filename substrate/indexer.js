@@ -8721,6 +8721,8 @@ module.exports = class Indexer extends AssetManager {
             for (let i = 0; i < decodedParams.length; i++) {
                 let fldName = flds[i]
                 let dParam = decodedParams[i]
+                //console.log(`dParam[${i}]`, dParam)
+                //TODO: parse tuple type
                 if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
                     rec[fldName] = JSON.stringify(dParam.value)
                 } else {
@@ -8940,8 +8942,8 @@ module.exports = class Indexer extends AssetManager {
                 hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                 nonce: tx.nonce,
                 transaction_index: tx.transactionIndex,
-                from_address: tx.from,
-                to_address: tx.to,
+                from_address: tx.from.toLowerCase(),
+                to_address: (tx.to != undefined)? tx.to.toLowerCase() : null,
                 value: rawTx.value,
                 gas: rawTx.gas,
                 gas_price: rawTx.gasPrice,
@@ -9033,7 +9035,7 @@ module.exports = class Indexer extends AssetManager {
                         log_index: l.logIndex,
                         transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                         transaction_index: i,
-                        address: l.address,
+                        address: l.address.toLowerCase(),
                         data: l.data,
                         topics: l.topics,
                         block_timestamp: block.timestamp,
