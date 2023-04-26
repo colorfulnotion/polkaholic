@@ -1070,6 +1070,26 @@ mysql> desc projectcontractabi;
         }
     }
 
+    extractABIFromRoutine(routine_definition) {
+        // Get the first line of the code string
+        const lines = routine_definition.split('\n');
+        //console.log(`lines`,lines)
+        const firstLine = lines[1];
+        //console.log(`firstLine`, firstLine)
+        // Regular expression to match the ABI object in the first line, accounting for any whitespace
+        const regex = /var abi\s*=\s*({.*})/;
+
+        // Search for the ABI object using the regular expression
+        const match = firstLine.match(regex);
+
+        if (match && match[1]) {
+            // Return the matched ABI string
+            return match[1];
+        } else {
+            return false
+        }
+    }
+
     async load_project_routines(datasetId = null, projectId = 'blockchain-etl-internal') {
         if (datasetId) {
             let query = `SELECT routine_name, data_type, routine_definition, ddl FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.ROUTINES;`
@@ -1099,7 +1119,15 @@ mysql> desc projectcontractabi;
                     contractName = sa.slice(0, idx).join("_");
                     name = sa.slice(idx + 1).join("_");
                 }
-                let sql = `insert into projectdatasetroutines ( projectId, datasetId, routine_name, data_type, routine_definition, ddl, contractName, abiType, name, addDT ) values ( ${mysql.escape(projectId)}, ${mysql.escape(datasetId)}, ${mysql.escape(r.routine_name)}, ${mysql.escape(r.data_type)}, ${mysql.escape(r.routine_definition)}, ${mysql.escape(r.ddl)}, ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name)`
+                let routine_definition = (r.routine_definition)
+                //console.log(`[${r.routine_name}] routine_definition`, routine_definition)
+                let abiStr = this.extractABIFromRoutine(routine_definition)
+                if (abiStr){
+                    abiStr = `${JSON.stringify([JSON.parse(abiStr)])}`
+                }
+                let abiStrSQL = (abiStr)? `'${abiStr}'` : `NULL`
+                console.log(`[${r.routine_name}] abi`, abiStrSQL)
+                let sql = `insert into projectdatasetroutines ( projectId, datasetId, routine_name, abi, data_type, routine_definition, ddl, contractName, abiType, name, addDT ) values ( ${mysql.escape(projectId)}, ${mysql.escape(datasetId)}, ${mysql.escape(r.routine_name)}, ${abiStrSQL}, ${mysql.escape(r.data_type)}, ${mysql.escape(r.routine_definition)}, ${mysql.escape(r.ddl)}, ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name)`
                 this.batchedSQL.push(sql);
             }
             await this.update_batchedSQL();
