@@ -221,6 +221,17 @@ async function main() {
             process.exit(0);
         });
    
+    program.command('projectroutines')
+	.option('-d, --datasetId <datasetId>', "Model datasetID", null)
+	.option('-p, --project <projectId>', "Model project", null)
+	.action(async (opt) => {
+            var evmetl = new EVMETL();
+	    let datasetId = opt.datasetId ? opt.datasetId : null;
+	    let projectId = opt.projectId ? opt.projectId : "blockchain-etl-internal";
+	    await evmetl.load_project_routines(datasetId, projectId);
+            process.exit(0);
+        });
+   
     
     await program.parseAsync(process.argv);
 }

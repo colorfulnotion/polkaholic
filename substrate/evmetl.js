@@ -1014,11 +1014,9 @@ mysql> desc projectcontractabi;
     }
 
     async load_project_schema(datasetId = null, projectId = 'blockchain-etl') {
-        //create table projectdatasetcolumns ( projectId varchar(32),  datasetId varchar(64), table_name varchar(64), column_name varchar(64), ordinal_position int, data_type varchar(16), is_nullable varchar(16), is_partitioning_column varchar(16), addDT datetime, primary key (projectId, datasetId, table_name, column_name) );
-
         if (datasetId) {
             let query = `SELECT table_name, column_name, ordinal_position, data_type, is_nullable, is_partitioning_column FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.COLUMNS;`
-            console.log("READING", query);
+            console.log("READING0", query);
             const options = {
                 query: query,
                 location: 'US'
@@ -1066,6 +1064,66 @@ mysql> desc projectcontractabi;
                         this.batchedSQL.push(sql);
                         await this.update_batchedSQL();
                         await this.load_project_schema(did);
+                    }
+                }
+            }
+        }
+    }
+
+    async load_project_routines(datasetId = null, projectId = 'blockchain-etl-internal') {
+        if (datasetId) {
+            let query = `SELECT routine_name, data_type, routine_definition, ddl FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.ROUTINES;`
+            console.log("READING1", query);
+            const options = {
+                query: query,
+                location: 'US'
+            };
+            const bigquery = this.get_big_query();
+            let recs = await this.execute_bqJob(query, options);
+            for (const r of recs) {
+                let sa = r.routine_name.split("_");
+                let contractName = "";
+                let abiType = "";
+                let name = "";
+                let idx = null;
+                for (let i = 0; i < sa.length; i++) {
+                    if ((sa[i] == "event") || sa[i] == "call" || sa[i] == "swaps") {
+                        idx = i;
+                        i = sa.length;
+                    }
+                }
+                if (idx == null) {
+                    console.log("FAILED to parse routine name", r.routine_name, "datasetId", projectId, datasetId);
+                } else {
+                    abiType = sa[idx];
+                    contractName = sa.slice(0, idx).join("_");
+                    name = sa.slice(idx + 1).join("_");
+                }
+                let sql = `insert into projectdatasetroutines ( projectId, datasetId, routine_name, data_type, routine_definition, ddl, contractName, abiType, name, addDT ) values ( ${mysql.escape(projectId)}, ${mysql.escape(datasetId)}, ${mysql.escape(r.routine_name)}, ${mysql.escape(r.data_type)}, ${mysql.escape(r.routine_definition)}, ${mysql.escape(r.ddl)}, ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name)`
+                this.batchedSQL.push(sql);
+            }
+            await this.update_batchedSQL();
+        } else {
+            let cmd = `bq ls --format=json -n 10000 --project_id=blockchain-etl`
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            if (stderr) {
+                console.log("ERR!!" + stderr);
+            } else {
+                let res = JSON.parse(stdout);
+                for (const r of res) {
+                    if (r.datasetReference && r.datasetReference.datasetId) {
+                        let did = r.datasetReference.datasetId
+                        let sql = `insert into projectdataset ( projectId, datasetId, location, addDT ) values ( '${projectId}', '${did}', '${r.location}', Now() ) on duplicate key update location = values(location)`
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL();
+                        try {
+                            await this.load_project_routines(did);
+                        } catch (err) {
+                            console.log(err);
+                        }
                     }
                 }
             }

@@ -8943,7 +8943,7 @@ module.exports = class Indexer extends AssetManager {
                 nonce: tx.nonce,
                 transaction_index: tx.transactionIndex,
                 from_address: tx.from.toLowerCase(),
-                to_address: (tx.to != undefined)? tx.to.toLowerCase() : null,
+                to_address: (tx.to != undefined) ? tx.to.toLowerCase() : null,
                 value: rawTx.value,
                 gas: rawTx.gas,
                 gas_price: rawTx.gasPrice,
