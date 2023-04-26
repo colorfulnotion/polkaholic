@@ -201,6 +201,27 @@ async function main() {
             process.exit(0);
         });
 
+
+    program.command('dryrun')
+        .argument('<query>', `Query`)
+	.action(async (query) => {
+            var evmetl = new EVMETL();
+	    await evmetl.dryrun(query);
+            process.exit(0);
+        });
+   
+    program.command('projectschema')
+	.option('-d, --datasetId <datasetId>', "Model datasetID", null)
+	.option('-p, --project <projectId>', "Model project", null)
+	.action(async (opt) => {
+            var evmetl = new EVMETL();
+	    let datasetId = opt.datasetId ? opt.datasetId : null;
+	    let projectId = opt.projectId ? opt.projectId : "blockchain-etl";
+	    await evmetl.load_project_schema(datasetId, projectId);
+            process.exit(0);
+        });
+   
+    
     await program.parseAsync(process.argv);
 }
 

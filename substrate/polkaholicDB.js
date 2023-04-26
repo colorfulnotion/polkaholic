@@ -126,7 +126,7 @@ module.exports = class PolkaholicDB {
 
             if (dbconfig.bq != undefined) {
                 if (dbconfig.bq.substrateetlKey) {
-                    this.BQ_SUBSTRATEETL_KEY = dbconfig.bq.substrateetlKey;
+                    this.BQ_SUBSTRATEETL_KEY = "/root/.bq_keys/s3.json" // dbconfig.bq.substrateetlKey;
                 }
             }
 
@@ -905,16 +905,15 @@ from chain where chainID = '${chainID}' limit 1`);
         return this.bigQuery;
     }
 
-    async execute_bqJob(sqlQuery, fn = false) {
+    async execute_bqJob(sqlQuery, opt = null) {
         // run bigquery job with suitable credentials
         const bigqueryClient = this.get_big_query();
-        const options = {
+        const options = opt ? opt : {
             query: sqlQuery,
             location: 'us-central1',
         };
 
         try {
-            let f = fn ? await fs.openSync(fn, "w", 0o666) : false;
             const response = await bigqueryClient.createQueryJob(options);
             const job = response[0];
             const [rows] = await job.getQueryResults();

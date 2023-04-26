@@ -1011,6 +1011,79 @@ mysql> desc projectcontractabi;
         // show the methodIDs
         let training_sql = `select method_id, signature, count(distinct to_address) numContracts, min(to_address), max(to_address), count(*) numCalls from \`substrate-etl.evm.transactions\` where length(input) > 2 and chain_id = 1 and method_id not in (${knownmethodIDs.join(",")}) group by method_id, signature having numContracts >= 4 and numCalls >= 4 order by numContracts desc;`
         console.log(training_sql);
-
     }
+
+    async load_project_schema(datasetId = null, projectId = 'blockchain-etl') {
+        //create table projectdatasetcolumns ( projectId varchar(32),  datasetId varchar(64), table_name varchar(64), column_name varchar(64), ordinal_position int, data_type varchar(16), is_nullable varchar(16), is_partitioning_column varchar(16), addDT datetime, primary key (projectId, datasetId, table_name, column_name) );
+
+        if (datasetId) {
+            let query = `SELECT table_name, column_name, ordinal_position, data_type, is_nullable, is_partitioning_column FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.COLUMNS;`
+            console.log("READING", query);
+            const options = {
+                query: query,
+                location: 'US'
+            };
+            const bigquery = this.get_big_query();
+            let recs = await this.execute_bqJob(query, options);
+            for (const r of recs) {
+                let sa = r.table_name.split("_");
+                let contractName = "";
+                let abiType = "";
+                let name = "";
+                let idx = null;
+                for (let i = 0; i < sa.length; i++) {
+                    if ((sa[i] == "event") || sa[i] == "call" || sa[i] == "swaps") {
+                        idx = i;
+                        i = sa.length;
+                    }
+                }
+                if (idx == null) {
+                    console.log("FAILED to parse table name", r.table_name, "datasetId", projectId, datasetId);
+                } else {
+                    abiType = sa[idx];
+                    contractName = sa.slice(0, idx).join("_");
+                    name = sa.slice(idx + 1).join("_");
+                    //console.log('contractName', contractName, "abitype", abiType, "name", name)
+                }
+                let sql = `insert into projectdatasetcolumns ( projectId, datasetId, table_name, column_name, ordinal_position, data_type, is_nullable, is_partitioning_column, contractName, abiType, name, addDT ) values ( '${projectId}', '${datasetId}', '${r.table_name}', '${r.column_name}', '${r.ordinal_position}', '${r.data_type}', '${r.is_nullable}', '${r.is_partitioning_column}',  ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name)`
+                this.batchedSQL.push(sql);
+            }
+            await this.update_batchedSQL();
+        } else {
+            let cmd = `bq ls --format=json -n 10000 --project_id=blockchain-etl`
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            if (stderr) {
+                console.log("ERR!!" + stderr);
+            } else {
+                let res = JSON.parse(stdout);
+                for (const r of res) {
+                    if (r.datasetReference && r.datasetReference.datasetId) {
+                        let did = r.datasetReference.datasetId
+                        let sql = `insert into projectdataset ( projectId, datasetId, location, addDT ) values ( '${projectId}', '${did}', '${r.location}', Now() ) on duplicate key update location = values(location)`
+                        this.batchedSQL.push(sql);
+                        await this.update_batchedSQL();
+                        await this.load_project_schema(did);
+                    }
+                }
+            }
+        }
+    }
+
+    async dryrun(query = "SELECT count(`extrinsic_id`) AS `COUNT_extrinsic_id__a7d70` FROM `contracts`.`contractscall` LIMIT 50000") {
+        console.log(query);
+
+        const options = {
+            query: query,
+            // Location must match that of the dataset(s) referenced in the query.
+            location: 'us-central1',
+            dryRun: true,
+        };
+        const bigquery = this.get_big_query();
+        const [job] = await bigquery.createQueryJob(options);
+        console.log(JSON.stringify(job.metadata));
+    }
+
 }
