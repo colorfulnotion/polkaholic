@@ -1,4 +1,19 @@
+CREATE OR REPLACE FUNCTION `substrate-etl.substrate_dev.xcmgarsymbol`(relayChain STRING, paraID int, currencyID STRING)
+RETURNS STRING
+LANGUAGE js
+OPTIONS (library=["gs://cdn.polkaholic.io/xcmgarlib3.js"])
+AS r"""
+ return xcmgarsymbol(relayChain, paraID, currencyID);
+""";
 
+
+CREATE OR REPLACE FUNCTION `substrate-etl.substrate_dev.xcmgardecimals`(relayChain STRING, paraID int, currencyID STRING)
+RETURNS STRING
+LANGUAGE js
+OPTIONS (library=["gs://cdn.polkaholic.io/xcmgarlib3.js"])
+AS r"""
+ return xcmgardecimals(relayChain, paraID, currencyID);
+""";
 
 
 CREATE OR REPLACE FUNCTION `substrate-etl.evm-dev.parse_UniswapV3Pool_event_Swap(data: ARRAY, topics: ARRAY)
@@ -47,17 +62,6 @@ var abi = {"anonymous": false, "inputs": [{"indexed": true, "internalType": "add
 
     return result;
 """;
-
-
-----
-SELECT count(*) numCalls, call_section, call_method
-FROM `substrate-etl.wagmedia.users` as users join 
-`substrate-etl.polkadot_enterprise.calls` as calls
- on users.account_pubkey = calls.signer_pub_key
- where account_pubkey is not null
- and date(block_time) >= date(date_sub(CURRENT_TIMESTAMP(), INTERVAL 7 DAY))
- group by call_section,  call_method
- order by numCalls desc;
 
 
 CREATE FUNCTION `substrate-etl.wagmedia.democracyLiveness`(section STRING, method STRING)

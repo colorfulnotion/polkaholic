@@ -5436,55 +5436,41 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     async generate_xcmgar_udfs() {
         let url = "https://raw.githubusercontent.com/colorfulnotion/xcm-global-registry/main/metadata/xcmgar.json";
         const axios = require("axios");
-        let NL = "\r\n";
         try {
             const resp = await axios.get(url);
-            let funcs = ["name", "symbol", "decimals"];
             let assets = resp.data.assets;
-            for (const func of funcs) {
-                let udf_template = "CREATE FUNCTION \`substrate-etl.polkadot_enterprise.currencyID_to__FUNCTION_\`(r STRING, p STRING, c STRING) " + NL + "RETURNS JSON " + NL + "LANGUAGE js " + NL +
-                    " " + NL + "AS r\"\"\"" + NL + "___RULES___" + NL + "  return null;" + NL + "\"\"\";" + NL
-
-                let RULES = [];
-                for (const relayChain of Object.keys(assets)) {
-                    let rcassets = assets[relayChain];
-                    for (const c of rcassets) {
-                        let paraID = c.paraID;
-                        let id = c.id;
-                        let chain_assets = c.data;
-                        for (const a of chain_assets) {
-                            let currencyID = typeof a.currencyID == "string" ? a.currencyID : null;
-                            if (currencyID == null && typeof a.asset == "object") {
-                                currencyID = JSON.stringify(a.asset);
-                            }
-
-                            let name = a.name;
-                            let symbol = a.symbol;
-                            let decimals = a.decimals;
-                            switch (func) {
-                                case "symbol":
-                                    RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return "${symbol}"`);
-                                    break;
-                                case "name":
-                                    RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return "${name}"`);
-                                    break;
-                                case "decimals":
-                                    RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return "${decimals}"`);
-                                    break;
-                                case "value":
-                                    RULES.push(`if ( r == "${relayChain}" && p == "${paraID}" && c == '${currencyID}' ) return " (val / 10**${decimals})"`);
-                                    break;
-                                case "price_usd": // TODO:
-                                case "value_usd": // TODO:
-                                    break;
-                            }
+	    let out = {}
+            for (const relayChain of Object.keys(assets)) {
+		out[relayChain] = {}
+                let rcassets = assets[relayChain];
+                for (const c of rcassets) {
+                    let paraID = c.paraID;
+                    let id = c.id;
+                    let chain_assets = c.data;
+                    for (const a of chain_assets) {
+                        let currencyID = typeof a.currencyID == "string" ? a.currencyID : null;
+                        if (currencyID == null && typeof a.asset == "object") {
+                            currencyID = JSON.stringify(a.asset);
                         }
+			if ( out[relayChain][paraID] == undefined ) {
+			    out[relayChain][paraID] = {}
+			}
+			out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
                     }
                 }
-                let out = udf_template.replace("___RULES___", RULES.join("\n")).replace("_FUNCTION_", func);
-                console.log(out);
-            }
-            console.log(funcs);
+	    }
+	    let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
+if ( m[relayChain] && m[relayChain][paraID] && m[relayChain][paraID][currencyID] ) { 
+ let x = m[relayChain][paraID][currencyID]; return { symbol: x[0], name: x[1], decimals: x[2] }
+}
+return null; 
+}
+function xcmgarsymbol(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.symbol : null )}; 
+function xcmgarname(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.name : null )}; 
+function xcmgardecimals(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.decimals: null )}`; 
+            let fn = "xcmgarlib3.js";
+	    let f = fs.openSync(fn, 'w', 0o666);
+            fs.writeSync(f, xcmgarlibrary);
         } catch (err) {
             console.log("ERROR", err);
         }
