@@ -323,22 +323,25 @@ module.exports = class EVMETL extends PolkaholicDB {
             if (proxyAddress || proxyImplementation) {
                 console.log(`proxyAddress=${proxyAddress}, proxyImplementation=${proxyImplementation}`)
                 if (!proxyAddress) proxyAddress = proxyImplementation
-                let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
-                if (proxyABI) {
-                    console.log("proxyABI", proxyABI);
+                if (proxyAddress != address){
+                    //0xc36442b4a4522e871399cd717abdd847ab11fe88 has implementation pointed to itself - thus creating nonstop loop..
+                    let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
                     if (proxyABI) {
-                        abiRaw = proxyABI
-                        vals.push('proxyAddress');
-                        flds.push(`${mysql.escape(proxyAddress)}`);
-                        replace.push("proxyAddress");
+                        console.log("proxyABI", proxyABI);
+                        if (proxyABI) {
+                            abiRaw = proxyABI
+                            vals.push('proxyAddress');
+                            flds.push(`${mysql.escape(proxyAddress)}`);
+                            replace.push("proxyAddress");
 
-                        vals.push('proxyAbiRaw');
-                        flds.push(`${mysql.escape(proxyABI)}`);
-                        replace.push("proxyAbiRaw");
+                            vals.push('proxyAbiRaw');
+                            flds.push(`${mysql.escape(proxyABI)}`);
+                            replace.push("proxyAbiRaw");
 
-                        vals.push('proxyAddressLastUpdateDT');
-                        flds.push(`Now()`);
-                        replace.push("proxyAddressLastUpdateDT");
+                            vals.push('proxyAddressLastUpdateDT');
+                            flds.push(`Now()`);
+                            replace.push("proxyAddressLastUpdateDT");
+                        }
                     }
                 }
             }
