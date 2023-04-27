@@ -138,6 +138,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
         let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+        console.log(`crawlABI cmd\n`, cmd)
         if (cmd == null) {
             console.log("No api available for chainID", chainID);
             return (false);
