@@ -134,8 +134,56 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0);
     }
 
+    /*
+    rec {
+      address: '0x1f98431c8ad98523631ae4a59f267346ea31f984',
+      chainID: 1,
+      abiRaw: '[{"inputs":[],"stateMutability":"nonpayable","type":"constructor"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"uint24","name":"fee","type":"uint24"},{"indexed":true,"internalType":"int24","name":"tickSpacing","type":"int24"}],"name":"FeeAmountEnabled","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"oldOwner","type":"address"},{"indexed":true,"internalType":"address","name":"newOwner","type":"address"}],"name":"OwnerChanged","type":"event"},{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"token0","type":"address"},{"indexed":true,"internalType":"address","name":"token1","type":"address"},{"indexed":true,"internalType":"uint24","name":"fee","type":"uint24"},{"indexed":false,"internalType":"int24","name":"tickSpacing","type":"int24"},{"indexed":false,"internalType":"address","name":"pool","type":"address"}],"name":"PoolCreated","type":"event"},{"inputs":[{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"}],"name":"createPool","outputs":[{"internalType":"address","name":"pool","type":"address"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"int24","name":"tickSpacing","type":"int24"}],"name":"enableFeeAmount","outputs":[],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"uint24","name":"","type":"uint24"}],"name":"feeAmountTickSpacing","outputs":[{"internalType":"int24","name":"","type":"int24"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"","type":"address"},{"internalType":"address","name":"","type":"address"},{"internalType":"uint24","name":"","type":"uint24"}],"name":"getPool","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"owner","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"view","type":"function"},{"inputs":[],"name":"parameters","outputs":[{"internalType":"address","name":"factory","type":"address"},{"internalType":"address","name":"token0","type":"address"},{"internalType":"address","name":"token1","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"},{"internalType":"int24","name":"tickSpacing","type":"int24"}],"stateMutability":"view","type":"function"},{"inputs":[{"internalType":"address","name":"_owner","type":"address"}],"name":"setOwner","outputs":[],"stateMutability":"nonpayable","type":"function"}]',
+      proxyAbiRaw: null,
+      status: 'Found',
+      etherscanContractName: 'UniswapV3Factory',
+      contractName: 'UniswapV3Factory',
+      projectName: 'uniswap',
+      proxyAddress: null
+    }
+    */
+
     async generateProject(address, chainID = 1, project, contractName) {
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
+        //TODO: abirepo should be chain specific?
+        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, contractName, projectName, proxyAddress from abirepo where address = '${address}' limit 1`
+        console.log(`generateProject sql`, sql)
+        let sqlRecs = await this.poolREADONLY.query(sql);
+        let projectABIInfo = false
+        if (sqlRecs.length == 1){
+            projectABIInfo = sqlRecs[0]
+        }else{
+            console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectABIInfo NOT FOUND`)
+            return false
+        }
+        var sigs = {};
+        let contractABIStr = (projectABIInfo.proxyAbiRaw)?  projectABIInfo.proxyAbiRaw : projectABIInfo.abiRaw
+        var output = ethTool.parseAbiSignature(contractABIStr)
+        console.log(`output`, output)
+
+        /* want two lists:
+        Events: [] - list of events given the address
+        Calls: [] - list of func given the address, excluding pure/view only func
+        */
+        let eventMap = {}
+        let callMap = {}
+        for (const e of output){
+            var fingerprintID = e.fingerprintID
+            sigs[fingerprintID] = e;
+            if (e.abiType == 'function' && e.stateMutability != 'view'){
+                callMap[fingerprintID] = e
+            }else if (e.abiType == 'event'){
+                eventMap[fingerprintID] = e
+            }
+        }
+        console.log(`sigs`, sigs)
+        console.log(`eventMap`, eventMap)
+        console.log(`callMap`, callMap)
     }
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
@@ -669,7 +717,6 @@ mysql> desc projectcontractabi;
                 numContractsTally[fingerprintID]++;
             }
         });
-        //return
         let abiRows = [];
         for (const fingerprintID of Object.keys(sigs)) {
             let data = sigs[fingerprintID];

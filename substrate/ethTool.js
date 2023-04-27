@@ -1486,7 +1486,7 @@ function parseAbiSignature(abiStrArr) {
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
             let abiStr = JSON.stringify([e])
             output.push({
-                stateMutability,
+                stateMutability: (stateMutability)? stateMutability: null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
                 secondaryID: secondaryID,
