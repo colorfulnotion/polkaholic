@@ -137,27 +137,44 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
-        /*
-        getsourcecode endpoint returns the contractName, along with with abi
-        */
-        //let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
-        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getsourcecode&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+        //getsourcecode endpoint returns the contractName, along with with abi
+        let cmd1 = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getsourcecode&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
 
         console.log(`crawlABI cmd\n`, cmd)
         if (cmd == null) {
             console.log("No api available for chainID", chainID);
             return (false);
         }
-        const {
-            stdout,
-            stderr
-        } = await exec(cmd, {
+
+        let res = await exec(cmd, {
             maxBuffer: 1024 * 64000
         });
-        var j = JSON.parse(stdout);
-        console.log(j);
-        return
+        var j = JSON.parse(res.stdout);
+        console.log(`getabi`, j);
+
+        //TODO: use getsourcecode only
+        let res1 = await exec(cmd1, {
+            maxBuffer: 1024 * 64000
+        });
+        var k = JSON.parse(res1.stdout);
+        console.log(`getsourcecode`, k);
+
+        //return
         let assetType = 'Contract';
+        let etherscan_contractName = null
+        let isProxy = false
+        let proxyImplementation = false
+        if (k.result && Array.isArray(k.result)){
+            let result = k.result[0]
+            if (result.ContractName != ""){
+                etherscan_contractName = result.ContractName
+            }
+            if (result.Proxy == "1"){
+                isProxy = true
+                proxyImplementation = result.Implementation
+            }
+        }
         let abiRaw = j.result;
         if (abiRaw.length > 3 && abiRaw.substr(0, 3) == "Con") {
             this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
@@ -189,8 +206,15 @@ module.exports = class EVMETL extends PolkaholicDB {
             flds.push(`${mysql.escape(contractName)}`);
             replace.push("contractName");
         }
+        if (etherscan_contractName){
+            vals.push('etherscanContractName');
+            flds.push(`${mysql.escape(etherscan_contractName)}`);
+            replace.push("etherscanContractName");
+        }
         if (abiRaw) {
-            flds.push(`'${address}'`);
+            //must push to the front, since address is primary key
+            flds = [`'${address}'`].concat(flds)
+            //flds.push(`'${address}'`);
 
             vals.push('status');
             flds.push(`'Found'`);
