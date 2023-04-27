@@ -594,6 +594,7 @@ mysql> desc projectcontractabi;
       abiType: 'event'
     }
     */
+
     async loadABI(contractABIStr) {
         var sigs = {};
         var numContractsTally = {};
@@ -1099,36 +1100,46 @@ mysql> desc projectcontractabi;
                 location: 'US'
             };
             const bigquery = this.get_big_query();
-            let recs = await this.execute_bqJob(query, options);
-            for (const r of recs) {
-                let sa = r.routine_name.split("_");
-                let contractName = "";
-                let abiType = "";
-                let name = "";
-                let idx = null;
-                for (let i = 0; i < sa.length; i++) {
-                    if ((sa[i] == "event") || sa[i] == "call" || sa[i] == "swaps") {
-                        idx = i;
-                        i = sa.length;
+            try {
+                let recs = await this.execute_bqJob(query, options);
+                for (const r of recs) {
+                    let sa = r.routine_name.split("_");
+                    let contractName = "";
+                    let abiType = "";
+                    let name = "";
+                    let idx = null;
+                    for (let i = 0; i < sa.length; i++) {
+                        if ((sa[i] == "event") || sa[i] == "call" || sa[i] == "swaps") {
+                            idx = i;
+                            i = sa.length;
+                        }
                     }
+                    if (idx == null) {
+                        console.log("FAILED to parse routine name", r.routine_name, "datasetId", projectId, datasetId);
+                    } else {
+                        abiType = sa[idx];
+                        contractName = sa.slice(0, idx).join("_");
+                        name = sa.slice(idx + 1).join("_");
+                    }
+                    let routine_definition = (r.routine_definition)
+                    //console.log(`[${r.routine_name}] routine_definition`, routine_definition)
+                    let abiStr = this.extractABIFromRoutine(routine_definition)
+                    let fingerprintID = 'Null'
+                    if (abiStr){
+                        abiStr = `${JSON.stringify([JSON.parse(abiStr)])}`
+                        var output = ethTool.parseAbiSignature(abiStr)
+                        if (output && output.length == 1){
+                            fingerprintID = `'${output[0].fingerprintID}'`
+                        }
+                        //await this.loadABI(abiStr)
+                    }
+                    let abiStrSQL = (abiStr)? `'${abiStr}'` : `NULL`
+                    console.log(`[${r.routine_name}] fingerprintID=${fingerprintID}, abi`, abiStrSQL)
+                    let sql = `insert into projectdatasetroutines ( projectId, datasetId, routine_name, fingerprintID, abi, data_type, routine_definition, ddl, contractName, abiType, name, addDT ) values ( ${mysql.escape(projectId)}, ${mysql.escape(datasetId)}, ${mysql.escape(r.routine_name)}, ${fingerprintID}, ${abiStrSQL}, ${mysql.escape(r.data_type)}, ${mysql.escape(r.routine_definition)}, ${mysql.escape(r.ddl)}, ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name), fingerprintID = values(fingerprintID), abi = values(abi)`
+                    this.batchedSQL.push(sql);
                 }
-                if (idx == null) {
-                    console.log("FAILED to parse routine name", r.routine_name, "datasetId", projectId, datasetId);
-                } else {
-                    abiType = sa[idx];
-                    contractName = sa.slice(0, idx).join("_");
-                    name = sa.slice(idx + 1).join("_");
-                }
-                let routine_definition = (r.routine_definition)
-                //console.log(`[${r.routine_name}] routine_definition`, routine_definition)
-                let abiStr = this.extractABIFromRoutine(routine_definition)
-                if (abiStr){
-                    abiStr = `${JSON.stringify([JSON.parse(abiStr)])}`
-                }
-                let abiStrSQL = (abiStr)? `'${abiStr}'` : `NULL`
-                console.log(`[${r.routine_name}] abi`, abiStrSQL)
-                let sql = `insert into projectdatasetroutines ( projectId, datasetId, routine_name, abi, data_type, routine_definition, ddl, contractName, abiType, name, addDT ) values ( ${mysql.escape(projectId)}, ${mysql.escape(datasetId)}, ${mysql.escape(r.routine_name)}, ${abiStrSQL}, ${mysql.escape(r.data_type)}, ${mysql.escape(r.routine_definition)}, ${mysql.escape(r.ddl)}, ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name)`
-                this.batchedSQL.push(sql);
+            } catch (err){
+                console.log(`err`, err)
             }
             await this.update_batchedSQL();
         } else {
