@@ -137,7 +137,12 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
-        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+        /*
+        getsourcecode endpoint returns the contractName, along with with abi
+        */
+        //let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getsourcecode&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+
         console.log(`crawlABI cmd\n`, cmd)
         if (cmd == null) {
             console.log("No api available for chainID", chainID);
@@ -151,6 +156,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         });
         var j = JSON.parse(stdout);
         console.log(j);
+        return
         let assetType = 'Contract';
         let abiRaw = j.result;
         if (abiRaw.length > 3 && abiRaw.substr(0, 3) == "Con") {
