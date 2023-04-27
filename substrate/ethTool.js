@@ -2741,6 +2741,23 @@ function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf5
     return fingerprintID
 }
 
+//0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92 -> evt_PoolCreated_0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118_4
+function computeTableIDFromFingerprintIDAndName(fingerprintID = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92', name = 'PoolCreated') {
+    //evtLen = 79; callLen = 21
+    let tableId = false
+    let typ = null
+    let pieces = fingerprintID.split('-')
+    if (fingerprintID.length == '79'){
+        typ = 'evt'
+        tableId = `${typ}_${name}_${pieces[0]}_${pieces[1]}`
+    }else if (fingerprintID.length == '21'){
+        typ = 'call'
+        tableId = `${typ}_${name}_${pieces[0]}`
+    }
+    return tableId
+}
+
+
 async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
@@ -2956,5 +2973,6 @@ module.exports = {
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
+    computeTableIDFromFingerprintIDAndName: computeTableIDFromFingerprintIDAndName,
     getEVMFlds: getEVMFlds
 };

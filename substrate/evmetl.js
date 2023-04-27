@@ -154,21 +154,34 @@ module.exports = class EVMETL extends PolkaholicDB {
         let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, contractName, projectName, proxyAddress from abirepo where address = '${address}' limit 1`
         console.log(`generateProject sql`, sql)
         let sqlRecs = await this.poolREADONLY.query(sql);
-        let projectABIInfo = false
+        let projectInfo = false
         if (sqlRecs.length == 1){
-            projectABIInfo = sqlRecs[0]
+            projectInfo = sqlRecs[0]
         }else{
-            console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectABIInfo NOT FOUND`)
+            console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectInfo NOT FOUND`)
             return false
         }
+        console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectInfo`, projectInfo)
+        let projectContractName = projectInfo.address.toLowerCase() //If projectName is unknown everywhere, use contractAddress
+        if (projectInfo.etherscanContractName){
+            // Contract parser by default fetch the etherscanContractName as contractName
+            projectContractName = projectInfo.etherscanContractName
+        }
+        if (projectInfo.contractName){
+            // Overwrite with our contractName if specified
+            projectContractName = projectInfo.contractName
+        }
+
         var sigs = {};
-        let contractABIStr = (projectABIInfo.proxyAbiRaw)?  projectABIInfo.proxyAbiRaw : projectABIInfo.abiRaw
+        let contractABIStr = (projectInfo.proxyAbiRaw)?  projectInfo.proxyAbiRaw : projectInfo.abiRaw
         var output = ethTool.parseAbiSignature(contractABIStr)
         console.log(`output`, output)
 
         /* want two lists:
         Events: [] - list of events given the address
         Calls: [] - list of func given the address, excluding pure/view only func
+        key: contractName_Type_name
+        key2: type_modifiedFingerPrintID
         */
         let eventMap = {}
         let callMap = {}
@@ -176,9 +189,15 @@ module.exports = class EVMETL extends PolkaholicDB {
             var fingerprintID = e.fingerprintID
             sigs[fingerprintID] = e;
             if (e.abiType == 'function' && e.stateMutability != 'view'){
-                callMap[fingerprintID] = e
+                let k = `${projectContractName}_call_${e.name}`
+                e.etlTableId = k
+                e.devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                callMap[k] = e
             }else if (e.abiType == 'event'){
-                eventMap[fingerprintID] = e
+                let k = `${projectContractName}_event_${e.name}`
+                e.etlTableId = k
+                e.devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                eventMap[k] = e
             }
         }
         console.log(`sigs`, sigs)
