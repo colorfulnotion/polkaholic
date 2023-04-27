@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+
 const {
     Command
 } = require('commander');
@@ -30,54 +31,69 @@ async function main() {
             let chainID = opt.chainID != null ? opt.chainID : 1;
             let project = opt.project ? opt.project : null;
             let contractName = opt.contractName ? opt.contractName : null;
-	    let evmetl = new EVMETL();
-	    await evmetl.crawlABI(address, chainID, project, contractName);
-	    process.exit(0);
+            let evmetl = new EVMETL();
+            await evmetl.crawlABI(address, chainID, project, contractName);
+            process.exit(0);
+        });
+
+    program.command('generateproject')
+        .description(`Get ABI for contract from external API (Etherscan, ...) based on chainID`)
+        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt, 1)
+        .option('-p, --project <project>', 'Project Name (e.g. wormhole)', "")
+        .option('-n, --contractName <contractName>', 'Contract Name (e.g. Endpoint)', "")
+        .argument('<address>', 'Contract Address')
+        .action(async (address, opt) => {
+            let chainID = opt.chainID != null ? opt.chainID : 1;
+            let project = opt.project ? opt.project : null;
+            let contractName = opt.contractName ? opt.contractName : null;
+            let evmetl = new EVMETL();
+            await evmetl.generateProject(address, chainID, project, contractName);
+            process.exit(0);
         });
 
     program.command('crawlabis')
         .description(`Get New ABIs`)
         .option('-c, --chainID <chainID>', 'ChainID to crawl ABIs', myParseInt, null)
         .action(async (opt) => {
-	    console.log(opt);
-	    let evmetl = new EVMETL();
-	    await evmetl.crawlABIs(opt.chainID);
-	    process.exit(0);
+            console.log(opt);
+            let evmetl = new EVMETL();
+            await evmetl.crawlABIs(opt.chainID);
+            process.exit(0);
         });
 
     program.command('loadabi')
         .description(`Get ABI for contract`)
         .argument('<abistr>', 'Contract Address')
         .action(async (abistr, opt) => {
-	    let evmetl = new EVMETL();
-	    await evmetl.loadABI(abistr);
-	    process.exit(0);
+            let evmetl = new EVMETL();
+            await evmetl.loadABI(abistr);
+            process.exit(0);
         });
 
     program.command('loadabirepo')
         .description(`Load ABI Repo into BigQuery`)
         .action(async (abistr, opt) => {
-	    let evmetl = new EVMETL();
-	    await evmetl.loadABIRepo();
-	    process.exit(0);
+            let evmetl = new EVMETL();
+            await evmetl.loadABIRepo();
+            process.exit(0);
         });
 
     program.command('asset_platforms')
         .description(`Fetch Asset Platforms (from coingecko)`)
         .action(async (opt) => {
-	    var PriceManager = require("./priceManager");
-	    let pm = new PriceManager();
-	    await pm.update_coingecko_asset_platforms();
-	    process.exit(0);
+            var PriceManager = require("./priceManager");
+            let pm = new PriceManager();
+            await pm.update_coingecko_asset_platforms();
+            process.exit(0);
         });
 
     program.command('priceusd')
         .description(`Fetch Price USD (from coingecko)`)
         .action(async (opt) => {
-	    var PriceManager = require("./priceManager");
-	    let pm = new PriceManager();
-	    await pm.update_coingecko_token_price_usd();
-	    process.exit(0);
+            var PriceManager = require("./priceManager");
+            let pm = new PriceManager();
+            await pm.update_coingecko_token_price_usd();
+            process.exit(0);
         });
 
     program.command('addcontracttype')
@@ -85,18 +101,18 @@ async function main() {
         .argument('<contractType>', 'Contract Address')
         .argument('<abistr>', 'Contract Address')
         .action(async (contractType, abistr, opt) => {
-	    let evmetl = new EVMETL();
-	    await evmetl.addContractType(contractType, abistr);
-	    process.exit(0);
+            let evmetl = new EVMETL();
+            await evmetl.addContractType(contractType, abistr);
+            process.exit(0);
         });
 
     program.command('contracttypes')
         .description(`Update Contract Types`)
         .action(async (opt) => {
-	    console.log(opt);
-	    let evmetl = new EVMETL();
-	    await evmetl.updateContractTypes(opt.chainID);
-	    process.exit(0);
+            console.log(opt);
+            let evmetl = new EVMETL();
+            await evmetl.updateContractTypes(opt.chainID);
+            process.exit(0);
         });
 
     program.command('reloadabi')
@@ -107,7 +123,7 @@ async function main() {
             await evmetl.reloadABI(opt.sql);
             process.exit(0);
         });
-    
+
     program.command('setupevm')
         .description("Setup or update BigQuery tables for EVM Chain. Use -u to update tbl schema")
         .usage("-c 137")
@@ -133,7 +149,7 @@ async function main() {
             let datasetID = opt.datasetID
             await evmetl.setup_dataset(datasetID);
             process.exit(0);
-    })
+        })
 
     program.command('deletedataset')
         .description("Delete dataset in substrate-etl")
@@ -144,14 +160,14 @@ async function main() {
             let datasetID = opt.datasetID
             await evmetl.delete_dataset(datasetID);
             process.exit(0);
-    })
+        })
 
     program.command('abianalytics')
         .description(`Reload ABIs`)
         .action(async (abistr, opt) => {
-	    let evmetl = new EVMETL();
-	    await evmetl.abiAnalytics();
-	    process.exit(0);
+            let evmetl = new EVMETL();
+            await evmetl.abiAnalytics();
+            process.exit(0);
         });
 
     program.command('callevents')
@@ -160,79 +176,79 @@ async function main() {
         .action(async (opt) => {
             var evmetl = new EVMETL();
             let isCreate = (opt.create) ? true : false
-	        await evmetl.setupCallEvents(isCreate);
+            await evmetl.setupCallEvents(isCreate);
             process.exit(0);
         });
 
     program.command('loadlabels')
-	.argument('<chainID>', 'Address')
+        .argument('<chainID>', 'Address')
         .argument('<fileName>', `Storage Slot`)
         .action(async (chainID, fileName, opt) => {
             var evmetl = new EVMETL();
-	    await evmetl.loadLabels(chainID, fileName);
+            await evmetl.loadLabels(chainID, fileName);
             process.exit(0);
         });
 
     program.command('getStorageAt')
         .description(`run getStorageAt`)
-	.argument('<address>', 'Address')
+        .argument('<address>', 'Address')
         .argument('<storageSlot>', `Storage Slot`)
-	.option('-c, --chainID <chainID>', 'Address', 1)
+        .option('-c, --chainID <chainID>', 'Address', 1)
         .action(async (address, storageSlot, opt) => {
             var evmetl = new EVMETL();
-	    let res = await evmetl.getStorageAt(storageSlot, address, opt.chainID);
-	    console.log(res);
+            let res = await evmetl.getStorageAt(storageSlot, address, opt.chainID);
+            console.log(res);
             process.exit(0);
         });
 
     program.command('projects')
         .action(async (address, storageSlot, opt) => {
             var evmetl = new EVMETL();
-	    await evmetl.modelProjects();
+            await evmetl.modelProjects();
             process.exit(0);
         });
 
     program.command('project')
-	.option('-a, --abiType <abiType>', "event")
+        .option('-a, --abiType <abiType>', "event")
         .action(async (opt) => {
             var evmetl = new EVMETL();
-	    let abiType = opt.abiType ? opt.abiType : "event";
-	    await evmetl.enrich_projectcontractabi(abiType);
+            let abiType = opt.abiType ? opt.abiType : "event";
+            await evmetl.enrich_projectcontractabi(abiType);
             process.exit(0);
         });
 
 
     program.command('dryrun')
         .argument('<query>', `Query`)
-	.action(async (query) => {
+        .action(async (query) => {
             var evmetl = new EVMETL();
-	    await evmetl.dryrun(query);
+            await evmetl.dryrun(query);
             process.exit(0);
         });
-   
+
     program.command('projectschema')
-	.option('-d, --datasetId <datasetId>', "Model datasetID", null)
-	.option('-p, --project <projectId>', "Model project", null)
-	.action(async (opt) => {
+        .option('-d, --datasetId <datasetId>', "Model datasetID", null)
+        .option('-p, --project <projectId>', "Model project", null)
+        .action(async (opt) => {
             var evmetl = new EVMETL();
-	    let datasetId = opt.datasetId ? opt.datasetId : null;
-	    let projectId = opt.projectId ? opt.projectId : "blockchain-etl";
-	    await evmetl.load_project_schema(datasetId, projectId);
+            let datasetId = opt.datasetId ? opt.datasetId : null;
+            let projectId = opt.projectId ? opt.projectId : "blockchain-etl";
+            await evmetl.load_project_schema(datasetId, projectId);
             process.exit(0);
         });
-   
+
     program.command('projectroutines')
-	.option('-d, --datasetId <datasetId>', "Model datasetID", null)
-	.option('-p, --project <projectId>', "Model project", null)
-	.action(async (opt) => {
+        .option('-d, --datasetId <datasetId>', "Model datasetID", null)
+        .option('-p, --project <projectId>', "Model project", null)
+        .action(async (opt) => {
             var evmetl = new EVMETL();
-	    let datasetId = opt.datasetId ? opt.datasetId : null;
-	    let projectId = opt.projectId ? opt.projectId : "blockchain-etl-internal";
-	    await evmetl.load_project_routines(datasetId, projectId);
+            let datasetId = opt.datasetId ? opt.datasetId : null;
+            let projectId = opt.projectId ? opt.projectId : "blockchain-etl-internal";
+            await evmetl.load_project_routines(datasetId, projectId);
             process.exit(0);
         });
-   
-    
+
+
     await program.parseAsync(process.argv);
 }
 

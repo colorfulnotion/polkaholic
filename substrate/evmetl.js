@@ -134,6 +134,10 @@ module.exports = class EVMETL extends PolkaholicDB {
         process.exit(0);
     }
 
+    async generateProject(address, chainID = 1, project, contractName) {
+        console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
+    }
+
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
 
@@ -187,19 +191,19 @@ module.exports = class EVMETL extends PolkaholicDB {
         let etherscan_contractName = null
         let isProxy = false
         let proxyImplementation = false
-        if (k.result && Array.isArray(k.result)){
+        if (k.result && Array.isArray(k.result)) {
             let result = k.result[0]
-            if (result.ContractName != ""){
+            if (result.ContractName != "") {
                 etherscan_contractName = result.ContractName
             }
-            if (result.Proxy == "1"){
+            if (result.Proxy == "1") {
                 isProxy = true
                 proxyImplementation = result.Implementation
             }
-            if (result.ABI != undefined && result.ABI.substr(0, 3) == "Con"){
+            if (result.ABI != undefined && result.ABI.substr(0, 3) == "Con") {
                 this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
                 await this.update_batchedSQL();
-            }else{
+            } else {
                 abiRaw = result.ABI
                 var contractABI = JSON.parse(abiRaw);
                 const prepareData = (e) => `${e.name}(${e.inputs.map((e) => e.type)})`;
@@ -227,7 +231,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             flds.push(`${mysql.escape(contractName)}`);
             replace.push("contractName");
         }
-        if (etherscan_contractName){
+        if (etherscan_contractName) {
             vals.push('etherscanContractName');
             flds.push(`${mysql.escape(etherscan_contractName)}`);
             replace.push("etherscanContractName");
@@ -1181,20 +1185,20 @@ mysql> desc projectcontractabi;
                     //console.log(`[${r.routine_name}] routine_definition`, routine_definition)
                     let abiStr = this.extractABIFromRoutine(routine_definition)
                     let fingerprintID = 'Null'
-                    if (abiStr){
+                    if (abiStr) {
                         abiStr = `${JSON.stringify([JSON.parse(abiStr)])}`
                         var output = ethTool.parseAbiSignature(abiStr)
-                        if (output && output.length == 1){
+                        if (output && output.length == 1) {
                             fingerprintID = `'${output[0].fingerprintID}'`
                         }
                         //await this.loadABI(abiStr)
                     }
-                    let abiStrSQL = (abiStr)? `'${abiStr}'` : `NULL`
+                    let abiStrSQL = (abiStr) ? `'${abiStr}'` : `NULL`
                     console.log(`[${r.routine_name}] fingerprintID=${fingerprintID}, abi`, abiStrSQL)
                     let sql = `insert into projectdatasetroutines ( projectId, datasetId, routine_name, fingerprintID, abi, data_type, routine_definition, ddl, contractName, abiType, name, addDT ) values ( ${mysql.escape(projectId)}, ${mysql.escape(datasetId)}, ${mysql.escape(r.routine_name)}, ${fingerprintID}, ${abiStrSQL}, ${mysql.escape(r.data_type)}, ${mysql.escape(r.routine_definition)}, ${mysql.escape(r.ddl)}, ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now() ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name), fingerprintID = values(fingerprintID), abi = values(abi)`
                     this.batchedSQL.push(sql);
                 }
-            } catch (err){
+            } catch (err) {
                 console.log(`err`, err)
             }
             await this.update_batchedSQL();
