@@ -136,28 +136,29 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
-        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
-        //getsourcecode endpoint returns the contractName, along with with abi
-        let cmd1 = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getsourcecode&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
 
+        /*
         console.log(`crawlABI cmd\n`, cmd)
+        let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
         if (cmd == null) {
             console.log("No api available for chainID", chainID);
             return (false);
         }
-
         let res = await exec(cmd, {
             maxBuffer: 1024 * 64000
         });
         var j = JSON.parse(res.stdout);
         console.log(`getabi`, j);
+        */
 
-        //TODO: use getsourcecode only
+        //getsourcecode endpoint returns the contractName, along with with abi
+        let cmd1 = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getsourcecode&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
+        // use getsourcecode only
         let res1 = await exec(cmd1, {
             maxBuffer: 1024 * 64000
         });
         var k = JSON.parse(res1.stdout);
-        console.log(`getsourcecode`, k);
+        console.log(`[${address}] getsourcecode`, k);
         /*
         {
             "status": "1",
@@ -181,7 +182,6 @@ module.exports = class EVMETL extends PolkaholicDB {
             ]
         }
         */
-        //return
         let assetType = 'Contract';
         let abiRaw = null
         let etherscan_contractName = null
@@ -213,24 +213,6 @@ module.exports = class EVMETL extends PolkaholicDB {
                 // TODO: use the methodsig to categorize the assetType (ERC20/721/.. vs Router/ERC20LP)
             }
         }
-        /*let abiRaw = j.result;
-        if (abiRaw.length > 3 && abiRaw.substr(0, 3) == "Con") {
-            this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
-            await this.update_batchedSQL();
-            abiRaw = null;
-        } else {
-            var contractABI = JSON.parse(abiRaw);
-            const prepareData = (e) => `${e.name}(${e.inputs.map((e) => e.type)})`;
-            const prepareData2 = (e) => `${e.name}(${e.inputs.map((e) => e.type + " " + e.name)})`;
-            const encodeSelector = (f) => web3.utils.sha3(f).slice(0, 10);
-            let methodsig = contractABI
-                .filter((e) => e.type === "function")
-                .flatMap(
-                    (e) => `${encodeSelector(prepareData(e))}|${prepareData2(e)}`
-                );
-            // TODO: use the methodsig to categorize the assetType (ERC20/721/.. vs Router/ERC20LP)
-        }
-        */
         let flds = [];
         let vals = [];
         let replace = [];
@@ -253,7 +235,6 @@ module.exports = class EVMETL extends PolkaholicDB {
         if (abiRaw) {
             //must push to the front, since address is primary key
             flds = [`'${address}'`].concat(flds)
-            //flds.push(`'${address}'`);
 
             vals.push('status');
             flds.push(`'Found'`);
@@ -264,22 +245,25 @@ module.exports = class EVMETL extends PolkaholicDB {
             replace.push("foundDT");
 
             vals.push('abiRaw');
-            flds.push(`${mysql.escape(JSON.stringify(j))}`);
+            flds.push(`${mysql.escape(abiRaw)}`);
             replace.push("abiRaw");
 
-            let abi = JSON.parse(j.result);
             let proxyAddress = await this.get_proxy_address(address, chainID);
             if (proxyAddress || proxyImplementation) {
                 console.log(`proxyAddress=${proxyAddress}, proxyImplementation=${proxyImplementation}`)
-                let proxyABI = await this.crawlABI(proxyImplementation, chainID, project, contractName);
+                if (!proxyAddress) proxyAddress = proxyImplementation
+                let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
                 if (proxyABI) {
                     console.log("proxyABI", proxyABI);
-                    if (proxyABI && proxyABI.status == 1) {
-                        //j = proxyABI;
+                    if (proxyABI) {
                         abiRaw = proxyABI
                         vals.push('proxyAddress');
                         flds.push(`${mysql.escape(proxyAddress)}`);
                         replace.push("proxyAddress");
+
+                        vals.push('proxyAbiRaw');
+                        flds.push(`${mysql.escape(proxyABI)}`);
+                        replace.push("proxyAbiRaw");
 
                         vals.push('proxyAddressLastUpdateDT');
                         flds.push(`Now()`);
@@ -298,14 +282,12 @@ module.exports = class EVMETL extends PolkaholicDB {
                 "replace": replace
             }, true);
 
-            //await this.loadABI(j.result)
             await this.loadABI(abiRaw)
         } else {
             this.batchedSQL.push(`update abirepo set lastAttemptDT = Now(), attempted = attempted + 1 where address = '${address}'`);
             await this.update_batchedSQL();
         }
         return abiRaw
-        //return j;
     }
 
     get_address_from_storage_value(storageVal) {
@@ -563,8 +545,8 @@ mysql> desc projectcontractabi;
                 }
             }
         }
-
     }
+
     abi_to_signature(abi) {
         let s = abi.replace("event ", "").replace("function ", "").replace(" payable", "").trim();
         if (s.includes("returns ")) {
@@ -573,6 +555,7 @@ mysql> desc projectcontractabi;
         }
         return s;
     }
+
     async reloadABI(targetSQL = null) {
         let sql = (targetSQL != undefined) ? targetSQL : `select abiType, name, signatureID, abi from contractabi where outdated = 1 order by numContracts desc;`
         var res = await this.poolREADONLY.query(sql);
