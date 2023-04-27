@@ -107,7 +107,6 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
-
     async loadLabels(chainID = 1, filePath = null) {
         var labelsData = JSON.parse(fs.readFileSync(filePath));
         let cnt = 0;
@@ -159,9 +158,32 @@ module.exports = class EVMETL extends PolkaholicDB {
         });
         var k = JSON.parse(res1.stdout);
         console.log(`getsourcecode`, k);
-
+        /*
+        {
+            "status": "1",
+            "message": "OK",
+            "result": [
+              {
+                "SourceCode": "..."",
+                "ABI": "[{\"constant\":false,\"inputs\":[{\"name\":\"newImplementation\",\"type\":\"address\"}],\"name\":\"upgradeTo\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newImplementation\",\"type\":\"address\"},{\"name\":\"data\",\"type\":\"bytes\"}],\"name\":\"upgradeToAndCall\",\"outputs\":[],\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"implementation\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"constant\":false,\"inputs\":[{\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"changeAdmin\",\"outputs\":[],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"constant\":true,\"inputs\":[],\"name\":\"admin\",\"outputs\":[{\"name\":\"\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"view\",\"type\":\"function\"},{\"inputs\":[{\"name\":\"_implementation\",\"type\":\"address\"}],\"payable\":false,\"stateMutability\":\"nonpayable\",\"type\":\"constructor\"},{\"payable\":true,\"stateMutability\":\"payable\",\"type\":\"fallback\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"previousAdmin\",\"type\":\"address\"},{\"indexed\":false,\"name\":\"newAdmin\",\"type\":\"address\"}],\"name\":\"AdminChanged\",\"type\":\"event\"},{\"anonymous\":false,\"inputs\":[{\"indexed\":false,\"name\":\"implementation\",\"type\":\"address\"}],\"name\":\"Upgraded\",\"type\":\"event\"}]",
+                "ContractName": "FiatTokenProxy",
+                "CompilerVersion": "v0.4.24+commit.e67f0147",
+                "OptimizationUsed": "0",
+                "Runs": "200",
+                "ConstructorArguments": "0000000000000000000000000882477e7895bdc5cea7cb1552ed914ab157fe56",
+                "EVMVersion": "Default",
+                "Library": "",
+                "LicenseType": "",
+                "Proxy": "1",
+                "Implementation": "0xa2327a938febf5fec13bacfb16ae10ecbc4cbdcf",
+                "SwarmSource": "bzzr://a4a547cfc7202c5acaaae74d428e988bc62ad5024eb0165532d3a8f91db4ed24"
+              }
+            ]
+        }
+        */
         //return
         let assetType = 'Contract';
+        let abiRaw = null
         let etherscan_contractName = null
         let isProxy = false
         let proxyImplementation = false
@@ -174,8 +196,24 @@ module.exports = class EVMETL extends PolkaholicDB {
                 isProxy = true
                 proxyImplementation = result.Implementation
             }
+            if (result.ABI != undefined && result.ABI.substr(0, 3) == "Con"){
+                this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
+                await this.update_batchedSQL();
+            }else{
+                abiRaw = result.ABI
+                var contractABI = JSON.parse(abiRaw);
+                const prepareData = (e) => `${e.name}(${e.inputs.map((e) => e.type)})`;
+                const prepareData2 = (e) => `${e.name}(${e.inputs.map((e) => e.type + " " + e.name)})`;
+                const encodeSelector = (f) => web3.utils.sha3(f).slice(0, 10);
+                let methodsig = contractABI
+                    .filter((e) => e.type === "function")
+                    .flatMap(
+                        (e) => `${encodeSelector(prepareData(e))}|${prepareData2(e)}`
+                    );
+                // TODO: use the methodsig to categorize the assetType (ERC20/721/.. vs Router/ERC20LP)
+            }
         }
-        let abiRaw = j.result;
+        /*let abiRaw = j.result;
         if (abiRaw.length > 3 && abiRaw.substr(0, 3) == "Con") {
             this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
             await this.update_batchedSQL();
@@ -192,6 +230,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 );
             // TODO: use the methodsig to categorize the assetType (ERC20/721/.. vs Router/ERC20LP)
         }
+        */
         let flds = [];
         let vals = [];
         let replace = [];
@@ -229,13 +268,15 @@ module.exports = class EVMETL extends PolkaholicDB {
             replace.push("abiRaw");
 
             let abi = JSON.parse(j.result);
-            let proxyAddress = null;
-            if (proxyAddress = await this.get_proxy_address(address, chainID)) {
-                let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
+            let proxyAddress = await this.get_proxy_address(address, chainID);
+            if (proxyAddress || proxyImplementation) {
+                console.log(`proxyAddress=${proxyAddress}, proxyImplementation=${proxyImplementation}`)
+                let proxyABI = await this.crawlABI(proxyImplementation, chainID, project, contractName);
                 if (proxyABI) {
                     console.log("proxyABI", proxyABI);
                     if (proxyABI && proxyABI.status == 1) {
-                        j = proxyABI;
+                        //j = proxyABI;
+                        abiRaw = proxyABI
                         vals.push('proxyAddress');
                         flds.push(`${mysql.escape(proxyAddress)}`);
                         replace.push("proxyAddress");
@@ -257,13 +298,14 @@ module.exports = class EVMETL extends PolkaholicDB {
                 "replace": replace
             }, true);
 
-            await this.loadABI(j.result)
-
+            //await this.loadABI(j.result)
+            await this.loadABI(abiRaw)
         } else {
             this.batchedSQL.push(`update abirepo set lastAttemptDT = Now(), attempted = attempted + 1 where address = '${address}'`);
             await this.update_batchedSQL();
         }
-        return j;
+        return abiRaw
+        //return j;
     }
 
     get_address_from_storage_value(storageVal) {
