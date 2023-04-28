@@ -8553,10 +8553,11 @@ module.exports = class Indexer extends AssetManager {
         console.log(`initEvmSchemaMap DONE`)
     }
 
+    //????? REVIEW THIS
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
         let tableID = null;
         let subTableIDInfo = null;
-        let a = to_address.toLowerCase();
+        let a = (to_address) ? to_address.toLowerCase(): '';
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID].tableId
             if (this.evmFingerprintMap[fingerprintID].addresses) {

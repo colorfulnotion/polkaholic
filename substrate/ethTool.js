@@ -1390,6 +1390,40 @@ function getMethodSignature(e) {
     return [`${e.name}(${inputs.join(', ')})`, topicLen]
 }
 
+function getMethodSignatureFlds(e) {
+    var flds = []
+    var indexedCnt = 0 //topic0 is signatureID
+    for (const inp of e.inputs) {
+        let isIndexed = false
+        if (inp.indexed != undefined) {
+            isIndexed = inp.indexed
+        }
+        let typeName;
+        if (Array.isArray(inp.components)) {
+            let t = []
+            let tupleType = inp.type
+            for (const c of inp.components) {
+                let cName = `${c.name}`.trim()
+                t.push(cName)
+            }
+            let componentsType = `(${t.join(', ')})`
+            if (tupleType == 'tuple[]') {
+                componentsType += `[]`
+            }
+            typeName = `${inp.name}`
+        } else {
+            typeName = `${inp.name}`.trim()
+        }
+        if (isIndexed) {
+            indexedCnt++
+            flds.push(`${typeName}`)
+        } else {
+            flds.push(typeName)
+        }
+    }
+    return flds
+}
+
 // goal: generate uniqueID for func + indexed events
 function getMethodFingureprint(e) {
     var inputs = []
@@ -1478,6 +1512,7 @@ function parseAbiSignature(abiStrArr) {
             let signatureRaw = getMethodSignatureRaw(e)
             let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
             let fingerprint = getMethodFingureprint(e)
+            let flds = getMethodSignatureFlds(e)
             /*
             previous fingerprintID is now secondaryID, which is NOT unique
             New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
@@ -1486,7 +1521,7 @@ function parseAbiSignature(abiStrArr) {
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
             let abiStr = JSON.stringify([e])
             output.push({
-                stateMutability,
+                stateMutability: (stateMutability)? stateMutability: null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
                 secondaryID: secondaryID,
@@ -1496,7 +1531,8 @@ function parseAbiSignature(abiStrArr) {
                 name: firstCharUpperCase(e.name),
                 abi: abiStr,
                 abiType,
-                topicLength: topicLen
+                topicLength: topicLen,
+                flds: flds
             })
         });
     } catch (err) {}
@@ -2741,6 +2777,23 @@ function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf5
     return fingerprintID
 }
 
+//0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92 -> evt_PoolCreated_0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118_4
+function computeTableIDFromFingerprintIDAndName(fingerprintID = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92', name = 'PoolCreated') {
+    //evtLen = 79; callLen = 21
+    let tableId = false
+    let typ = null
+    let pieces = fingerprintID.split('-')
+    if (fingerprintID.length == '79'){
+        typ = 'evt'
+        tableId = `${typ}_${name}_${pieces[0]}_${pieces[1]}`
+    }else if (fingerprintID.length == '21'){
+        typ = 'call'
+        tableId = `${typ}_${name}_${pieces[0]}`
+    }
+    return tableId
+}
+
+
 async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
@@ -2956,5 +3009,6 @@ module.exports = {
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
+    computeTableIDFromFingerprintIDAndName: computeTableIDFromFingerprintIDAndName,
     getEVMFlds: getEVMFlds
 };
