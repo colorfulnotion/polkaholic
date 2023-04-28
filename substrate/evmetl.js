@@ -151,7 +151,12 @@ module.exports = class EVMETL extends PolkaholicDB {
     async generateProject(address, chainID = 1, project, contractName) {
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
         //TODO: abirepo should be chain specific?
-        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, contractName, projectName, proxyAddress from abirepo where address = '${address}' limit 1`
+        /*
+        address -> table mapping aren't necessarily 1 to 1
+        For example: we want to use 0xc36442b4a4522e871399cd717abdd847ab11fe88 -> to aggregate ALL uniswapV3 swap events. In this case we set the customContractName = 'UniswapV3Pool'
+
+        */
+        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, customContractName, contractName, projectName, proxyAddress from abirepo where address = '${address}' limit 1`
         console.log(`generateProject sql`, sql)
         let sqlRecs = await this.poolREADONLY.query(sql);
         let projectInfo = false
@@ -170,6 +175,11 @@ module.exports = class EVMETL extends PolkaholicDB {
         if (projectInfo.contractName){
             // Overwrite with our contractName if specified
             projectContractName = projectInfo.contractName
+        }
+        if (projectInfo.customContractName){
+            // Overwrite with our customContractName if specified
+            projectContractName = projectInfo.customContractName
+            //TODO: need to link to other virtual table
         }
 
         var sigs = {};
@@ -203,6 +213,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`sigs`, sigs)
         console.log(`eventMap`, eventMap)
         console.log(`callMap`, callMap)
+        console.log(`event table`, Object.keys(eventMap))
+        console.log(`call tabel`, Object.keys(callMap))
     }
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
@@ -267,7 +279,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 isProxy = true
                 proxyImplementation = result.Implementation
             }
-            if (result.ABI != undefined && result.ABI.substr(0, 3) == "Con") {
+            if (result.ABI != undefined && result.ABI.substr(0, 3) == "Contract source code not verified") {
                 this.batchedSQL.push(`update abirepo set status = 'Unverified' where address = '${address}'`);
                 await this.update_batchedSQL();
             } else {
