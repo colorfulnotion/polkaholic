@@ -94,6 +94,10 @@ function dechex(number) {
 module.exports = class EVMETL extends PolkaholicDB {
     methodMap = {};
 
+    evmSchemaMap = {}; //by tableId
+    evmFingerprintMap = {}; //by fingerprintID
+    evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
+
     async getStorageAt(storageSlot, address, chainID = 1) {
         console.log("getStorageAt", storageSlot, address, chainID);
         const ethers = require('ethers');
@@ -148,7 +152,25 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
     */
 
+
+    /*
+    {
+      "block_timestamp": "2023-04-26 04:50:11.000000 UTC",
+      "block_number": "17128132",
+      "transaction_hash": "0x7cd1db53cef1106a00fe33680b4e4be2eaef023feff0fd266bb65916cca77889",
+      "log_index": "322",
+      "contract_address": "0x1f98431c8ad98523631ae4a59f267346ea31f984",
+      "token0": "0x66a0f676479cee1d7373f3dc2e2952778bff5bd6",
+      "token1": "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2",
+      "fee": "100",
+      "tickSpacing": "1",
+      "pool": "0xf9f912186861147dd00ec74720db648502bc1ccf"
+    }
+    */
+
     async generateProject(address, chainID = 1, project, contractName) {
+        await this.initEvmSchemaMap()
+
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
         //TODO: abirepo should be chain specific?
         /*
@@ -200,13 +222,23 @@ module.exports = class EVMETL extends PolkaholicDB {
             sigs[fingerprintID] = e;
             if (e.abiType == 'function' && e.stateMutability != 'view'){
                 let k = `${projectContractName}_call_${e.name}`
+                let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
+                let devFlds = this.getSchemaFlds(modifiedFingerprintID)
                 e.etlTableId = k
-                e.devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                e.devTabelId = devTabelId
+                e.modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(e.devTabelId)
+                e.devFlds = devFlds
                 callMap[k] = e
             }else if (e.abiType == 'event'){
                 let k = `${projectContractName}_event_${e.name}`
+                let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
+                let devFlds = this.getSchemaFlds(modifiedFingerprintID)
                 e.etlTableId = k
-                e.devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                e.devTabelId = devTabelId
+                e.modifiedFingerprintID = modifiedFingerprintID
+                e.devFlds = devFlds
                 eventMap[k] = e
             }
         }
@@ -216,6 +248,115 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`event table`, Object.keys(eventMap))
         console.log(`call tabel`, Object.keys(callMap))
     }
+
+    getTableIDFromFingerprintID(fingerprintID, to_address = null) {
+        let tableID = null;
+        let subTableIDInfo = null;
+        let a = (to_address) ? to_address.toLowerCase(): '';
+        if (this.evmFingerprintMap[fingerprintID] != undefined) {
+            tableID = this.evmFingerprintMap[fingerprintID].tableId
+            if (this.evmFingerprintMap[fingerprintID].addresses) {
+                console.log(to_address, a);
+                if (this.evmFingerprintMap[fingerprintID].addresses[a] != undefined) {
+                    subTableIDInfo = this.evmFingerprintMap[fingerprintID].addresses[a];
+                }
+            }
+        }
+        return [tableID, subTableIDInfo];
+    }
+
+    getSchemaFlds(fingerprintID) {
+        let flds = false
+        if (this.evmFingerprintMap[fingerprintID] != undefined) {
+            flds = this.evmFingerprintMap[fingerprintID].flds
+        }
+        return flds
+    }
+
+    async initEvmSchemaMap() {
+        let projectcontractabiRecs = await this.poolREADONLY.query(`select address, fingerprintID, name, projectName, abiType from projectcontractabi`);
+        let projectcontractabi = {};
+        for (const r of projectcontractabiRecs) {
+            let subtableId = (r.abiType == "function") ? `call_project_${r.projectName}_${r.name}_${r.address}_${r.fingerprintID}` : `evt_project_${r.projectName}_${r.name}_${r.address}_${r.fingerprintID}`;
+            if (projectcontractabi[r.fingerprintID] == undefined) {
+                projectcontractabi[r.fingerprintID] = {};
+            }
+            projectcontractabi[r.fingerprintID][r.address] = {
+                project: r.projectName,
+                subtableId: subtableId,
+                abiType: r.abiType,
+                status: "Unknown"
+            };
+        }
+
+        let evmDataset = this.evmDatasetID
+        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
+
+        let evmSchemaMap = {}
+        let evmFingerprintMap = {}
+        for (const t of tablesRecs) {
+            let tblType = t.tbl_type
+            let tableId = t.table_name
+            let colName = t.column_name
+            let ordinalIdx = t.ordinal_position - 1
+            let fingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
+            if (evmSchemaMap[tableId] == undefined) {
+                evmSchemaMap[tableId] = {};
+            }
+            if (evmFingerprintMap[fingerprintID] == undefined) {
+                //evmFingerprintMap[fingerprintID] = tableId;
+                evmFingerprintMap[fingerprintID] = {}
+                evmFingerprintMap[fingerprintID].flds = []
+                evmFingerprintMap[fingerprintID].tableId = tableId
+                if (projectcontractabi[fingerprintID]) {
+                    // when a first interaction happens with an address held in this map, we create another subtable for the project
+                    evmFingerprintMap[fingerprintID].projectcontractabi = projectcontractabi[fingerprintID];
+                }
+            }
+            if (tableId.includes("call_project_") || tableId.includes("evt_project_")) {
+                let sa = tableId.split("_");
+                let address = sa[4];
+                if (evmFingerprintMap[fingerprintID].projectcontractabi[address].status == "Unknown") {
+                    evmFingerprintMap[fingerprintID].projectcontractabi[address].status = "Created";
+                }
+            }
+            if (tblType == 'call' && ordinalIdx >= 8) {
+                evmFingerprintMap[fingerprintID].flds.push(colName)
+            } else if (tblType == 'evt' && ordinalIdx >= 7) {
+                evmFingerprintMap[fingerprintID].flds.push(colName)
+            }
+            evmSchemaMap[tableId][colName] = t.data_type;
+            // TODO: get description for full ABI
+        }
+        this.evmSchemaMap = evmSchemaMap
+        this.evmFingerprintMap = evmFingerprintMap
+        console.log(`evmSchemaMap ${Object.keys(evmSchemaMap).length}`)
+        console.log(`evmFingerprintMap ${Object.keys(evmFingerprintMap).length}`)
+        console.log(`initEvmSchemaMap DONE`)
+    }
+
+    /*
+    {
+        stateMutability: 'nonpayable',
+        fingerprint: 'createPool(address,address,uint24)',
+        fingerprintID: '0xa1671295-0xee2dec0c',
+        secondaryID: '0xa1671295',
+        signatureID: '0xa1671295',
+        signatureRaw: 'createPool(address,address,uint24)',
+        signature: 'createPool(address tokenA, address tokenB, uint24 fee)',
+        name: 'CreatePool',
+        abi: '[{"inputs":[{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"}],"name":"createPool","outputs":[{"internalType":"address","name":"pool","type":"address"}],"stateMutability":"nonpayable","type":"function"}]',
+        abiType: 'function',
+        topicLength: 0,
+        etlTableId: 'UniswapV3Factory_call_CreatePool',
+        devTabelId: 'call_CreatePool_0xa1671295'
+    }
+    */
+    async createProjectContractView(talbeInfo){
+        //need to create schema mapping and compute ordinal position
+
+    }
+
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
