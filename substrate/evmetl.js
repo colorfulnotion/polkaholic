@@ -6,6 +6,7 @@ const util = require('util');
 const exec = util.promisify(require('child_process').exec);
 
 const ethTool = require("./ethTool");
+const paraTool = require("./paraTool");
 const path = require('path');
 
 const fs = require('fs');
@@ -169,8 +170,6 @@ module.exports = class EVMETL extends PolkaholicDB {
     */
 
     async generateProject(address, chainID = 1, project, contractName) {
-        //await this.initEvmSchemaMap()
-
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
         //TODO: abirepo should be chain specific?
         /*
@@ -178,7 +177,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         For example: we want to use 0xc36442b4a4522e871399cd717abdd847ab11fe88 -> to aggregate ALL uniswapV3 swap events. In this case we set the customContractName = 'UniswapV3Pool'
 
         */
-        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, customContractName, contractName, projectName, proxyAddress from abirepo where address = '${address}' limit 1`
+        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, customContractName, contractName, projectName, proxyAddress, isAggregate, isAggregate, aggregateAddress from abirepo where address = '${address}' limit 1`
         console.log(`generateProject sql`, sql)
         let sqlRecs = await this.poolREADONLY.query(sql);
         let projectInfo = false
@@ -230,22 +229,34 @@ module.exports = class EVMETL extends PolkaholicDB {
                 let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
                 let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
                 let devFlds = this.getSchemaFlds(modifiedFingerprintID)
+                console.log(`${modifiedFingerprintID}, devFlds`, devFlds)
                 e.etlTableId = k
                 e.devTabelId = devTabelId
                 e.modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(e.devTabelId)
+                e.etlMeta = ["block_timestamp", "block_number", "transaction_hash", "trace_address", "to_address", "call_success"]
+                e.devMeta = ["call_block_time", "call_block_number", "call_tx_hash", "call_trace_address", "contract_address", "status"]
+                e.etlExtra = ["transaction_index", "error"]
+                e.devExtra = ["chain_id", "evm_chain_id"]
                 e.devFlds = devFlds
-                e.etlFlds = devFlds
+                e.etlFlds = e.flds
+                delete e.flds
                 callMap[k] = e
             }else if (e.abiType == 'event'){
                 let k = `${projectContractName}_event_${e.name}`
                 let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
                 let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
                 let devFlds = this.getSchemaFlds(modifiedFingerprintID)
+                console.log(`${modifiedFingerprintID}, devFlds`, devFlds)
                 e.etlTableId = k
                 e.devTabelId = devTabelId
                 e.modifiedFingerprintID = modifiedFingerprintID
+                e.etlMeta = ["block_timestamp", "block_number", "transaction_hash", "log_index", "contract_address"]
+                e.devMeta = ["evt_block_time", "evt_block_number", "evt_tx_hash", "evt_index", "contract_address"]
+                e.etlExtra = []
+                e.devExtra = ["chain_id", "evm_chain_id"]
                 e.devFlds = devFlds
-                e.etlFlds = devFlds
+                e.etlFlds = e.flds
+                delete e.flds
                 eventMap[k] = e
             }
         }
@@ -254,6 +265,15 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`callMap`, callMap)
         console.log(`event table`, Object.keys(eventMap))
         console.log(`call tabel`, Object.keys(callMap))
+        for (const eventKey of Object.keys(eventMap)){
+            let eventTableInfo = eventMap[eventKey]
+            if (projectInfo.projectName){
+                let datasetID = projectInfo.projectName
+                let isAggregate = (projectInfo.isAggregate)? true : false
+                let targetContractAddress = (!isAggregate)? projectInfo.address: null
+                this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+            }
+        }
     }
 
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
@@ -344,24 +364,82 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     /*
     {
-        stateMutability: 'nonpayable',
-        fingerprint: 'createPool(address,address,uint24)',
-        fingerprintID: '0xa1671295-0xee2dec0c',
-        secondaryID: '0xa1671295',
-        signatureID: '0xa1671295',
-        signatureRaw: 'createPool(address,address,uint24)',
-        signature: 'createPool(address tokenA, address tokenB, uint24 fee)',
-        name: 'CreatePool',
-        abi: '[{"inputs":[{"internalType":"address","name":"tokenA","type":"address"},{"internalType":"address","name":"tokenB","type":"address"},{"internalType":"uint24","name":"fee","type":"uint24"}],"name":"createPool","outputs":[{"internalType":"address","name":"pool","type":"address"}],"stateMutability":"nonpayable","type":"function"}]',
-        abiType: 'function',
-        topicLength: 0,
-        etlTableId: 'UniswapV3Factory_call_CreatePool',
-        devTabelId: 'call_CreatePool_0xa1671295'
+        stateMutability: null,
+        fingerprint: 'PoolCreated(index_topic_1 address,index_topic_2 address,index_topic_3 uint24,int24,address)',
+        fingerprintID: '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92',
+        secondaryID: '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0xe9cf7a91',
+        signatureID: '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118',
+        signatureRaw: 'PoolCreated(address,address,uint24,int24,address)',
+        signature: 'PoolCreated(index_topic_1 address token0, index_topic_2 address token1, index_topic_3 uint24 fee, int24 tickSpacing, address pool)',
+        name: 'PoolCreated',
+        abi: '[{"anonymous":false,"inputs":[{"indexed":true,"internalType":"address","name":"token0","type":"address"},{"indexed":true,"internalType":"address","name":"token1","type":"address"},{"indexed":true,"internalType":"uint24","name":"fee","type":"uint24"},{"indexed":false,"internalType":"int24","name":"tickSpacing","type":"int24"},{"indexed":false,"internalType":"address","name":"pool","type":"address"}],"name":"PoolCreated","type":"event"}]',
+        abiType: 'event',
+        topicLength: 4,
+        etlTableId: 'UniswapV3Factory_event_PoolCreated',
+        devTabelId: 'evt_PoolCreated_0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118_4',
+        modifiedFingerprintID: '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4',
+        etlMeta: [
+          'block_timestamp',
+          'block_number',
+          'transaction_hash',
+          'log_index',
+          'contract_address'
+        ],
+        devMeta: [
+          'evt_block_time',
+          'evt_block_number',
+          'evt_tx_hash',
+          'evt_index',
+          'contract_address'
+        ],
+        etlExtra: [],
+        devExtra: [ 'chain_id', 'evm_chain_id' ],
+        devFlds: [ 'token0', 'token1', 'fee', 'tickSpacing', 'pool' ],
+        etlFlds: [ 'token0', 'token1', 'fee', 'tickSpacing', 'pool' ]
     }
     */
-    async createProjectContractView(talbeInfo){
+
+    createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap'){
+        let bqProjectID = `substrate-etl`
+        //let bqDataset = `${this.evmDatasetID}`
+        let bqDataset = `evm_dev`
         //need to create schema mapping and compute ordinal position
 
+        let flds = []
+        for (let i = 0; i < tableInfo.devExtra.length; i++) {
+            flds.push(tableInfo.devExtra[i])
+        }
+
+        for (let i = 0; i < tableInfo.devMeta.length; i++) {
+            let devM = tableInfo.devMeta[i]
+            let etlM = tableInfo.etlMeta[i]
+            let s = `${devM} as ${etlM}`
+            flds.push(s)
+        }
+
+        for (let i = 0; i < tableInfo.devFlds.length; i++) {
+            let devF = tableInfo.devFlds[i]
+            let etlF = tableInfo.etlFlds[i]
+            let s = `${devF} as ${etlF}`
+            flds.push(s)
+        }
+
+        let fldStr = flds.join(', ')
+        let timePartitionField = (tableInfo.abiType == 'function')? "call_block_time" : "evt_block_time"
+
+        let condFilter = ''
+        if (!isAggregate){
+            condFilter = `and Lower(contract_address) = "${contractAddress}"`
+        }
+        let subTbl = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
+        //building view
+        let sql =  ` ${subTbl}
+        select ${fldStr} from dev
+        `
+        sql = paraTool.removeNewLine(sql)
+        console.log(`sql\n`, sql)
+        let sqlView = ` bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
+        console.log(`sqlView\n`, sqlView)
     }
 
 

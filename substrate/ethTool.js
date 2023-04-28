@@ -1416,7 +1416,7 @@ function getMethodSignatureFlds(e) {
         }
         if (isIndexed) {
             indexedCnt++
-            flds.push(`index_topic_${indexedCnt} ${typeName}`)
+            flds.push(`${typeName}`)
         } else {
             flds.push(typeName)
         }

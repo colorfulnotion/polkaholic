@@ -47,6 +47,7 @@ async function main() {
             let project = opt.project ? opt.project : null;
             let contractName = opt.contractName ? opt.contractName : null;
             let evmetl = new EVMETL();
+            await evmetl.initEvmSchemaMap()
             await evmetl.generateProject(address, chainID, project, contractName);
             process.exit(0);
         });
