@@ -1390,6 +1390,40 @@ function getMethodSignature(e) {
     return [`${e.name}(${inputs.join(', ')})`, topicLen]
 }
 
+function getMethodSignatureFlds(e) {
+    var flds = []
+    var indexedCnt = 0 //topic0 is signatureID
+    for (const inp of e.inputs) {
+        let isIndexed = false
+        if (inp.indexed != undefined) {
+            isIndexed = inp.indexed
+        }
+        let typeName;
+        if (Array.isArray(inp.components)) {
+            let t = []
+            let tupleType = inp.type
+            for (const c of inp.components) {
+                let cName = `${c.name}`.trim()
+                t.push(cName)
+            }
+            let componentsType = `(${t.join(', ')})`
+            if (tupleType == 'tuple[]') {
+                componentsType += `[]`
+            }
+            typeName = `${inp.name}`
+        } else {
+            typeName = `${inp.name}`.trim()
+        }
+        if (isIndexed) {
+            indexedCnt++
+            flds.push(`index_topic_${indexedCnt} ${typeName}`)
+        } else {
+            flds.push(typeName)
+        }
+    }
+    return flds
+}
+
 // goal: generate uniqueID for func + indexed events
 function getMethodFingureprint(e) {
     var inputs = []
@@ -1478,6 +1512,7 @@ function parseAbiSignature(abiStrArr) {
             let signatureRaw = getMethodSignatureRaw(e)
             let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
             let fingerprint = getMethodFingureprint(e)
+            let flds = getMethodSignatureFlds(e)
             /*
             previous fingerprintID is now secondaryID, which is NOT unique
             New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
@@ -1496,7 +1531,8 @@ function parseAbiSignature(abiStrArr) {
                 name: firstCharUpperCase(e.name),
                 abi: abiStr,
                 abiType,
-                topicLength: topicLen
+                topicLength: topicLen,
+                flds: flds
             })
         });
     } catch (err) {}

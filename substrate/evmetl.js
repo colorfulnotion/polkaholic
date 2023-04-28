@@ -169,7 +169,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     */
 
     async generateProject(address, chainID = 1, project, contractName) {
-        await this.initEvmSchemaMap()
+        //await this.initEvmSchemaMap()
 
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
         //TODO: abirepo should be chain specific?
@@ -214,6 +214,11 @@ module.exports = class EVMETL extends PolkaholicDB {
         Calls: [] - list of func given the address, excluding pure/view only func
         key: contractName_Type_name
         key2: type_modifiedFingerPrintID
+
+        etl_ : external format
+        dev_ : internal format
+
+
         */
         let eventMap = {}
         let callMap = {}
@@ -229,6 +234,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devTabelId = devTabelId
                 e.modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(e.devTabelId)
                 e.devFlds = devFlds
+                e.etlFlds = devFlds
                 callMap[k] = e
             }else if (e.abiType == 'event'){
                 let k = `${projectContractName}_event_${e.name}`
@@ -239,6 +245,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devTabelId = devTabelId
                 e.modifiedFingerprintID = modifiedFingerprintID
                 e.devFlds = devFlds
+                e.etlFlds = devFlds
                 eventMap[k] = e
             }
         }
