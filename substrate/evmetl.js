@@ -433,13 +433,10 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
         let subTbl = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
         //building view
-        let sql =  ` ${subTbl}
-        select ${fldStr} from dev
-        `
+        let sql =  `${subTbl} select ${fldStr} from dev`
         sql = paraTool.removeNewLine(sql)
-        console.log(`sql\n`, sql)
         let sqlView = ` bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
-        console.log(`sqlView\n`, sqlView)
+        console.log(sqlView)
     }
 
 
