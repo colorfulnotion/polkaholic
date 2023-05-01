@@ -146,7 +146,11 @@ async function main() {
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
             let blockchainID = chain.chainID
-            let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
+            //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
+            let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
+            paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDArbitrum, paraTool.chainIDAvalanche]
+
             if (evmChainIDList.includes(blockchainID)) {
                 await crawler.index_block_evm(chainID, blockNumber);
             } else {

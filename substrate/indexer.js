@@ -9185,30 +9185,48 @@ module.exports = class Indexer extends AssetManager {
 
         // stream into call_ ,  evt_ table
         console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
+
+        let tableIds = Object.keys(auto_evm_rows_map)
+        let autoEvmRowPromise = []
+        let autoEvmRowPromiseTableId = []
         for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
             //console.log(`${evmDatasetID}:${tableId} row`, rows)
-            try {
-                if (rows && rows.length > 0) {
-                    await bigquery
-                        .dataset(evmDatasetID)
-                        .table(tableId)
-                        .insert(rows, {
-                            raw: true
-                        });
-                    console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
-                }
-            } catch (err) {
-                let errorStr = err.toString()
-                if (!errorStr.includes('Already Exists')) {
-                    console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
-                    await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
-                    this.logger.error({
-                        op: "auto_evm_row_insert",
-                        tableId: `${tableId}`,
-                        error: errorStr,
-                        rows: rows
-                    })
+            if (rows && rows.length > 0) {
+                autoEvmRowPromiseTableId.push(tableId)
+                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {raw: true}))
+            }
+        }
+        let autoEvmRowStates;
+        try {
+            autoEvmRowStates = await Promise.allSettled(autoEvmRowPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
+            this.log_manager_error(e, "batchCrawlerInit", "Promise.allSettled");
+        }
+        for (let i = 0; i < autoEvmRowStates.length; i += 1) {
+            let autoEvmRowState = autoEvmRowStates[i]
+            let tableId = autoEvmRowPromiseTableId[i]
+            let rows = auto_evm_rows_map[tableId]
+            if (autoEvmRowState.status != undefined && autoEvmRowState.status == "fulfilled") {
+                //console.log(`autoEvmRowState[${i}] fulfilled`, autoEvmRowState)
+                console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
+            } else {
+                let rejectedReason = JSON.parse(JSON.stringify(autoEvmRowState['reason']))
+                let errorStr = rejectedReason.message
+                if (errorStr){
+                    if (!errorStr.includes('Already Exists')) {
+                        console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
+                        await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
+                        this.logger.error({
+                            op: "auto_evm_row_insert",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            rows: rows
+                        })
+                    }
                 }
             }
         }

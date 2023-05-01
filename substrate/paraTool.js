@@ -1554,6 +1554,18 @@ module.exports = {
     chainIDPolkadot: 0,
     chainIDKusama: 2,
 
+    // other evm
+    chainIDEthereum: 1,
+    chainIDOptimism: 10,
+    chainIDBsc: 56,
+    chainIDPolygon: 137,
+    chainIDZksync: 324,
+    chainIDAstarEVM: 592,
+    chainIDMoonbeamEVM: 1284,
+    chainIDMoonriverEVM: 1285,
+    chainIDArbitrum: 42161,
+    chainIDAvalanche: 43114,
+
     // assetSource
     assetSourceCoingecko: 'coingecko',
     assetSourceOracle: 'oracle',
