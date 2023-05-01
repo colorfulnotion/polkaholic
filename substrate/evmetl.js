@@ -98,6 +98,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     evmSchemaMap = {}; //by tableId
     evmFingerprintMap = {}; //by fingerprintID
     evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
+    bqLocation = "us-central1";
 
     async getStorageAt(storageSlot, address, chainID = 1) {
         console.log("getStorageAt", storageSlot, address, chainID);
@@ -229,16 +230,19 @@ module.exports = class EVMETL extends PolkaholicDB {
         let callMap = {}
         for (const e of output){
             var fingerprintID = e.fingerprintID
+            let modifiedFingerprintID = ethTool.computeModifiedFingerprintID(fingerprintID)
             sigs[fingerprintID] = e;
             if (e.abiType == 'function' && e.stateMutability != 'view'){
                 let k = `${projectContractName}_call_${e.name}`
-                let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
-                let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
+                let devTabelId = ethTool.computeTableId(JSON.parse(e.abi), modifiedFingerprintID)
+                //let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                //let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
+                console.log(`devTabelId=${devTabelId}, modifiedFingerprintID=${modifiedFingerprintID}`)
                 let devFlds = this.getSchemaFlds(modifiedFingerprintID)
                 console.log(`${modifiedFingerprintID}, devFlds`, devFlds)
                 e.etlTableId = k
                 e.devTabelId = devTabelId
-                e.modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(e.devTabelId)
+                e.modifiedFingerprintID = modifiedFingerprintID
                 e.etlMeta = ["block_timestamp", "block_number", "transaction_hash", "trace_address", "to_address", "call_success"]
                 e.devMeta = ["call_block_time", "call_block_number", "call_tx_hash", "call_trace_address", "contract_address", "status"]
                 e.etlExtra = ["transaction_index", "error"]
@@ -255,8 +259,10 @@ module.exports = class EVMETL extends PolkaholicDB {
 
             }else if (e.abiType == 'event'){
                 let k = `${projectContractName}_event_${e.name}`
-                let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
-                let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
+                let devTabelId = ethTool.computeTableId(JSON.parse(e.abi), modifiedFingerprintID)
+                //let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
+                //let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(devTabelId)
+                console.log(`devTabelId=${devTabelId}, modifiedFingerprintID=${modifiedFingerprintID}`)
                 let devFlds = this.getSchemaFlds(modifiedFingerprintID)
                 console.log(`${modifiedFingerprintID}, devFlds`, devFlds)
                 e.etlTableId = k
@@ -277,7 +283,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 }
             }
         }
-        console.log(`sigs`, sigs)
+        //console.log(`sigs`, sigs)
         console.log(`eventMap`, eventMap)
         console.log(`callMap`, callMap)
         console.log(`event table`, Object.keys(eventMap))
@@ -313,7 +319,11 @@ module.exports = class EVMETL extends PolkaholicDB {
 
         for (const cmd of viewCmds){
             console.log(cmd);
-            //await exec(cmd);
+            try {
+                await exec(cmd);
+            } catch (e){
+                console.log(`${e.toString()}`)
+            }
         }
     }
 
@@ -443,8 +453,8 @@ module.exports = class EVMETL extends PolkaholicDB {
     async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap'){
         const bigquery = this.get_big_query();
         let bqProjectID = `substrate-etl`
-        //let bqDataset = `${this.evmDatasetID}`
-        let bqDataset = `evm_dev`
+        let bqDataset = `${this.evmDatasetID}`
+        //let bqDataset = `evm_dev`
         //need to create schema mapping and compute ordinal position
 
         let flds = []

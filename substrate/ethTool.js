@@ -2793,6 +2793,21 @@ function computeTableIDFromFingerprintIDAndName(fingerprintID = '0x783cca1c0412d
     return tableId
 }
 
+function computeModifiedFingerprintID(fingerprintID = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92') {
+    //evtLen = 79; callLen = 21
+    let modifiedFingerprintID = false
+    let typ = null
+    let pieces = fingerprintID.split('-')
+    if (fingerprintID.length == '79'){
+        typ = 'evt'
+        modifiedFingerprintID = `${pieces[0]}_${pieces[1]}`
+    }else if (fingerprintID.length == '21'){
+        typ = 'call'
+        modifiedFingerprintID = `${pieces[0]}`
+    }
+    return modifiedFingerprintID
+}
+
 
 async function detect_contract_labels(web3Api, contractAddress, bn) {
 
@@ -3010,5 +3025,6 @@ module.exports = {
     createEvmSchema: createEvmSchema,
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
     computeTableIDFromFingerprintIDAndName: computeTableIDFromFingerprintIDAndName,
+    computeModifiedFingerprintID: computeModifiedFingerprintID,
     getEVMFlds: getEVMFlds
 };
