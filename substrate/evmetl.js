@@ -170,6 +170,12 @@ module.exports = class EVMETL extends PolkaholicDB {
     */
 
     async generateProject(address, chainID = 1, project, contractName) {
+
+        let chain = await this.getChain(chainID);
+        //console.log(`chain`, chain)
+        let evm_chain_name = (chain && chain.id && chain.isEVM)? chain.id : false
+        console.log(`evm_chain_name`, evm_chain_name)
+
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
         //TODO: abirepo should be chain specific?
         /*
@@ -177,7 +183,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         For example: we want to use 0xc36442b4a4522e871399cd717abdd847ab11fe88 -> to aggregate ALL uniswapV3 swap events. In this case we set the customContractName = 'UniswapV3Pool'
 
         */
-        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, customContractName, contractName, projectName, proxyAddress, isAggregate, isAggregate, aggregateAddress from abirepo where address = '${address}' limit 1`
+        let sql = `select address, chainID, CONVERT(abiRaw USING utf8) abiRaw, CONVERT(proxyAbiRaw USING utf8) proxyAbiRaw, status, etherscanContractName, customContractName, contractName, projectName, proxyAddress, isAggregate, isAggregate, aggregateAddress from abirepo where address = '${address}' and chainID ='${chainID}' limit 1`
         console.log(`generateProject sql`, sql)
         let sqlRecs = await this.poolREADONLY.query(sql);
         let projectInfo = false
@@ -279,7 +285,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const eventKey of Object.keys(eventMap)){
             let eventTableInfo = eventMap[eventKey]
             if (projectInfo.projectName){
-                let datasetID = projectInfo.projectName
+                let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
                 let isAggregate = (projectInfo.isAggregate)? true : false
                 let targetContractAddress = (!isAggregate)? projectInfo.address: null
                 this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
@@ -432,7 +438,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             // we have not initiated the tableId yet..
             tableInfo.devFlds = tableInfo.etlFlds
         }
-        
+
         for (let i = 0; i < tableInfo.devFlds.length; i++) {
             let devF = tableInfo.devFlds[i]
             let etlF = tableInfo.etlFlds[i]
@@ -451,7 +457,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         //building view
         let sql =  `${subTbl} select ${fldStr} from dev`
         sql = paraTool.removeNewLine(sql)
-        let sqlView = ` bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
+        let sqlView = ` bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
         console.log(sqlView)
     }
 
@@ -565,6 +571,10 @@ module.exports = class EVMETL extends PolkaholicDB {
             vals.push('foundDT');
             flds.push(`Now()`);
             replace.push("foundDT");
+
+            vals.push('chainID');
+            flds.push(`'${chainID}'`);
+            replace.push("chainID");
 
             vals.push('abiRaw');
             flds.push(`${mysql.escape(abiRaw)}`);
