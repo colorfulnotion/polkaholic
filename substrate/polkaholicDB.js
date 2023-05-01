@@ -817,8 +817,12 @@ from chain where chainID = '${chainID}' limit 1`);
             chain.WSEndpoint = chain.WSBackfill
             console.log("API using backfill endpoint", chain.WSEndpoint);
         }
-        if (!this.api) {
-            this.api = await this.get_api(chain);
+        let isSubstrate = chain.chainID != chain.evmChainID
+        if (isSubstrate){
+            //for substrate, initiat with polkadotjs
+            if (!this.api) {
+                this.api = await this.get_api(chain);
+            }
         }
         if (!this.web3Api) {
             this.web3Api = await this.getWeb3Api(chain, backfill);
