@@ -240,7 +240,13 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devFlds = devFlds
                 e.etlFlds = e.flds
                 delete e.flds
-                callMap[k] = e
+                if (callMap[k] == undefined){
+                    callMap[k] = e
+                }else{
+                    console.log(`WARNING k not unique! modifiedFingerprintID`, modifiedFingerprintID)
+                    callMap[k] = e
+                }
+
             }else if (e.abiType == 'event'){
                 let k = `${projectContractName}_event_${e.name}`
                 let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
@@ -257,7 +263,12 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devFlds = devFlds
                 e.etlFlds = e.flds
                 delete e.flds
-                eventMap[k] = e
+                if (eventMap[k] == undefined){
+                    eventMap[k] = e
+                }else{
+                    console.log(`WARNING k not unique! modifiedFingerprintID`, modifiedFingerprintID)
+                    eventMap[k] = e
+                }
             }
         }
         console.log(`sigs`, sigs)
@@ -417,6 +428,11 @@ module.exports = class EVMETL extends PolkaholicDB {
             flds.push(s)
         }
 
+        if (!tableInfo.devFlds){
+            // we have not initiated the tableId yet..
+            tableInfo.devFlds = tableInfo.etlFlds
+        }
+        
         for (let i = 0; i < tableInfo.devFlds.length; i++) {
             let devF = tableInfo.devFlds[i]
             let etlF = tableInfo.etlFlds[i]
@@ -442,7 +458,6 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     async crawlABI(address, chainID = 1, project = null, contractName = null) {
         let chain = await this.getChain(chainID);
-
         /*
         console.log(`crawlABI cmd\n`, cmd)
         let cmd = `curl -k -s -X GET '${chain.etherscanAPIURL}/api?module=contract&action=getabi&address=${address}&apikey=${this.EXTERNAL_APIKEYS[chain.id]}'`;
@@ -464,6 +479,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             maxBuffer: 1024 * 64000
         });
         var k = JSON.parse(res1.stdout);
+        console.log(`[${address}] cmd1\n`, cmd1);
         console.log(`[${address}] getsourcecode`, k);
         /*
         {
