@@ -465,6 +465,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 
             //create dev table on miss
             let tableId = tableInfo.devTabelId
+            let evmDatasetID = this.evmDatasetID
             let schema = ethTool.createEvmSchema(JSON.parse(tableInfo.abi), tableInfo.modifiedFingerprintID, tableId)
             let sch = schema.schema
             let timePartitioning = schema.timePartitioning
@@ -475,7 +476,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 console.log(`\n\nNew Schema for ${tableId}`)
                 try {
                     const [table] = await bigquery
-                        .dataset(datasetID)
+                        .dataset(evmDatasetID)
                         .createTable(tableId, {
                             schema: sch,
                             location: 'us-central1',
@@ -484,7 +485,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 } catch (err) {
                     let errorStr = err.toString()
                     if (!errorStr.includes('Already Exists')) {
-                        console.log(`${datasetID}:${tableId} Error`, errorStr)
+                        console.log(`${evmDatasetID}:${tableId} Error`, errorStr)
                         this.logger.error({
                             op: "createProjectContractView:auto_evm_schema_create",
                             tableId: `${tableId}`,
