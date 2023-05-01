@@ -2229,7 +2229,10 @@ module.exports = class Crawler extends Indexer {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
         }
-        if (chainID == 1 || chainID == 10 || chainID == 56 || chainID == 137 || chainID == 42161 || chainID == 43114) {
+        let evmChainList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
+            paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDArbitrum, paraTool.chainIDAvalanche]
+        if (evmChainList.includes(chainID)) {
             this.crawlEVM(chainID);
             return [null, null, null];
         } else {
