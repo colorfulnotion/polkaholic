@@ -282,6 +282,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`callMap`, callMap)
         console.log(`event table`, Object.keys(eventMap))
         console.log(`call tabel`, Object.keys(callMap))
+
         for (const eventKey of Object.keys(eventMap)){
             let eventTableInfo = eventMap[eventKey]
             if (projectInfo.projectName){
@@ -289,6 +290,16 @@ module.exports = class EVMETL extends PolkaholicDB {
                 let isAggregate = (projectInfo.isAggregate)? true : false
                 let targetContractAddress = (!isAggregate)? projectInfo.address: null
                 this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+            }
+        }
+
+        for (const callKey of Object.keys(callMap)){
+            let callTableInfo = callMap[callKey]
+            if (projectInfo.projectName){
+                let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
+                let isAggregate = (projectInfo.isAggregate)? true : false
+                let targetContractAddress = (!isAggregate)? projectInfo.address: null
+                this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
             }
         }
     }
