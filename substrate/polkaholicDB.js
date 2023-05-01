@@ -126,7 +126,7 @@ module.exports = class PolkaholicDB {
 
             if (dbconfig.bq != undefined) {
                 if (dbconfig.bq.substrateetlKey) {
-                    this.BQ_SUBSTRATEETL_KEY = "/root/.bq_keys/s3.json" // dbconfig.bq.substrateetlKey;
+                    this.BQ_SUBSTRATEETL_KEY = dbconfig.bq.substrateetlKey;
                 }
             }
 
