@@ -283,24 +283,37 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`event table`, Object.keys(eventMap))
         console.log(`call tabel`, Object.keys(callMap))
 
+        let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
+
+        //TODO: create datasetID when missing
+        await this.create_dataset(datasetID)
+        let isAggregate = (projectInfo.isAggregate)? true : false
+        let targetContractAddress = (!isAggregate)? projectInfo.address: null
+
+        let viewCmds = []
         for (const eventKey of Object.keys(eventMap)){
             let eventTableInfo = eventMap[eventKey]
             if (projectInfo.projectName){
-                let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
-                let isAggregate = (projectInfo.isAggregate)? true : false
-                let targetContractAddress = (!isAggregate)? projectInfo.address: null
-                this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+                let viewCmd = await this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+                if (viewCmd){
+                    viewCmds.push(viewCmd)
+                }
             }
         }
 
         for (const callKey of Object.keys(callMap)){
             let callTableInfo = callMap[callKey]
             if (projectInfo.projectName){
-                let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
-                let isAggregate = (projectInfo.isAggregate)? true : false
-                let targetContractAddress = (!isAggregate)? projectInfo.address: null
-                this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
+                let viewCmd = await this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
+                if (viewCmd){
+                    viewCmds.push(viewCmd)
+                }
             }
+        }
+
+        for (const cmd of viewCmds){
+            console.log(cmd);
+            //await exec(cmd);
         }
     }
 
@@ -427,7 +440,8 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
     */
 
-    createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap'){
+    async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap'){
+        const bigquery = this.get_big_query();
         let bqProjectID = `substrate-etl`
         //let bqDataset = `${this.evmDatasetID}`
         let bqDataset = `evm_dev`
@@ -446,8 +460,43 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
 
         if (!tableInfo.devFlds){
-            // we have not initiated the tableId yet..
+            // we have not initiated the tableId yet use etl as schema definition
             tableInfo.devFlds = tableInfo.etlFlds
+
+            //create dev table on miss
+            let tableId = tableInfo.devTabelId
+            let schema = ethTool.createEvmSchema(JSON.parse(tableInfo.abi), tableInfo.modifiedFingerprintID, tableId)
+            let sch = schema.schema
+            let timePartitioning = schema.timePartitioning
+            console.log(`[${tableInfo.devTabelId}] sch`, sch)
+            //tables[tableId] = sch;
+            let isCeateTable = true
+            if (isCeateTable) {
+                console.log(`\n\nNew Schema for ${tableId}`)
+                try {
+                    const [table] = await bigquery
+                        .dataset(datasetID)
+                        .createTable(tableId, {
+                            schema: sch,
+                            location: 'us-central1',
+                            timePartitioning: timePartitioning,
+                        });
+                } catch (err) {
+                    let errorStr = err.toString()
+                    if (!errorStr.includes('Already Exists')) {
+                        console.log(`${datasetID}:${tableId} Error`, errorStr)
+                        this.logger.error({
+                            op: "createProjectContractView:auto_evm_schema_create",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            schema: sch
+                        })
+                    }
+                }
+            } else {
+                console.log(`*****\nNew Schema ${tableId}\n`, sch, `\n`)
+            }
+
         }
 
         for (let i = 0; i < tableInfo.devFlds.length; i++) {
@@ -468,8 +517,9 @@ module.exports = class EVMETL extends PolkaholicDB {
         //building view
         let sql =  `${subTbl} select ${fldStr} from dev`
         sql = paraTool.removeNewLine(sql)
-        let sqlView = ` bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
-        console.log(sqlView)
+        let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
+        console.log(sqlViewCmd)
+        return sqlViewCmd
     }
 
 
@@ -1054,6 +1104,26 @@ mysql> desc projectcontractabi;
         }
     }
 
+    async create_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`){
+        //check if exist
+        let cmd = `bq ls --project_id=${projectID} --dataset_id=${detasetID}`
+        let cmd2 = `bq --location=us-central1 mk --dataset ${projectID}:${detasetID}`
+        try {
+            console.log(cmd);
+            await exec(cmd);
+            console.log(`dataset=${projectID}:${detasetID} Exist`)
+        } catch (e) {
+            // TODO optimization: do not create twice
+            try {
+                console.log(`Create dataset=${projectID}:${detasetID}`)
+                console.log(cmd2)
+                await exec(cmd2);
+            } catch (e2){
+                console.log(`e2`, e2.toString())
+            }
+        }
+    }
+
     async delete_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         //Dengerous!
         let cmd = `bq rm -r -d ${projectID}:${detasetID}`
@@ -1116,7 +1186,7 @@ mysql> desc projectcontractabi;
 
     async getAlltables(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         let fullTableIDs = []
-        let bqCmd = `bq ls --max_results 1000000 --project_id=${projectID} --dataset_id="${detasetID}" --format=json | jq -r '.[].tableReference.tableId' > schema/substrateetl/evm/callevenets.txt`
+        let bqCmd = `bq ls --max_results 1000000  v --dataset_id="${detasetID}" --format=json | jq -r '.[].tableReference.tableId' > schema/substrateetl/evm/callevenets.txt`
         let res = await exec(bqCmd)
         try {
             if (res.stdout && res.stderr == '') {
