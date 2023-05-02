@@ -2099,8 +2099,8 @@ module.exports = class Crawler extends Indexer {
 
     crawl_evm_core(web3, chainID) {
         let lastHeaderReceived = this.getCurrentTS();
-        let evmRPCBlockReceipts = this.evmRPCBlockReceipts
-
+        let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
+        let evmRPCInternalApi = this.evmRPCInternal
         web3.eth.subscribe('newBlockHeaders', async (error, result) => {
             if (!error) {
                 lastHeaderReceived = this.getCurrentTS();
@@ -2138,8 +2138,8 @@ module.exports = class Crawler extends Indexer {
                         let log_retry_ms = 500
                         let evmReceipts = false
 
-                        let evmReceiptsFunc = (evmRPCBlockReceipts) ? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number) : ethTool.crawlEvmReceipts(web3, block, isParallel)
-                        let evmReceiptsCtx = (evmRPCBlockReceipts) ? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})` : `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        let evmReceiptsFunc = (evmRPCBlockReceiptsApi) ? this.crawlEvmBlockReceipts(evmRPCBlockReceiptsApi, block.number) : ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = (evmRPCBlockReceiptsApi) ? `this.crawlEvmBlockReceipts(evmRPCBlockReceiptsApi, ${block.number})` : `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
                         evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
                         if (!evmReceipts) evmReceipts = [];
                         console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
@@ -2150,8 +2150,13 @@ module.exports = class Crawler extends Indexer {
                         ])
                         let [dTxns, dReceipts] = await statusesPromise
                         let evmTrace = false
+                        if (evmRPCInternalApi){
+                            let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
+                            let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
+                            evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
+                            console.log(`[${block.number}] evmTrace`, evmTrace)
+                        }
                         await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, this.contractABIs, this.contractABISignatures)
-
                     }
                 } catch (err) {
                     console.log(`crawlEvmReceipts err`, err)
