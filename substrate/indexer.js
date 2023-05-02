@@ -9246,12 +9246,18 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async retryWithDelay(operation, maxRetries = 10, delay = 500, ctx = "") {
+    async retryWithDelay(operation, maxRetries = 10, delay = 500, ctx = "", expectedNum = 0) {
         for (let i = 0; i < maxRetries; i++) {
             const result = await operation();
-            if (result !== false) {
-                console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
-                return result;
+            if (result) {
+                if (ctx.includes("crawlEvmBlockReceipts")){
+                    console.log(`retryWithDelay`, result)
+                    console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
+                    return result;
+                }else{
+                    console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
+                    return result;
+                }
             }
             if (i < maxRetries - 1) {
                 await new Promise((resolve) => setTimeout(resolve, delay));
@@ -9283,8 +9289,13 @@ module.exports = class Indexer extends AssetManager {
                 console.log(blockNumber, receiptData.result.length, cmd);
                 return (receiptData.result);
             }
+            if (receiptData.error){
+                console.log(`crawlEvmBlockReceipts cmd`, cmd)
+                console.log(`crawlEvmBlockReceipts error`, receiptData.error)
+                return false
+            }
             //console.log(`crawlEvmBlockReceipts`, cmd)
-            return (null);
+            return false;
         } catch (error) {
             this.logger.warn({
                 "op": "crawlEvmBlockReceipts",
@@ -9373,7 +9384,7 @@ module.exports = class Indexer extends AssetManager {
                 let evmReceiptsFunc = (evmRPCBlockReceipts) ? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number) : ethTool.crawlEvmReceipts(web3, block, isParallel)
                 let evmReceiptsCtx = (evmRPCBlockReceipts) ? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})` : `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
 
-                evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx, numTransactions)
                 if (!evmReceipts) evmReceipts = [];
                 console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
 
