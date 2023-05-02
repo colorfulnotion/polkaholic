@@ -1664,7 +1664,6 @@ function decodeReceipt(r, contractABIs, contractABISignatures) {
     // shallow copy throws error here... not sure why?
     //let res = JSON.parse(JSON.stringify(r))
     var res = Object.assign({}, r);
-    console.log(`decodeReceipt r`, r)
     if (!res) return;
     let decodedLogs = []
     if (res.logs) {

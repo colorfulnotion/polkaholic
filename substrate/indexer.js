@@ -8512,6 +8512,8 @@ module.exports = class Indexer extends AssetManager {
 
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
+        let callExtraCol = ["chain_id", "evm_chain_id", "contract_address", "call_success", "call_tx_hash", "call_tx_index", "call_trace_address", "call_block_time", "call_block_number"]
+        let eventExtraCol = ["chain_id", "evm_chain_id", "contract_address", "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"]
         for (const t of tablesRecs) {
             let tblType = t.tbl_type
             let tableId = t.table_name
@@ -8538,9 +8540,11 @@ module.exports = class Indexer extends AssetManager {
                     evmFingerprintMap[fingerprintID].projectcontractabi[address].status = "Created";
                 }
             }
-            if (tblType == 'call' && ordinalIdx >= 8) {
+            if (tblType == 'call' && ordinalIdx >= callExtraCol.length) {
+                // call input ordinals starts at callExtraColLen
                 evmFingerprintMap[fingerprintID].flds.push(colName)
-            } else if (tblType == 'evt' && ordinalIdx >= 7) {
+            } else if (tblType == 'evt' && ordinalIdx >= eventExtraCol.length) {
+                // evt input ordinals starts at eventExtraCol
                 evmFingerprintMap[fingerprintID].flds.push(colName)
             }
             evmSchemaMap[tableId][colName] = t.data_type;
@@ -8681,7 +8685,6 @@ module.exports = class Indexer extends AssetManager {
     generateCallBqRec(tableId, projectTableInfo, fingerprintID, evmTx, acctAddr) {
         try {
             let decodedParams = evmTx.params ? JSON.parse(evmTx.params) : [];
-            console.log(`generateCallBqRec txstatus`, evmTx)
             let rec = {
                 chain_id: evmTx.id, //string
                 evm_chain_id: evmTx.chain_id, //integer
@@ -8691,7 +8694,6 @@ module.exports = class Indexer extends AssetManager {
                 call_tx_index: evmTx.transaction_index,
                 call_block_time: evmTx.block_timestamp,
                 call_block_number: evmTx.block_number,
-                error: null, //TODO:
             }
 
             // used for labels
@@ -8711,7 +8713,6 @@ module.exports = class Indexer extends AssetManager {
             }
 
             let flds = this.getSchemaFlds(fingerprintID)
-
             if (flds.length != decodedParams.length) {
                 this.logger.error({
                     op: "generateCallBqRec",

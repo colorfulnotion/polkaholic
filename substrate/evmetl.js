@@ -372,6 +372,8 @@ module.exports = class EVMETL extends PolkaholicDB {
 
         let evmDataset = this.evmDatasetID
         let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
+        let callExtraCol = ["chain_id", "evm_chain_id", "contract_address", "call_success", "call_tx_hash", "call_tx_index", "call_trace_address", "call_block_time", "call_block_number"]
+        let eventExtraCol = ["chain_id", "evm_chain_id", "contract_address", "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"]
 
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
@@ -401,9 +403,9 @@ module.exports = class EVMETL extends PolkaholicDB {
                     evmFingerprintMap[fingerprintID].projectcontractabi[address].status = "Created";
                 }
             }
-            if (tblType == 'call' && ordinalIdx >= 8) {
+            if (tblType == 'call' && ordinalIdx >= callExtraCol.length) {
                 evmFingerprintMap[fingerprintID].flds.push(colName)
-            } else if (tblType == 'evt' && ordinalIdx >= 7) {
+            } else if (tblType == 'evt' && ordinalIdx >= eventExtraCol.length) {
                 evmFingerprintMap[fingerprintID].flds.push(colName)
             }
             evmSchemaMap[tableId][colName] = t.data_type;
