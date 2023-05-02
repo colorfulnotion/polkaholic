@@ -8681,14 +8681,17 @@ module.exports = class Indexer extends AssetManager {
     generateCallBqRec(tableId, projectTableInfo, fingerprintID, evmTx, acctAddr) {
         try {
             let decodedParams = evmTx.params ? JSON.parse(evmTx.params) : [];
+            console.log(`generateCallBqRec txstatus`, evmTx)
             let rec = {
                 chain_id: evmTx.id, //string
                 evm_chain_id: evmTx.chain_id, //integer
                 contract_address: evmTx.to_address,
-                call_success: true, //TODO
+                call_success: (evmTx.receipt_status == 1)? true: false, //TODO
                 call_tx_hash: evmTx.hash,
+                call_tx_index: evmTx.transaction_index,
                 call_block_time: evmTx.block_timestamp,
                 call_block_number: evmTx.block_number,
+                error: null, //TODO:
             }
 
             // used for labels

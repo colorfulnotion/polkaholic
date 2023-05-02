@@ -1664,6 +1664,7 @@ function decodeReceipt(r, contractABIs, contractABISignatures) {
     // shallow copy throws error here... not sure why?
     //let res = JSON.parse(JSON.stringify(r))
     var res = Object.assign({}, r);
+    console.log(`decodeReceipt r`, r)
     if (!res) return;
     let decodedLogs = []
     if (res.logs) {
@@ -2674,6 +2675,11 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
                 sch.push({
                     "name": "call_tx_hash",
                     "type": "string",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
+                    "name": "call_tx_index",
+                    "type": "integer",
                     "mode": "REQUIRED"
                 });
                 sch.push({
