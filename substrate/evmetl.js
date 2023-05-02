@@ -243,8 +243,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.etlTableId = k
                 e.devTabelId = devTabelId
                 e.modifiedFingerprintID = modifiedFingerprintID
-                e.etlMeta = ["block_timestamp", "block_number", "transaction_hash", "trace_address", "to_address", "call_success"]
-                e.devMeta = ["call_block_time", "call_block_number", "call_tx_hash", "call_trace_address", "contract_address", "status"]
+                e.etlMeta = ["block_timestamp", "block_number", "transaction_hash", "trace_address", "to_address", "status"]
+                e.devMeta = ["call_block_time", "call_block_number", "call_tx_hash", "call_trace_address", "contract_address", "call_success"]
                 e.etlExtra = ["transaction_index", "error"]
                 e.devExtra = ["chain_id", "evm_chain_id"]
                 e.devFlds = devFlds
@@ -320,7 +320,10 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const cmd of viewCmds){
             console.log(cmd);
             try {
-                await exec(cmd);
+                let res = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`res`, res)
             } catch (e){
                 console.log(`${e.toString()}`)
             }
