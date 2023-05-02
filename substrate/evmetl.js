@@ -98,7 +98,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     evmSchemaMap = {}; //by tableId
     evmFingerprintMap = {}; //by fingerprintID
     evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
-    bqLocation = "us-central1";
+    evmBQLocation = "us";
 
     async getStorageAt(storageSlot, address, chainID = 1) {
         console.log("getStorageAt", storageSlot, address, chainID);
@@ -371,7 +371,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
 
         let evmDataset = this.evmDatasetID
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
+        let query = `SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`
+        let tablesRecs = await this.execute_bqJob(query, paraTool.BQUSMulti);
         let callExtraCol = ["chain_id", "evm_chain_id", "contract_address", "call_success", "call_tx_hash", "call_tx_index", "call_trace_address", "call_block_time", "call_block_number"]
         let eventExtraCol = ["chain_id", "evm_chain_id", "contract_address", "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"]
 
@@ -494,7 +495,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                         .dataset(evmDatasetID)
                         .createTable(tableId, {
                             schema: sch,
-                            location: 'us-central1',
+                            location: this.evmBQLocation,
                             timePartitioning: timePartitioning,
                         });
                 } catch (err) {
@@ -824,8 +825,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
         let hits = {};
         if (abiType == "function") {
-            let sql = `SELECT * FROM \`substrate-etl.evm.transactions\` as transactions where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`
-            let recs = await this.execute_bqJob(sql);
+            let query = `SELECT * FROM \`substrate-etl.evm.transactions\` as transactions where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             for (const r of recs) {
                 if (r.to_address) {
                     let a = r.to_address.toLowerCase();
@@ -840,8 +841,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                 }
             }
         } else if (abiType == "event") {
-            let sql = `SELECT * FROM \`substrate-etl.evm.logs\` as logs  where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`;
-            let recs = await this.execute_bqJob(sql);
+            let query = `SELECT * FROM \`substrate-etl.evm.logs\` as logs  where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`;
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
             console.log(recs.length, abiType);
             for (const r of recs) {
                 if (r.address) {
@@ -1111,7 +1112,7 @@ mysql> desc projectcontractabi;
     }
 
     async setup_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
-        let cmd = `bq --location=us-central1 mk --dataset --description="DESCRIPTION" ${projectID}:${detasetID}`
+        let cmd = `bq --location=${this.evmBQLocation} mk --dataset --description="DESCRIPTION" ${projectID}:${detasetID}`
         try {
             console.log(cmd);
             //await exec(cmd);
@@ -1123,7 +1124,7 @@ mysql> desc projectcontractabi;
     async create_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`){
         //check if exist
         let cmd = `bq ls --project_id=${projectID} --dataset_id=${detasetID}`
-        let cmd2 = `bq --location=us-central1 mk --dataset ${projectID}:${detasetID}`
+        let cmd2 = `bq --location=${this.evmBQLocation} mk --dataset ${projectID}:${detasetID}`
         try {
             console.log(cmd);
             await exec(cmd);
@@ -1179,9 +1180,9 @@ mysql> desc projectcontractabi;
     async learnMethod(chainID = 1, address = "") {
         // sample recent evm transactions + logs
         if (true) {
-            let sql = `SELECT signature, count(*) numTransactions FROM \`substrate-etl.evm.transactions\` as transactions where transactions.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)   group by signature order by numTransactions desc;`
+            let query = `SELECT signature, count(*) numTransactions FROM \`substrate-etl.evm.transactions\` as transactions where transactions.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)   group by signature order by numTransactions desc;`
             console.log(sql);
-            let recs = await this.execute_bqJob(sql);
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
             for (const r of recs) {
                 let sql0 = `update contractabi set numTransactions = '${r.numTransactions}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1189,8 +1190,8 @@ mysql> desc projectcontractabi;
                 await this.update_batchedSQL()
             }
             return (true);
-            sql = `SELECT signature, count(*) numLogs FROM \`substrate-etl.evm.logs\` as logs  where logs.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)  group by signature order by count(*) desc;`;
-            recs = await this.execute_bqJob(sql);
+            query = `SELECT signature, count(*) numLogs FROM \`substrate-etl.evm.logs\` as logs  where logs.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)  group by signature order by count(*) desc;`;
+            recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
             for (const r of recs) {
                 let sql0 = `update contractabi set numLogs = '${r.numLogs}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1310,9 +1311,10 @@ mysql> desc projectcontractabi;
     }
 
     async crawlABIs(chainID = null, renew = false) {
+        //evm table is still in us-centra1
         let w = chainID ? ` and chainID = ${chainID}` : ""
-        let sql = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 2 and length(method_id) >= 10 group by to_address order by numTransactions7d desc limit 100000`;
-        let recs = renew ? await this.execute_bqJob(sql) : [];
+        let query = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 2 and length(method_id) >= 10 group by to_address order by numTransactions7d desc limit 100000`;
+        let recs = renew ? await this.execute_bqJob(query, paraTool.BQUSCentral1) : [];
         let out = [];
         let vals = ["chainID", "numTransactions7d", "status", "createDT"];
         let replace = ["numTransactions7d", "chainID"];
@@ -1330,8 +1332,8 @@ mysql> desc projectcontractabi;
             "data": out,
             "replace": replace
         });
-        sql = `select address, chainID from abirepo where status = 'Unknown' and ( lastAttemptDT is null or lastAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and projectName is not null ${w} order by numTransactions7d desc, chainID asc limit 1000`;
-        var res = await this.poolREADONLY.query(sql);
+        query = `select address, chainID from abirepo where status = 'Unknown' and ( lastAttemptDT is null or lastAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and projectName is not null ${w} order by numTransactions7d desc, chainID asc limit 1000`;
+        var res = await this.poolREADONLY.query(query);
         for (const r of res) {
             console.log(r.address, r.chainID)
             await this.crawlABI(r.address, r.chainID);
@@ -1357,8 +1359,8 @@ mysql> desc projectcontractabi;
         }
         console.log(`loaded evm`, loadedTableIDs)
         */
-
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`);
+        let schemaQuery = `SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`
+        let tablesRecs = await this.execute_bqJob(schemaQuery, paraTool.BQUSMulti);
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
                 tables[t.table_name] = {};
@@ -1392,7 +1394,7 @@ mysql> desc projectcontractabi;
                         .dataset(datasetId)
                         .createTable(tableId, {
                             schema: sch,
-                            location: 'us-central1',
+                            location: this.evmBQLocation,
                             timePartitioning: timePartitioning,
                         });
                 } catch (err) {
@@ -1469,7 +1471,7 @@ mysql> desc projectcontractabi;
         // Now, for the last 7 days with contractaddress-methodID combinations, find the contractAddresses using those methodIDs, computing log likelihood across all contract types
         let sql = `select to_address, ${methods.join(",")} from \`substrate-etl.evm.transactions\` group by to_address  order by count(*) desc limit 100000`
         console.log("CATEGORIZER", sql);
-        let recs = await this.execute_bqJob(sql);
+        let recs = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
         for (const d of recs) {
             if (d.to_address) {
                 let address = d.to_address.toLowerCase();
@@ -1505,12 +1507,14 @@ mysql> desc projectcontractabi;
         if (datasetId) {
             let query = `SELECT table_name, column_name, ordinal_position, data_type, is_nullable, is_partitioning_column FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.COLUMNS;`
             console.log("READING0", query);
+            /*
             const options = {
                 query: query,
                 location: 'US'
             };
+            */
             const bigquery = this.get_big_query();
-            let recs = await this.execute_bqJob(query, options);
+            let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
             for (const r of recs) {
                 let sa = r.table_name.split("_");
                 let contractName = "";
@@ -1582,13 +1586,15 @@ mysql> desc projectcontractabi;
         if (datasetId) {
             let query = `SELECT routine_name, data_type, routine_definition, ddl FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.ROUTINES;`
             console.log("READING1", query);
+            /*
             const options = {
                 query: query,
                 location: 'US'
             };
+            */
             const bigquery = this.get_big_query();
             try {
-                let recs = await this.execute_bqJob(query, options);
+                let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
                 for (const r of recs) {
                     let sa = r.routine_name.split("_");
                     let contractName = "";
@@ -1662,7 +1668,7 @@ mysql> desc projectcontractabi;
         const options = {
             query: query,
             // Location must match that of the dataset(s) referenced in the query.
-            location: 'us-central1',
+            location: this.evmBQLocation,
             dryRun: true,
         };
         const bigquery = this.get_big_query();

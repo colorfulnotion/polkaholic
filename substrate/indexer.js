@@ -100,6 +100,7 @@ module.exports = class Indexer extends AssetManager {
     numXCMMessagesOut = {};
 
     evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
+    evmBQLocation = 'us';
 
     xcmMeta = []; //this should be removed after every block
 
@@ -8508,7 +8509,8 @@ module.exports = class Indexer extends AssetManager {
         }
 
         let evmDataset = this.evmDatasetID
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
+        let schemaQuery = `SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`
+        let tablesRecs = await this.execute_bqJob(schemaQuery, paraTool.BQUSMulti);
 
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
@@ -9169,7 +9171,7 @@ module.exports = class Indexer extends AssetManager {
                     .dataset(evmDatasetID)
                     .createTable(schemaTableId, {
                         schema: sch,
-                        location: 'us-central1',
+                        location: this.evmBQLocation,
                         timePartitioning: timePartitioning,
                     });
             } catch (err) {
