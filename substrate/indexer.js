@@ -9274,7 +9274,7 @@ module.exports = class Indexer extends AssetManager {
                     stdout,
                     stderr
                 } = await exec(cmd, {
-                    maxBuffer: 1024 * 64000
+                    maxBuffer: 1024 * 640000
                 });
                 let receiptData = JSON.parse(stdout);
                 if (receiptData.result) {
