@@ -355,12 +355,14 @@ module.exports = class XCMCleaner extends Query {
         }
         return null;
     }
-    async execute_bqJob(sqlQuery, fn = false) {
+
+    // different than polkaholicDB.execute_bqJob
+    async execute_bqJobFn(sqlQuery, fn = false) {
         // run bigquery job with suitable credentials
         const bigqueryClient = this.get_big_query();
         const options = {
             query: sqlQuery,
-            location: 'us-central1',
+            location: paraTool.BQUSCentral1,
         };
 
         try {
@@ -392,7 +394,7 @@ module.exports = class XCMCleaner extends Query {
         let sqlQuery = `SELECT event_id, extrinsic_id, block_number, section, method, UNIX_SECONDS(block_time) as ts, data FROM \`substrate-etl.${relayChain}.events${paraID}\` WHERE ( DATE(block_time) = \"${logDT}\" ${q} ) and block_time >= TIMESTAMP_SECONDS(${sourceTS}) and block_time < TIMESTAMP_SECONDS(${sourceTS+180}) and section in ("tokens", "balances", "currencies", "assets", "eqBalances")`;
         console.log("substrate-etl search....", sqlQuery);
         // run query, get events matching destAddress
-        let rows = this.cachedRows ? this.cachedRows : await this.execute_bqJob(sqlQuery);
+        let rows = this.cachedRows ? this.cachedRows : await this.execute_bqJobFn(sqlQuery);
         this.cachedRows = rows;
         console.log("***** searchSubstrateETLEvents", perfect_match, rows);
         let amounts = {};

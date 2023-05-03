@@ -830,7 +830,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     async update_coingecko_token_price_usd(chainID = 1, renew = false) {
         if (renew) {
             let sql = `SELECT  address,  COUNT(*) numLogs FROM  \`substrate-etl.evm.logs\` WHERE block_timestamp >= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 day) AND chain_id = 1 and signature in ('Transfer(index_topic_1 address from, index_topic_2 address to, uint256 value)', 'Transfer(index_topic_1 address from, index_topic_2 address to, index_topic_3 uint256 tokenId)', 'Approval(index_topic_1 address owner, index_topic_2 address spender, uint256 value)') group by address ORDER BY  numLogs desc  LIMIT 20000`
-            let recs = await this.execute_bqJob(sql);
+            let recs = await this.execute_bqJob(sql, paraTool.BQUSMulti);
             let cnt = 0;
             for (const r of recs) {
                 let address = r.address;
@@ -1216,7 +1216,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 await this.get_xcasset_priceUSD(r.symbol, r.relayChain, r.indexTS - 86400) :
                 await this.get_asset_priceUSD(r.asset, r.chainID, r.indexTS - 86400);
             let priceUSDPercentChange = (priceUSD24hr > 0) ? 100 * (r.priceUSD - priceUSD24hr) / priceUSD24hr : 0
-            // ok now store the best price, the verification path, and the % change along with the liquidity 
+            // ok now store the best price, the verification path, and the % change along with the liquidity
             let sql = (isXCAsset) ?
                 `update xcmasset set priceUSD = '${r.priceUSD}', lastPriceUpdateDT = from_unixtime(${r.indexTS}), liquid = ${r.liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(r.verificationPath)} where symbol = '${r.symbol}' and relayChain = '${r.relayChain}'` :
                 `update asset set priceUSD = '${r.priceUSD}', lastPriceUpdateDT = from_unixtime(${r.indexTS}), liquid = ${r.liquid}, priceUSDPercentChange = '${priceUSDPercentChange}', verificationPath = ${mysql.escape(r.verificationPath)} where asset = '${r.asset}' and chainID = '${r.chainID}'`;

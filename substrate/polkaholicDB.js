@@ -56,6 +56,8 @@ module.exports = class PolkaholicDB {
     paraIDs = [];
     paras = {};
     pool = false;
+    //TODO: move to US
+    defaultBQLocation = "us-central1";
 
     numIndexingErrors = 0;
     reloadChainInfo = false; // if set to true after system properties brings in a new asset, we get one chance to do so.
@@ -909,12 +911,12 @@ from chain where chainID = '${chainID}' limit 1`);
         return this.bigQuery;
     }
 
-    async execute_bqJob(sqlQuery, opt = null) {
+    async execute_bqJob(sqlQuery, targetBQLocation = null) {
         // run bigquery job with suitable credentials
         const bigqueryClient = this.get_big_query();
-        const options = opt ? opt : {
+        const options = {
             query: sqlQuery,
-            location: 'us-central1',
+            location: (targetBQLocation)? targetBQLocation : this.defaultBQLocation,
         };
 
         try {
@@ -932,7 +934,7 @@ from chain where chainID = '${chainID}' limit 1`);
     async load_calls_events(datasetId = "substrate_dev") {
         const bigquery = this.get_big_query()
         let sql = `select table_name, column_name, data_type, ordinal_position, is_nullable from substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS where ( table_name like 'call_%' or table_name like 'evt_%' ) and column_name not in ("block_time", "relay_chain", "para_id", "extrinsic_id", "extrinsic_hash", "call_id", "signer_ss58", "signer_pub_key") limit 1000000`;
-        let columns = await this.execute_bqJob(sql);
+        let columns = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
         this.bqTablesCallsEvents = {}
         for (const c of columns) {
             let sa = c.table_name.split("_");
