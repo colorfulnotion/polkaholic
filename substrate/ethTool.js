@@ -944,7 +944,8 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     let methodID = '0x';
     let decodedTxnInput = {};
     let output = txn
-
+    //TODO: need to handle both RPC and WS format
+    
     if (!contractcreationAddress) {
         if (txInput.length >= 10) {
             methodID = txInput.slice(0, 10)

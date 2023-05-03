@@ -8915,8 +8915,8 @@ module.exports = class Indexer extends AssetManager {
                 state_root: block.stateRoot,
                 receipts_root: block.receiptsRoot,
                 miner: block.miner,
-                difficulty: block.difficulty,
-                total_difficulty: block.totalDifficulty,
+                difficulty: paraTool.dechexToInt(block.difficulty),
+                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
                 size: block.size,
                 extra_data: block.extraData,
                 gas_limit: block.gasLimit,
@@ -8968,6 +8968,13 @@ module.exports = class Indexer extends AssetManager {
                 signature: null,
                 params: null
             }
+            //arbitrum 0x0 values??
+            if (evmTx.value == "0x0") evmTx.value = 0
+            if (evmTx.gas == "0x0") evmTx.gas = 0
+            if (evmTx.gas_price == "0x0") evmTx.gas_price = 0
+            if (evmTx.receipt_cumulative_gas_used == "0x0") evmTx.receipt_cumulative_gas_used = 0
+            if (evmTx.receipt_gas_used == "0x0") evmTx.receipt_gas_used = 0
+
             if (decodedInput) {
                 evmTx.decoded = (decodedInput.decodeStatus == 'success');
                 evmTx.method_id = methodID;
@@ -9323,7 +9330,7 @@ module.exports = class Indexer extends AssetManager {
         let cmd = `curl ${evmRPCInternalApi}  -X POST -H "Content-Type: application/json" --data '{"method":"qn_getBlockWithReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
-            console.log(`≈ try#${i}`)
+            console.log(`crawlQNEvmBlockAndReceiptsWithRetry [${blockNumber}] try#${i}`)
             try {
                 const {
                     stdout,
@@ -9507,9 +9514,14 @@ module.exports = class Indexer extends AssetManager {
         let log_timeout_ms = 5000
 
         let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+        //let res = false
         if (res && res.block != undefined && res.receipts != undefined){
             console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
-            block = res.block
+            //block = res.block
+            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+
             let evmReceipts = res.receipts
             let evmTrace = false
             if (evmRPCInternalApi){
@@ -9523,6 +9535,7 @@ module.exports = class Indexer extends AssetManager {
                 ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
             ])
             let [dTxns, dReceipts] = await statusesPromise
+            console.log(`dTxns`, dTxns)
             await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
         }else{
             let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
@@ -9557,7 +9570,7 @@ module.exports = class Indexer extends AssetManager {
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                     ])
                     let [dTxns, dReceipts] = await statusesPromise
-
+                    console.log(`dTxns`, dTxns)
                     let evmTrace = false
                     if (evmRPCInternalApi){
                         let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
