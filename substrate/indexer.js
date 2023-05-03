@@ -9256,6 +9256,52 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    async crawlEvmBlockTracesWithRetry(evmRPCInternal, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        console.log(`crawlEvmBlockTracesWithRetry evmRPCInternal +++`, evmRPCInternal)
+        if (!evmRPCInternal) {
+            return (false);
+        }
+        console.log(`crawlEvmBlockTracesWithRetry evmRPCInternal`, evmRPCInternal)
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+
+        for (let i = 0; i < maxRetries; i++) {
+            console.log(`crawlEvmBlockTracesWithRetry try#${i}`)
+            try {
+                const {
+                    stdout,
+                    stderr
+                } = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                let receiptData = JSON.parse(stdout);
+                if (receiptData.result) {
+                    console.log(`crawlEvmBlockTracesWithRetry ${blockNumber} DONE`, cmd);
+                    return (receiptData.result);
+                }
+                if (receiptData.error){
+                    console.log(`crawlEvmBlockTracesWithRetry cmd`, cmd)
+                    console.log(`crawlEvmBlockTracesWithRetry error`, receiptData.error)
+                }
+                //console.log(`crawlEvmBlockReceipts`, cmd)
+            } catch (error) {
+                this.logger.warn({
+                    "op": "crawlEvmBlockTracesWithRetry",
+                    "cmd": cmd,
+                    "err": error
+                })
+                console.log(error);
+            }
+            if (i < maxRetries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        console.log(`crawlEvmBlockTracesWithRetry Failed maxRetries(${maxRetries}) reached`)
+        return false;
+    }
+
     async crawlEvmBlockTraces(evmRPCInternal, blockNumber, timeoutMS = 20000) {
         if (!evmRPCInternal) {
             return (false);
@@ -9525,9 +9571,12 @@ module.exports = class Indexer extends AssetManager {
             let evmReceipts = res.receipts
             let evmTrace = false
             if (evmRPCInternalApi){
+                /*
                 let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
                 let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
                 evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx)
+                */
+                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
                 //console.log(`[${block.number}] evmTrace`, evmTrace)
             }
             var statusesPromise = Promise.all([
@@ -9573,9 +9622,12 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`dTxns`, dTxns)
                     let evmTrace = false
                     if (evmRPCInternalApi){
+                        /*
                         let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
                         let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
                         evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
+                        */
+                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
                         //console.log(`[${block.number}] evmTrace`, evmTrace)
                     }
                     await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)

@@ -2128,9 +2128,12 @@ module.exports = class Crawler extends Indexer {
                     let evmReceipts = res.receipts
                     let evmTrace = false
                     if (evmRPCInternalApi){
+                        /*
                         let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
                         let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
                         evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx)
+                        */
+                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
                         //console.log(`[${block.number}] evmTrace`, evmTrace)
                     }
                     var statusesPromise = Promise.all([
@@ -2180,9 +2183,12 @@ module.exports = class Crawler extends Indexer {
                             console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                             let evmTrace = false
                             if (evmRPCInternalApi){
+                                /*
                                 let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
                                 let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
                                 evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
+                                */
+                                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
                                 //console.log(`[${block.number}] evmTrace`, evmTrace)
                             }
                             var statusesPromise = Promise.all([
