@@ -71,9 +71,9 @@ module.exports = class Indexer extends AssetManager {
     assetholder = {};
     api = false;
     web3Api = false;
-    evmRPC = false;              //
+    evmRPC = false; //
     evmRPCBlockReceipts = false; // api endpoint that supports eth_getBlockReceipts
-    evmRPCInternal = false;      // api endpoint that supports eth_getBlockReceipts
+    evmRPCInternal = false; // api endpoint that supports eth_getBlockReceipts
     contractABIs = false;
     contractABISignatures = {};
     chainID = false;
@@ -92,13 +92,15 @@ module.exports = class Indexer extends AssetManager {
     labels = {}
 
     addressLabelCandidates = {};
+    crawlErcToken = {}; // by tokenAddress
+    ercTokenList = {}; // by tokenAddress
 
     recentXcmMsgs = []; //will flush from here.
     numXCMMessagesIn = {};
     numXCMMessagesOut = {};
 
-
-    evmDatasetID = "evm_dev"; /*** FOR DEVELOPEMENT: change to evm_test ***/
+    evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
+    evmBQLocation = 'us';
 
     xcmMeta = []; //this should be removed after every block
 
@@ -433,10 +435,10 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    updateAddressLabelCandidates(address, label, recBT){
+    updateAddressLabelCandidates(address, label, recBT) {
         if (this.addressLabelCandidates[address] == undefined) this.addressLabelCandidates[address] = {}
-        let labelID = (label.labelID_full)? label.labelID_full : label.labelID_generic
-        if (labelID && this.addressLabelCandidates[address][labelID] == undefined){
+        let labelID = (label.labelID_full) ? label.labelID_full : label.labelID_generic
+        if (labelID && this.addressLabelCandidates[address][labelID] == undefined) {
             this.addressLabelCandidates[address][labelID] = recBT
         }
     }
@@ -4251,19 +4253,19 @@ module.exports = class Indexer extends AssetManager {
             encodedCalls.push(opaqueCall)
         }
         try {
-            if ( argsDef ) {
-		for (let i = 0; i < argsDef.length; i++) {
+            if (argsDef) {
+                for (let i = 0; i < argsDef.length; i++) {
                     let argsDef_i = argsDef[i]
                     let argsDef_i_type = argsDef_i.type
                     let argsDef_i_name = argsDef_i.name
                     //console.log(`argsDef_i`, argsDef_i)
                     //console.log(`argsDef_i_type`, argsDef_i_type)
                     if (extrinsic_args_conversion_list.includes(argsDef_i_type)) {
-			let arg_val = exos.method.args[argsDef_i_name]
-			exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
+                        let arg_val = exos.method.args[argsDef_i_name]
+                        exos.method.args[argsDef_i_name] = paraTool.toIntegerStr(arg_val)
                     }
-		}
-	    }
+                }
+            }
         } catch (argsDefErr) {
             console.log(`decode_s_extrinsic argsDefErr`, argsDefErr)
         }
@@ -5762,39 +5764,14 @@ module.exports = class Indexer extends AssetManager {
         return paraTool.makeAssetChain(lowerAssetKey, chainID);
     }
 
-    initERCAssetOnCache(assetChain, tokenInfo, isXcAsset = false) {
-        let assetType = tokenInfo.assetType
-        if (this.tallyAsset[assetChain] == undefined) {
-            this.tallyAsset[assetChain] = tokenInfo
-            //console.log(`${assetChain}`, this.tallyAsset[assetChain])
-            let contractAddress = tokenInfo.tokenAddress.toLowerCase()
-            this.ercTokenList[contractAddress] = tokenInfo;
-            //console.log('CONTRACT Init ON Cache', assetType, assetChain, tokenInfo);
-        }
-    }
 
-    initERCAssetOnMiss(assetChain, tokenInfo, assetType, isXcAsset = false) {
-        tokenInfo.assetType = assetType;
-        if (this.tallyAsset[assetChain] == undefined) {
-            this.tallyAsset[assetChain] = tokenInfo
-            //console.log(`${assetChain}`, this.tallyAsset[assetChain])
-            let contractAddress = tokenInfo.tokenAddress.toLowerCase()
-            this.ercTokenList[contractAddress] = tokenInfo;
-            console.log('CONTRACT FETCH ON MISS', assetType, assetChain);
-        }
-    }
-
-    initERCAsset(assetChain, tokenInfo, tx, assetType) {
+    initERCAsset(contractAddress, chainID, tokenInfo, tx, assetType) {
         tokenInfo.creator = tx.from;
         tokenInfo.createdAtTx = tx.transactionHash;
         tokenInfo.assetType = assetType;
         tokenInfo.createTS = tx.timestamp;
-        if (this.tallyAsset[assetChain] == undefined) {
-            this.tallyAsset[assetChain] = tokenInfo
-            let contractAddress = tokenInfo.tokenAddress.toLowerCase()
-            this.ercTokenList[contractAddress] = tokenInfo;
-            console.log('CONTRACT CREATE', assetType, assetChain, tokenInfo);
-        }
+        contractAddress = contractAddress.toLowerCase()
+        this.ercTokenList[contractAddress] = tokenInfo;
     }
 
     async process_evm_contract_create(tx, chainID, finalized = false, isTip = false) {
@@ -5803,50 +5780,37 @@ module.exports = class Indexer extends AssetManager {
         let bn = tx.blockNumber
         let contractAddress = tx.creates
         // ethTool rpccall (4)
+        // TODO: generate labels with ethTool.detect_contract_labels(web3api, address, bn)
         let erc20TokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
         if (erc20TokenInfo) {
             // store in ercTokenList + tallyAsset, flushed in flushShort/flusTokens
             let ercType = paraTool.assetTypeERC20
 
             // ethTool rpccall (5)
-            let lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
+            /*let lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
             if (!lpTokenInfo) {
                 this.cacheNonCompliantLP(contractAddress)
             }
-            erc20TokenInfo.lpInfo = lpTokenInfo
-            /*
-            if (lpTokenInfo) {
-                ercType = paraTool.assetTypeERC20LiquidityPair
-            }
-            */
-            let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(erc20TokenInfo.tokenAddress, chainID) // REVIEW
-            this.initERCAsset(assetChain, erc20TokenInfo, tx, ercType);
+            erc20TokenInfo.lpInfo = lpTokenInfo */
+            this.initERCAsset(contractAddress, chainID, erc20TokenInfo, tx, ercType);
             return `${paraTool.assetTypeERC20}`
         }
         // trying erc721 next
-        // ethTool rpccall (6)
         let erc721ContractInfo = await ethTool.getERC721ContractInfo(web3Api, contractAddress, bn)
         if (erc721ContractInfo) {
-            let assetChain = this.getErc721TokenAssetChain(erc721ContractInfo.tokenAddress, chainID)
-            this.initERCAsset(assetChain, erc721ContractInfo, tx, paraTool.assetTypeERC721);
+            this.initERCAsset(contractAddress, chainID, erc721ContractInfo, tx, paraTool.assetTypeERC721);
             return `${paraTool.assetTypeERC721}`
         }
 
-        //trying erc1155 (stub)
-        // ethTool rpccall (7)
+        //trying erc1155
         let erc1155ContractInfo = await ethTool.getERC1155ContractInfo(web3Api, contractAddress, bn)
         if (erc1155ContractInfo) {
-            let assetChain = this.getErc1155TokenAssetChain(erc1155ContractInfo.tokenAddress, chainID)
-            this.initERCAsset(assetChain, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
+            this.initERCAsset(contractAddress, chainID, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
             return `${paraTool.assetTypeERC1155}`
         }
 
         {
-            let contractInfo = {
-                tokenAddress: contractAddress,
-            };
-            let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(contractAddress, chainID); // REVIEW
-            this.initERCAsset(assetChain, contractInfo, tx, paraTool.assetTypeContract);
+            this.initERCAsset(contractAddress, chainID, contractInfo, tx, paraTool.assetTypeContract);
             return `${paraTool.assetTypeContract}`
         }
         return (false);
@@ -5883,70 +5847,119 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async process_erc20_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
-        let web3Api = this.web3Api
-        let bn = tx.blockNumber
-        //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
-        //   2. mark that the assetholder balancer have to be fetched
-        let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(t.tokenAddress, chainID) // REVIEW
-        let tokenInfo = this.tallyAsset[assetChain]
-        // [mint] token send from '0x0000000000000000000000000000000000000000'
-        // [burn] token sent to '0x0000000000000000000000000000000000000000' or '0x000000000000000000000000000000000000dEaD'
-        // we can't distinguish incremtental token mint within a block - so we only should fetch token at most once per block
-        let isMint = t.from == '0x0000000000000000000000000000000000000000'
-        let isBurn = (t.to == '0x0000000000000000000000000000000000000000' || t.to == '0x000000000000000000000000000000000000dEaD')
-        let isMiss = true
-        let isCached = false
-        if (tokenInfo != undefined) {
-            isCached = true
-            isMiss = false
-            /*if ((tokenInfo.blockNumber != tx.blockNumber) && (isMint || isBurn)) {
-                // fetch once per block here
-                isCached = false
-            } */
-        } else {
-            // search ercTokenList first
-            let cAddress = t.tokenAddress.toLowerCase();
-            if (this.ercTokenList[cAddress]) {
-                isCached = true;
-                tokenInfo = this.ercTokenList[cAddress] // note: totalSupply is not accurate here
-
-                // console.log(`[${bn}-${tx.transactionIndex}] ERC20 Cache FOUND  ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
+    async crawl_erc_tokens(bn, blockTS, chainID) {
+        let RPCBackfill = null // TODO
+        let rows = [];
+        for (const contractAddress of Object.keys(this.crawlErcToken)) {
+            try {
+                let cAddress = contractAddress.toLowerCase();
+                //TODO: want to classify contractAddress
+                let tokenInfo = await ethTool.getERC20TokenInfo(this.web3Api, cAddress, bn, RPCBackfill)
+                if (tokenInfo && tokenInfo.symbol) {
+                    this.ercTokenList[cAddress] = tokenInfo;
+                    if (tokenInfo.tokenType == "ERC20LP") {
+                        //console.log(cAddress, tokenInfo);
+                    }
+                    // add cell with tokenInfo to metadata
+                    let r = {
+                        key: cAddress,
+                        data: {
+                            metadata: {}
+                        }
+                    }
+                    r.data.metadata[chainID.toString()] = {
+                        value: JSON.stringify(tokenInfo),
+                        timestamp: blockTS * 1000000
+                    }
+                    rows.push(r);
+                }
+            } catch (err) {
+                console.log(`crawl_erc_tokens`, err);
             }
         }
-        if (isCached) {
-            // console.log(`[${bn}-${tx.transactionIndex}] ERC20 Cached  ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
-            this.initERCAssetOnCache(rawAssetChain, tokenInfo, isXcAsset) //MK: should be rawAssetChain here
-        } else {
-            // TODO: search mysql asset first, then do RPC
-            // ethTool rpccall (9)
-            tokenInfo = await ethTool.getERC20TokenInfo(web3Api, t.tokenAddress, bn)
-            let ercType = paraTool.assetTypeERC20
+        this.crawlErcToken = {};
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        console.log("-------> CRAWL_ERC_TOKENS", rows.length);
+        try {
+            await this.insertBTRows(tblRealtime, rows, tblName);
+        } catch (err) {
+            console.log(err);
+        }
+    }
 
-            let lpTokenInfo = false;
-            if (!this.isCachedNonCompliantLP(t.tokenAddress)) {
-                // ethTool rpccall (10)
-                lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, t.tokenAddress, bn)
-                if (!lpTokenInfo) {
-                    this.cacheNonCompliantLP(t.tokenAddress)
+    async process_token_address(tokenAddress, chainID, tokenID = null) {
+        try {
+            // 1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
+            // 2. mark that the assetholder balances have to be fetched
+            let cAddress = tokenAddress.toLowerCase();
+
+            if (this.ercTokenList[cAddress]) {
+                return this.ercTokenList[cAddress] // note: totalSupply is not accurate here
+            }
+            // if we have marked it for crawl already, then don't do anything
+            if (this.crawlErcToken[cAddress] !== undefined) {
+                return null;
+            }
+
+            // read metadata from btAccountRealtime
+            let [tblName, tblRealtime] = this.get_btTableRealtime()
+            try {
+                let row = null;
+
+                [row] = await tblRealtime.row(cAddress).get();
+                let rowData = row.data;
+                let pricefeed = rowData["pricefeed"];
+                let usd = null
+
+                if (pricefeed) {
+                    for (const chainID of Object.keys(pricefeed)) {
+                        let pf = JSON.parse(pricefeed["coingecko"][0].value);
+                        if (pf.usd) usd = pf.usd;
+                    }
+                }
+
+                let metadata = rowData["metadata"];
+                if (metadata) {
+                    for (const chainID of Object.keys(metadata)) {
+                        let tokenInfo = JSON.parse(metadata[chainID.toString()][0].value);
+                        if (tokenInfo.decimals) {
+                            if (usd) {
+                                tokenInfo.usd = usd;
+                            }
+                            this.ercTokenList[cAddress] = tokenInfo;
+                            return tokenInfo;
+                        }
+                    }
+                }
+
+                this.crawlErcToken[cAddress] = tokenID;
+                return null;
+            } catch (err) {
+                if (err && (err.code == 404)) {
+                    console.log(" 99999 **marking", tokenAddress, chainID)
+                    // we should only do this on a 404
+                    this.crawlErcToken[cAddress] = tokenID;
+                } else {
+                    console.log(err);
                 }
             }
-            /*
-            if (lpTokenInfo) {
-                ercType = paraTool.assetTypeERC20LiquidityPair
-            }
-            */
-            if (tokenInfo) {
-                tokenInfo.lpInfo = lpTokenInfo
-                console.log(`**[${bn}-${tx.transactionIndex}] ${ercType} Fetched ${t.tokenAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply} (Miss: ${isMiss}, Mint: ${isMint}, Burn: ${isBurn})`)
-                this.initERCAssetOnMiss(rawAssetChain, tokenInfo, ercType, isXcAsset)
-                //this.tallyAsset[assetChain] = tokenInfo
-            }
+        } catch (e2) {
+            console.log("jjjjjj", e2);
         }
-        // This mark for lookup on isTip = true for processAssetTypeERC20/fetchAssetHolderBalances
+        return null;
+    }
+
+    async process_erc20_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
+        let bn = tx.blockNumber
+        let tokenInfo = await this.process_token_address(t.tokenAddress, chainID)
+
         if (finalized) {
-            this.updateAssetHolder(assetChain, t.from, bn)
-            this.updateAssetHolder(assetChain, t.to, bn)
+            if (tokenInfo) {
+                // *** TODO: add symbol, decimal, value_usd, price_usd
+            }
+            // This mark for lookup on isTip = true for processAssetTypeERC20/fetchAssetHolderBalances
+            // this.updateAssetHolder(assetChain, t.from, bn)
+            // this.updateAssetHolder(assetChain, t.to, bn)
         }
 
         if (t.from && t.to && t.tokenAddress) {
@@ -5960,43 +5973,12 @@ module.exports = class Indexer extends AssetManager {
                 ts: tx.timestamp,
                 value: t.value,
             };
-            let extrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
+            // let extrinsicID = `${tx.blockNumber}-${tx.transactionIndex}`
             if (finalized) {
-                this.updateAddressExtrinsicStorage(t.from, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
-                this.updateAddressExtrinsicStorage(t.to, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
-                this.updateAddressExtrinsicStorage(t.tokenAddress, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+                // this.updateAddressExtrinsicStorage(t.from, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+                // this.updateAddressExtrinsicStorage(t.to, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
+                // this.updateAddressExtrinsicStorage(t.tokenAddress, extrinsicID, tx.transactionHash, "feedevmtransfer", v, tx.timestamp, true);
             }
-        }
-    }
-
-
-    async fetchMissingERC20(contractAddress, bn) {
-        let web3Api = this.web3Api
-        // ethTool rpccall (11)
-        let tokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
-        let ercType = paraTool.assetTypeERC20
-        // ethTool rpccall (12)
-        /*
-        if (lpTokenInfo) {
-            ercType = paraTool.assetTypeERC20LiquidityPair
-        }
-        */
-        if (tokenInfo) {
-            //let lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
-            let lpTokenInfo = false;
-            if (!this.isCachedNonCompliantLP(contractAddress)) {
-                // ethTool rpccall (10)
-                lpTokenInfo = await ethTool.getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn)
-                if (!lpTokenInfo) {
-                    this.cacheNonCompliantLP(contractAddress)
-                }
-            }
-
-            tokenInfo.lpInfo = lpTokenInfo
-            let [isXcAsset, assetChain, rawAssetChain] = paraTool.getErcTokenAssetChain(contractAddress, this.chainID) // REVIEW
-            console.log(`**[${bn}] ${ercType} Fetched ${contractAddress} ${tokenInfo.symbol}\t${tokenInfo.totalSupply}`)
-            this.initERCAssetOnMiss(rawAssetChain, tokenInfo, paraTool.assetTypeERC20, isXcAsset)
-            //this.tallyAsset[assetChain] = tokenInfo
         }
     }
 
@@ -6004,48 +5986,23 @@ module.exports = class Indexer extends AssetManager {
         let web3Api = this.web3Api
         let bn = tx.blockNumber
         let tokenID = t.tokenId
-        let contractAddress = t.tokenAddress
+        let cAddress = t.tokenAddress.toLowerCase();
         let sender = t.from
         let recipient = t.to
         //   1. if this is an unknown token, fetch tokenInfo with getERC20TokenInfo
         //   2. mark that the assetholder balancer have to be fetched
-        let assetChain = this.getErc721TokenIDAssetChain(contractAddress, tokenID, chainID)
-        let erc721TokenIDMeta = this.tallyAsset[assetChain]
-        // [mint] token send from '0x0000000000000000000000000000000000000000'
-        // [burn] token sent to '0x0000000000000000000000000000000000000000' or '0x000000000000000000000000000000000000dEaD'
-        // we can't distinguish incremtental token mint within a block - so we only should fetch token at most once per block
-        let isMint = sender == '0x0000000000000000000000000000000000000000'
-        let isBurn = (recipient == '0x0000000000000000000000000000000000000000' || recipient == '0x000000000000000000000000000000000000dEaD')
-        let isMiss = true
-        let isCached = false
-        if (erc721TokenIDMeta != undefined) {
-            isCached = true
-            isMiss = false
-            if ((erc721TokenIDMeta.blockNumber != tx.blockNumber) && (isMint || isBurn)) {
-                // only fetch for "missed" case
-                // isCached = false
-            }
-        }
-
-        if (isCached) {
+        //let assetChain = this.getErc721TokenIDAssetChain(cAddress, tokenID, chainID)
+        let erc721TokenIDMeta = await this.process_token_address(cAddress, chainID, tokenID);
+        if (erc721TokenIDMeta) {
+            console.log("process_erc721_token_transfer -- ", tokenInfo.symbol);
             let prevHolder = erc721TokenIDMeta.owner
             erc721TokenIDMeta.owner = recipient
             erc721TokenIDMeta.blockNumber = bn
-            console.log(`[${bn}-${tx.transactionIndex}] ERC721 tokenID Cached  ${contractAddress} [${erc721TokenIDMeta.tokenID}], prevHolder:${prevHolder} -> currHolder:${erc721TokenIDMeta.owner}`)
-
-        } else {
-            // TODO: search btAsset first, then do RPC
-            // ignore burned tokenID on miss
-            if (!isBurn && false) {
-                // ethTool rpccall (13)
-                erc721TokenIDMeta = await ethTool.getERC721NFTMeta(web3Api, contractAddress, tokenID, false, bn)
-                console.log(`**[${bn}-${tx.transactionIndex}] ERC721 tokenID Fetched ${contractAddress} [${erc721TokenIDMeta.tokenID}], currHolder:${erc721TokenIDMeta.owner}, (Miss: ${isMiss}, Mint: ${isMint}, Burn: ${isBurn})`)
-            }
+            // TODO: write new owner
         }
-        if (erc721TokenIDMeta) {
-            erc721TokenIDMeta.assetType = paraTool.assetTypeERC721Token;
-            this.tallyAsset[assetChain] = erc721TokenIDMeta // TODO
-        }
+        // erc721TokenIDMeta = await ethTool.getERC721NFTMeta(web3Api, contractAddress, tokenID, false, bn)
+        // console.log(`**[${bn}-${tx.transactionIndex}] ERC721 tokenID Fetched ${contractAddress} [${erc721TokenIDMeta.tokenID}], currHolder:${erc721TokenIDMeta.owner}, (Miss: ${isMiss}, Mint: ${isMint}, Burn: ${isBurn})`)
+        // erc721TokenIDMeta.assetType = paraTool.assetTypeERC721Token;
     }
 
     async process_erc1155_token_transfer(tx, t, chainID, eventID = "0", finalized = false) {
@@ -6070,126 +6027,8 @@ module.exports = class Indexer extends AssetManager {
             if (t.type == "ERC1155") {
                 await this.process_erc1155_token_transfer(tx, t, chainID, eventID, finalized)
             }
-
         }
         return (false);
-    }
-
-
-    //called after erc20 transfers is processed
-    async process_evmtx_swap(tx, chainID, finalized = false) {
-        let web3Api = this.web3Api
-        let bn = tx.blockNumber
-        let swaps = tx.swaps
-
-        for (const s of swaps) {
-            //concole.log(`[${bn}-${tx.transactionIndex}]`, JSON.stringify(t))
-            if (s.type == "swapV2") {
-                await this.process_v2_swap(s, chainID, bn, true, finalized)
-            }
-        }
-        return (false);
-    }
-
-    async process_v2_swap(swapEvent, chainID, bn, retryOnMiss = true, finalized = false) {
-        //console.log(`process_v2_swap`, swapEvent)
-        if (swapEvent.type == "swapV2") {
-            let lpTokenAddress = swapEvent.lpTokenAddress
-            let lpToken = this.getLPToken(lpTokenAddress)
-            if (lpToken && lpToken.lpInfo) {
-                let lpTokenInfo = lpToken.lpInfo
-                //console.log(lpToken)
-                //console.log(lpTokenInfo)
-                let token0In = paraTool.dechexToInt(swapEvent.amount0In) / 10 ** lpTokenInfo.token0Decimals
-                let token1In = paraTool.dechexToInt(swapEvent.amount1In) / 10 ** lpTokenInfo.token1Decimals
-                let token0Out = paraTool.dechexToInt(swapEvent.amount0Out) / 10 ** lpTokenInfo.token0Decimals
-                let token1Out = paraTool.dechexToInt(swapEvent.amount1Out) / 10 ** lpTokenInfo.token1Decimals
-                //trade volume: by definition, it's the inflow (token1In, token0Out)
-                //trade fee: total outflow - total inflow (TODO)
-                let token0Symbol = lpTokenInfo.token0Symbol
-                let token1Symbol = lpTokenInfo.token1Symbol
-                let inFlow = (token0In != 0) ? `${token0In} ${token0Symbol}` : `${token1In} ${token1Symbol}`
-                let outFlow = (token0Out != 0) ? `${token0Out} ${token0Symbol}` : `${token1Out} ${token1Symbol}`
-                //console.log(`[${lpTokenAddress}][${token0Symbol}/${token1Symbol}] - inFlow +${inFlow}, outFlow -${outFlow}`)
-                if (token0Symbol == undefined || token1Symbol == undefined || isNaN(token0In) || isNaN(token1In) || isNaN(token0Out) || isNaN(token1Out)) {
-                    console.log(`[${lpTokenAddress}] missing lpToken !`, lpToken)
-                    console.log(`[${lpTokenAddress}] missing lpInfo  !`, lpTokenInfo)
-                    console.log(`[${lpTokenAddress}] NAN check: 0In=${token0In}, 1In=${token1In}, 0Out=${token0Out}, 1Out=${token1Out}, 0Decimals=${lpTokenInfo.token0Decimals}, 1Decimals=${lpTokenInfo.token1Decimals}`)
-                }
-                let r = {
-                    token0In: token0In,
-                    token1Out: token1Out,
-                    token1In: token1In,
-                    token0Out: token0Out,
-                    lpAddress: lpTokenAddress
-                }
-                //console.log(`swapV2`, r)
-                let assetChainLP = this.getErc20LPAssetChain(lpTokenAddress, chainID)
-                let [isXcAsset, assetChainLPAsNormal, rawAssetChainLPAsNormal] = paraTool.getErcTokenAssetChain(lpTokenAddress, chainID) // REVIEW
-                lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
-                this.initERCAssetOnCache(rawAssetChainLPAsNormal, lpToken, isXcAsset) //MK should be original
-                if (finalized) {
-                    this.updateAssetERC20SwapTradingVolume(assetChainLP, r.token0In, r.token1In, r.token0Out, r.token1Out) //MK
-                }
-            } else if (retryOnMiss) {
-                console.log(`process_v2_swap: fetching unknown lpToken ${lpTokenAddress}`, lpToken)
-                await this.fetchMissingERC20(lpTokenAddress, bn)
-                await this.process_v2_swap(swapEvent, chainID, bn, false, finalized)
-            } else {
-                console.log(`process_v2_swap: unknown lpToken ${lpTokenAddress} exit`, lpToken)
-            }
-        } else {
-            console.log(`new swapEvent detected`, swapEvent)
-        }
-    }
-
-    async process_evmtx_syncEvent(syncEvent, chainID, bn, retryOnMiss = true, finalized = false) {
-        if (syncEvent.type == "syncV2") {
-            let lpTokenAddress = syncEvent.lpTokenAddress
-            let lpToken = this.getLPToken(lpTokenAddress)
-            if (lpToken && lpToken.lpInfo) {
-                let lpTokenInfo = lpToken.lpInfo
-                //console.log(lpToken)
-                //console.log(lpTokenInfo)
-                let lp0 = paraTool.dechexToInt(syncEvent.reserve0) / 10 ** lpTokenInfo.token0Decimals
-                let lp1 = paraTool.dechexToInt(syncEvent.reserve1) / 10 ** lpTokenInfo.token1Decimals
-                let rat = lp0 / lp1
-                let token0Symbol = lpTokenInfo.token0Symbol
-                let token1Symbol = lpTokenInfo.token1Symbol
-                //console.log(`[${lpTokenAddress}][${token0Symbol}/${token1Symbol}] - ${lp0}/${lp1} ~ ${rat}`)
-                let r = {
-                    lp0: lp0,
-                    lp1: lp1,
-                    rat: rat,
-                    lpAddress: lpTokenAddress
-                }
-                //console.log(`syncV2`, r)
-                let assetChainLP = this.getErc20LPAssetChain(lpTokenAddress, chainID)
-                let [isXcAsset, assetChainLPAsNormal, rawAssetChainLPAsNormal] = paraTool.getErcTokenAssetChain(lpTokenAddress, chainID) // REVIEW
-                lpToken.assetType = paraTool.assetTypeERC20 // modify assetType here so it get updated at the tip
-                this.initERCAssetOnCache(rawAssetChainLPAsNormal, lpToken, isXcAsset) // should be original?
-                if (finalized) {
-                    this.updateAssetERC20LiquidityPair(assetChainLP, r.lp0, r.lp1, r.rat) //MK
-                }
-            } else if (retryOnMiss) {
-                console.log(`process_evmtx_syncEvent: fetching unknown lpToken ${lpTokenAddress}`)
-                await this.fetchMissingERC20(lpTokenAddress, bn)
-                await this.process_evmtx_syncEvent(syncEvent, chainID, bn, false, finalized)
-            } else {
-                console.log(`process_evmtx_syncEvent: unknown lpToken ${lpTokenAddress} exit`)
-            }
-        } else {
-            console.log(`new syncEvent detected`, syncEvent)
-        }
-    }
-
-    getLPToken(lpTokenAddress) {
-        lpTokenAddress = lpTokenAddress.toLowerCase()
-        let lpToken = this.ercTokenList[lpTokenAddress]
-        if (lpToken != undefined) {
-            return lpToken
-        }
-        return false
     }
 
     // For all txs in txpool content, write the raw data to hashes feedpending -- it doesn't have a blockNumber/blockHash yet but does have "decodedInput" -- the time is the present time
@@ -6227,6 +6066,81 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
+    async process_evmtx_swapV2(swapEvent, chainID, lpTokenInfo) {
+        let token0In = paraTool.dechexToInt(swapEvent.amount0In) / 10 ** lpTokenInfo.token0Decimals
+        let token1In = paraTool.dechexToInt(swapEvent.amount1In) / 10 ** lpTokenInfo.token1Decimals
+        let token0Out = paraTool.dechexToInt(swapEvent.amount0Out) / 10 ** lpTokenInfo.token0Decimals
+        let token1Out = paraTool.dechexToInt(swapEvent.amount1Out) / 10 ** lpTokenInfo.token1Decimals
+        //trade volume: by definition, it's the inflow (token1In, token0Out)
+        //trade fee: total outflow - total inflow (TODO)
+        //let inFlow = (token0In != 0) ? `${token0In} ${token0Symbol}` : `${token1In} ${token1Symbol}`
+        //let outFlow = (token0Out != 0) ? `${token0Out} ${token0Symbol}` : `${token1Out} ${token1Symbol}`
+        let r = {
+            token0Symbol: lpTokenInfo.token0Symbol,
+            token1Symbol: lpTokenInfo.token1Symbol,
+            token0Decimals: lpTokenInfo.token0Decimals,
+            token1Decimals: lpTokenInfo.token1Decimals,
+            token0In,
+            token1Out,
+            token1In,
+            token0Out
+        }
+        if (lpTokenInfo.token0 && lpTokenInfo.token1) {
+            let t0 = lpTokenInfo.token0.toLowerCase();
+            let t1 = lpTokenInfo.token1.toLowerCase();
+            let tok0 = await this.process_token_address(t0, chainID);
+            if (tok0) {
+                r.token0price_usd = tok0.usd;
+                r.token0value_usd = tok0.usd * token0In;
+            } else {
+                console.log("***** SWP MISS on ", t0);
+            }
+            let tok1 = await this.process_token_address(t1, chainID);
+            if (tok1) {
+                r.token1price_usd = tok1.usd;
+                r.token1value_usd = tok1.usd * token1In;
+            } else {
+                console.log("***** SWP MISS on ", t1);
+            }
+            console.log("process_evmtx_swapV2", r, lpTokenInfo);
+        }
+    }
+
+    async process_evmtx_syncV2(syncEvent, chainID, lpTokenInfo) {
+        let lp0 = paraTool.dechexToInt(syncEvent.reserve0) / 10 ** lpTokenInfo.token0Decimals
+        let lp1 = paraTool.dechexToInt(syncEvent.reserve1) / 10 ** lpTokenInfo.token1Decimals
+        let r = {
+            token0Symbol: lpTokenInfo.token0Symbol,
+            token1Symbol: lpTokenInfo.token1Symbol,
+            token0Decimals: lpTokenInfo.token0Decimals,
+            token1Decimals: lpTokenInfo.token1Decimals,
+            lp0,
+            lp1,
+            rat: lp0 / lp1
+        }
+        if (lpTokenInfo.token0 && lpTokenInfo.token1) {
+
+            let t0 = lpTokenInfo.token0.toLowerCase();
+            let t1 = lpTokenInfo.token1.toLowerCase();
+            let tok0 = await this.process_token_address(t0, chainID);
+            if (tok0) {
+                r.token0price_usd = tok0.usd;
+                r.token0tvl = lp0 * tok0.usd;
+            } else {
+                console.log("*** process_evmtx_syncV2 MISS", t0);
+            }
+            let tok1 = await this.process_token_address(t1, chainID);
+            if (tok1) {
+                r.token1price_usd = tok1.usd;
+                r.token1tvl = lp1 * tok1.usd;
+            } else {
+                console.log("*** process_evmtx_syncV2 MISS", t1);
+            }
+            console.log("process_evmtx_syncV2", r, lpTokenInfo);
+        }
+
+    }
+
     // For all evm txs in evmFullBlock, we wish to be able to at least:
     //  - /account/0x7aB.. --> get all the ERC20/721/... assets across chains at the tip
     //    Design: easy to value native assets with coin prices, but very challenging to value ALL assets,
@@ -6235,36 +6149,50 @@ module.exports = class Indexer extends AssetManager {
     async process_evm_transaction(tx, chainID, finalized = false, isTip = false, writeSubstrateBT = true) {
         if (tx == undefined) return;
         let contractType = false
+        // Contract Creates
         if (ethTool.isTxContractCreate(tx)) {
-            // Contract Creates
             contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
             console.log("CONTRACT CREATE", contractType);
         }
 
+        // Native Transfers
         if (ethTool.isTxNativeTransfer(tx)) {
-            // Native Transfers
             await this.process_evmtx_native_transfer(tx, chainID, finalized);
         }
 
+        // Token Transfers (ERC20/ERC721/1155)
         if (ethTool.isTxTokenTransfer(tx)) {
-            // Token Transfers (ERC20/ERC721/1155)
             await this.process_evmtx_token_transfer(tx, chainID, finalized);
-            //console.log("TOKEN TRANSFER");
         }
 
         if (ethTool.isTxSwap(tx)) {
             // swap detected - aggregate trading volumes
-            await this.process_evmtx_swap(tx, chainID, finalized);
-            //console.log("SWAP");
-        }
-        let syncEvents = ethTool.isTxLPSync(tx) // swap, add/removeLiquidity
-        if (syncEvents) {
-            //LP token lp0, lp1 updates
-            let bn = tx.blockNumber
-            for (const syncEvent of syncEvents) {
-                await this.process_evmtx_syncEvent(syncEvent, chainID, tx, true, finalized)
+            for (const s of tx.swaps) {
+                let lpTokenInfo = await this.process_token_address(s.lpTokenAddress, chainID)
+                if (lpTokenInfo) {
+                    if (s.type == "swapV2") {
+                        this.process_evmtx_swapV2(s, chainID, lpTokenInfo)
+                    }
+                    if (s.type == "swapV3") {
+                        //TODO
+                        //this.process_evmtx_swapV3(s, chainID, lpTokenInfo)
+                    }
+                }
             }
         }
+
+        let syncEvents = ethTool.isTxLPSync(tx) // swap, add/removeLiquidity
+        if (syncEvents) {
+            for (const syncEvent of syncEvents) {
+                let lpTokenInfo = await this.process_token_address(syncEvent.lpTokenAddress, chainID)
+                if (lpTokenInfo) {
+                    if (syncEvent.type == "syncV2") {
+                        this.process_evmtx_syncV2(syncEvent, chainID, lpTokenInfo)
+                    }
+                } else {}
+            }
+        }
+
         if (writeSubstrateBT) {
             //process feedevmtx
             let evmTxHash = tx.transactionHash
@@ -8493,19 +8421,19 @@ module.exports = class Indexer extends AssetManager {
         let labels = {};
         for (const l of labelRecs) {
             let lrec = {
-                label: (l.label)? l.label: null,
-                fingerprintID: (l.fingerprintID)? `${l.fingerprintID}`: null,
-                contractAddress: (l.contractAddress)? `${l.contractAddress.toLowerCase()}`: null,
-                evmchainID: (l.evmchainID)? l.evmchainID: null,
-                name: (l.name)? `${l.name}`: null,
-                signature: (l.signature)? `${l.signature}`: null,
-                signatureID: (l.signatureID)? `${l.signatureID}`: null,
-                signatureRaw: (l.signatureRaw)? `${l.signatureRaw}`: null,
-                abi: (l.abi)? `${l.abi}`: null,
-                abiType: (l.abiType)? `${l.abiType}`: null,
-                description: (l.description)? `${l.description}`: null,
+                label: (l.label) ? l.label : null,
+                fingerprintID: (l.fingerprintID) ? `${l.fingerprintID}` : null,
+                contractAddress: (l.contractAddress) ? `${l.contractAddress.toLowerCase()}` : null,
+                evmchainID: (l.evmchainID) ? l.evmchainID : null,
+                name: (l.name) ? `${l.name}` : null,
+                signature: (l.signature) ? `${l.signature}` : null,
+                signatureID: (l.signatureID) ? `${l.signatureID}` : null,
+                signatureRaw: (l.signatureRaw) ? `${l.signatureRaw}` : null,
+                abi: (l.abi) ? `${l.abi}` : null,
+                abiType: (l.abiType) ? `${l.abiType}` : null,
+                description: (l.description) ? `${l.description}` : null,
                 fullKey: null,
-                labelID: (l.labelID)? `${l.labelID}`: null,
+                labelID: (l.labelID) ? `${l.labelID}` : null,
                 labelID_generic: null,
                 labelID_full: null,
             }
@@ -8514,27 +8442,27 @@ module.exports = class Indexer extends AssetManager {
             let contractAddress = lrec.contractAddress
             let signatureID = lrec.signatureID
             let modifiedFingerprintID = lrec.fingerprintID
-            if (modifiedFingerprintID && modifiedFingerprintID.length == 21){
+            if (modifiedFingerprintID && modifiedFingerprintID.length == 21) {
                 modifiedFingerprintID = signatureID
-            }else if (modifiedFingerprintID && modifiedFingerprintID.length == 79){
-                modifiedFingerprintID = modifiedFingerprintID.substr(0,68)
+            } else if (modifiedFingerprintID && modifiedFingerprintID.length == 79) {
+                modifiedFingerprintID = modifiedFingerprintID.substr(0, 68)
             }
 
             // create full key (modifiedFingerprintID_evmChainID_contractAddress) if possible
-            if (modifiedFingerprintID && contractAddress && evmChainID){
+            if (modifiedFingerprintID && contractAddress && evmChainID) {
                 let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
                 let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
                 lrec.fullKey = fullKey
-                lrec.labelID_full =  `${paraTool.sha1_4bytes(modifiedFingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
+                lrec.labelID_full = `${paraTool.sha1_4bytes(modifiedFingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
                 lrec.labelID_unique = `${paraTool.sha1_4bytes(lrec.fingerprintID)}${paraTool.sha1_4bytes(evmChainIDContractAddressKey)}`
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
-                console.log(`fullKey***`, lrec)
+                //console.log(`fullKey***`, lrec)
                 labels[fullKey] = lrec
                 labels[lrec.labelID_unique] = lrec
             }
 
             // create generic key
-            if (modifiedFingerprintID){
+            if (modifiedFingerprintID) {
                 labels[modifiedFingerprintID] = lrec;
                 lrec.labelID_generic = `${paraTool.sha1_4bytes(lrec.fingerprintID)}`
             }
@@ -8542,33 +8470,52 @@ module.exports = class Indexer extends AssetManager {
             // TODO: handle case when either evmChainID or contractAddress is missing
         }
         this.labels = labels
-        console.log(`labels`, this.labels)
+        //console.log(`labels`, this.labels)
     }
 
-    getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID='', contractAddress=''){
+    getLabelCandidate(acctAddr, modifiedFingerprintID, evmChainID = '', contractAddress = '') {
         let label = false
         let evmChainIDContractAddressKey = `${evmChainID}_${contractAddress}`
         let fullKey = `${modifiedFingerprintID}_${evmChainIDContractAddressKey}`
-        if (this.labels[fullKey] != undefined){
+        if (this.labels[fullKey] != undefined) {
             let fullKeyLabel = this.labels[fullKey]
             console.log(`[${acctAddr}] getLabel fullkey ${fullKey}`, fullKeyLabel)
             return fullKeyLabel
         }
-        if (this.labels[modifiedFingerprintID] != undefined){
+        if (this.labels[modifiedFingerprintID] != undefined) {
             let genricLabel = this.labels[modifiedFingerprintID]
-            console.log(`[${acctAddr}] getLabel generic ${modifiedFingerprintID}`, genricLabel)
+            //console.log(`[${acctAddr}] getLabel generic ${modifiedFingerprintID}`, genricLabel)
             return genricLabel
         }
         return false
     }
 
     async initEvmSchemaMap() {
+
         await this.initLabels();
+        let projectcontractabiRecs = await this.poolREADONLY.query(`select address, fingerprintID, name, projectName, abiType from projectcontractabi`);
+        let projectcontractabi = {};
+        for (const r of projectcontractabiRecs) {
+            let subtableId = (r.abiType == "function") ? `call_project_${r.projectName}_${r.name}_${r.address}_${r.fingerprintID}` : `evt_project_${r.projectName}_${r.name}_${r.address}_${r.fingerprintID}`;
+            if (projectcontractabi[r.fingerprintID] == undefined) {
+                projectcontractabi[r.fingerprintID] = {};
+            }
+            projectcontractabi[r.fingerprintID][r.address] = {
+                project: r.projectName,
+                subtableId: subtableId,
+                abiType: r.abiType,
+                status: "Unknown"
+            };
+        }
+
         let evmDataset = this.evmDatasetID
-        let tablesRecs = await this.execute_bqJob(`SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`);
+        let schemaQuery = `SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`
+        let tablesRecs = await this.execute_bqJob(schemaQuery, paraTool.BQUSMulti);
 
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
+        let callExtraCol = ["chain_id", "evm_chain_id", "contract_address", "call_success", "call_tx_hash", "call_tx_index", "call_trace_address", "call_block_time", "call_block_number"]
+        let eventExtraCol = ["chain_id", "evm_chain_id", "contract_address", "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"]
         for (const t of tablesRecs) {
             let tblType = t.tbl_type
             let tableId = t.table_name
@@ -8583,10 +8530,23 @@ module.exports = class Indexer extends AssetManager {
                 evmFingerprintMap[fingerprintID] = {}
                 evmFingerprintMap[fingerprintID].flds = []
                 evmFingerprintMap[fingerprintID].tableId = tableId
+                if (projectcontractabi[fingerprintID]) {
+                    // when a first interaction happens with an address held in this map, we create another subtable for the project
+                    evmFingerprintMap[fingerprintID].projectcontractabi = projectcontractabi[fingerprintID];
+                }
             }
-            if (tblType == 'call' && ordinalIdx >= 8) {
+            if (tableId.includes("call_project_") || tableId.includes("evt_project_")) {
+                let sa = tableId.split("_");
+                let address = sa[4];
+                if (evmFingerprintMap[fingerprintID].projectcontractabi[address].status == "Unknown") {
+                    evmFingerprintMap[fingerprintID].projectcontractabi[address].status = "Created";
+                }
+            }
+            if (tblType == 'call' && ordinalIdx >= callExtraCol.length) {
+                // call input ordinals starts at callExtraColLen
                 evmFingerprintMap[fingerprintID].flds.push(colName)
-            } else if (tblType == 'evt' && ordinalIdx >= 7) {
+            } else if (tblType == 'evt' && ordinalIdx >= eventExtraCol.length) {
+                // evt input ordinals starts at eventExtraCol
                 evmFingerprintMap[fingerprintID].flds.push(colName)
             }
             evmSchemaMap[tableId][colName] = t.data_type;
@@ -8599,12 +8559,21 @@ module.exports = class Indexer extends AssetManager {
         console.log(`initEvmSchemaMap DONE`)
     }
 
-    getTableIDFromFingerprintID(fingerprintID) {
-        let tableID = false
+    //????? REVIEW THIS
+    getTableIDFromFingerprintID(fingerprintID, to_address = null) {
+        let tableID = null;
+        let subTableIDInfo = null;
+        let a = (to_address) ? to_address.toLowerCase(): '';
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID].tableId
+            if (this.evmFingerprintMap[fingerprintID].addresses) {
+                console.log(to_address, a);
+                if (this.evmFingerprintMap[fingerprintID].addresses[a] != undefined) {
+                    subTableIDInfo = this.evmFingerprintMap[fingerprintID].addresses[a];
+                }
+            }
         }
-        return tableID
+        return [tableID, subTableIDInfo];
     }
 
     getSchemaFlds(fingerprintID) {
@@ -8640,134 +8609,164 @@ module.exports = class Indexer extends AssetManager {
         return schemaInfo
     }
 
-    generateEventBqRec(tableId, fingerprintID, evmLog, acctAddr) {
-        let decodedEvents = JSON.parse(evmLog.events)
-        let rec = {
-            chain_id: evmLog.id, //string
-            evm_chain_id: evmLog.chain_id, //integer
-            contract_address: evmLog.address,
-            evt_tx_hash: evmLog.transaction_hash,
-            evt_index: evmLog.log_index,
-            evt_block_time: evmLog.block_timestamp,
-            evt_block_number: evmLog.block_number,
-        }
-
-        // used for labels
-        let recBT = {
-            chain_id: evmLog.id, //string
-            evm_chain_id: evmLog.chain_id, //integer
-            contract_address: evmLog.address,
-            tx_hash: evmLog.transaction_hash,
-            block_time: evmLog.block_timestamp,
-            block_number: evmLog.block_number,
-        }
-
-        let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
-        if (eventLabel){
-            console.log(`generateEventBqRec eventLabel ***`, eventLabel)
-            this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
-        }
-
-        let flds = this.getSchemaFlds(fingerprintID)
-        if (flds.length != decodedEvents.length) {
-            this.logger.error({
-                op: "generateEventBqRec",
-                tableId: `${tableId}`,
-                error: `flds mismatch`,
-                flds: flds,
-                params: decodedEvents,
-            })
-            return false
-        }
-        for (let i = 0; i < decodedEvents.length; i++) {
-            let fldName = flds[i]
-            let dEvent = decodedEvents[i]
-            let bqColType = ethTool.mapABITypeToBqType(dEvent.type)
-            if (bqColType == 'JSON') {
-                rec[fldName] = JSON.stringify(dEvent.value)
-            } else {
-                rec[fldName] = dEvent.value
+    generateEventBqRec(tableId, projectTableInfo, fingerprintID, evmLog, acctAddr) {
+        try {
+            let decodedEvents = JSON.parse(evmLog.events)
+            let rec = {
+                chain_id: evmLog.id, //string
+                evm_chain_id: evmLog.chain_id, //integer
+                contract_address: evmLog.address,
+                evt_tx_hash: evmLog.transaction_hash,
+                evt_index: evmLog.log_index,
+                evt_block_time: evmLog.block_timestamp,
+                evt_block_number: evmLog.block_number,
             }
+
+            // used for labels
+            let recBT = {
+                chain_id: evmLog.id, //string
+                evm_chain_id: evmLog.chain_id, //integer
+                contract_address: evmLog.address,
+                tx_hash: evmLog.transaction_hash,
+                block_time: evmLog.block_timestamp,
+                block_number: evmLog.block_number,
+            }
+
+            let eventLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
+            if (eventLabel) {
+                //console.log(`generateEventBqRec eventLabel ***`, eventLabel)
+                this.updateAddressLabelCandidates(acctAddr, eventLabel, recBT)
+            }
+
+            let flds = this.getSchemaFlds(fingerprintID)
+            if (flds.length != decodedEvents.length) {
+                this.logger.error({
+                    op: "generateEventBqRec",
+                    tableId: `${tableId}`,
+                    error: `flds mismatch`,
+                    flds: flds,
+                    params: decodedEvents,
+                })
+                return [null, null];
+            }
+            for (let i = 0; i < decodedEvents.length; i++) {
+                let fldName = flds[i]
+                let dEvent = decodedEvents[i]
+                let bqColType = ethTool.mapABITypeToBqType(dEvent.type)
+                if (bqColType == 'JSON') {
+                    rec[fldName] = JSON.stringify(dEvent.value)
+                } else {
+                    rec[fldName] = dEvent.value
+                }
+            }
+            /*
+              for (const dEvent of decodedEvents) {
+              rec[dEvent.name] = dEvent.value
+              }
+            */
+            let bqRec = {
+                insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
+                json: rec
+            }
+            let bqRec2 = null
+            if (projectTableInfo) {
+                let subtableId = projectTableInfo.subtableId;
+                bqRec2 = {
+                    insertId: `${subtableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
+                    json: rec
+                }
+            }
+            return [bqRec, bqRec2]
+        } catch (err) {
+            console.log("generateEventBqRec", err);
+            return [null, null];
         }
-        /*
-        for (const dEvent of decodedEvents) {
-            rec[dEvent.name] = dEvent.value
-        }
-        */
-        let bqRec = {
-            insertId: `${tableId}_${evmLog.transaction_hash}_${evmLog.log_index}`,
-            json: rec
-        }
-        return bqRec
     }
 
-    //evt_ClientData_0x095e66fa4dd6a6f7b43fb8444a7bd0edb870508c7abf639bc216efb0bcff9779_1
-    //call_safeTransferFrom_0xb88d4fde
-    generateCallBqRec(tableId, fingerprintID, evmTx, acctAddr) {
-        let decodedParams = JSON.parse(evmTx.params)
-        let rec = {
-            chain_id: evmTx.id, //string
-            evm_chain_id: evmTx.chain_id, //integer
-            contract_address: evmTx.to_address,
-            call_success: true, //TODO
-            call_tx_hash: evmTx.hash,
-            call_block_time: evmTx.block_timestamp,
-            call_block_number: evmTx.block_number,
-        }
 
-        // used for labels
-        let recBT = {
-            chain_id: evmTx.id, //string
-            evm_chain_id: evmTx.chain_id, //integer
-            contract_address: evmTx.to_address,
-            tx_hash: evmTx.hash,
-            block_time: evmTx.block_timestamp,
-            block_number: evmTx.block_number,
-        }
-
-        let callLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
-        if (callLabel){
-            console.log(`generateCallBqRec callLabel ***`, callLabel)
-            this.updateAddressLabelCandidates(acctAddr, callLabel, recBT)
-        }
-
-        let flds = this.getSchemaFlds(fingerprintID)
-        if (flds.length != decodedParams.length) {
-            this.logger.error({
-                op: "generateCallBqRec",
-                tableId: `${tableId}`,
-                error: `flds mismatch`,
-                flds: flds,
-                params: decodedParams,
-            })
-            return false
-        }
-        for (let i = 0; i < decodedParams.length; i++) {
-            let fldName = flds[i]
-            let dParam = decodedParams[i]
-            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
-                rec[fldName] = JSON.stringify(dParam.value)
-            } else {
-                rec[fldName] = dParam.value
+    generateCallBqRec(tableId, projectTableInfo, fingerprintID, evmTx, acctAddr) {
+        try {
+            let decodedParams = evmTx.params ? JSON.parse(evmTx.params) : [];
+            let rec = {
+                chain_id: evmTx.id, //string
+                evm_chain_id: evmTx.chain_id, //integer
+                contract_address: evmTx.to_address,
+                call_success: (evmTx.receipt_status == 1)? true: false, //TODO
+                call_tx_hash: evmTx.hash,
+                call_tx_index: evmTx.transaction_index,
+                call_block_time: evmTx.block_timestamp,
+                call_block_number: evmTx.block_number,
             }
-        }
-        /*
-        for (const dParam of decodedParams) {
-            if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
-                rec[dParam.name] = JSON.stringify(dParam.value)
-            } else {
-                rec[dParam.name] = dParam.value
+
+            // used for labels
+            let recBT = {
+                chain_id: evmTx.id, //string
+                evm_chain_id: evmTx.chain_id, //integer
+                contract_address: evmTx.to_address,
+                tx_hash: evmTx.hash,
+                block_time: evmTx.block_timestamp,
+                block_number: evmTx.block_number,
             }
+
+            let callLabel = this.getLabelCandidate(acctAddr, fingerprintID, rec.evm_chain_id, rec.contract_address)
+            if (callLabel) {
+                //console.log(`generateCallBqRec callLabel ***`, callLabel)
+                this.updateAddressLabelCandidates(acctAddr, callLabel, recBT)
+            }
+
+            let flds = this.getSchemaFlds(fingerprintID)
+            if (flds.length != decodedParams.length) {
+                this.logger.error({
+                    op: "generateCallBqRec",
+                    tableId: `${tableId}`,
+                    error: `flds mismatch`,
+                    flds: flds,
+                    params: decodedParams,
+                })
+                return [null, null];
+            }
+            for (let i = 0; i < decodedParams.length; i++) {
+                let fldName = flds[i]
+                let dParam = decodedParams[i]
+                //console.log(`dParam[${i}]`, dParam)
+                //TODO: parse tuple type
+                if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+                    rec[fldName] = JSON.stringify(dParam.value)
+                } else {
+                    rec[fldName] = dParam.value
+                }
+            }
+            /*
+              for (const dParam of decodedParams) {
+              if (ethTool.mapABITypeToBqType(dParam.type) == 'JSON') {
+              rec[dParam.name] = JSON.stringify(dParam.value)
+              } else {
+              rec[dParam.name] = dParam.value
+              }
+              }
+            */
+            let bqRec = {
+                insertId: `${tableId}_${evmTx.hash}`,
+                json: rec
+            }
+            let bqRec2 = null
+            if (projectTableInfo) {
+                let subtableId = projectTableInfo.subtableId;
+                bqRec2 = {
+                    insertId: `${subtableId}_${evmTx.hash}`,
+                    json: rec
+                }
+            }
+            return [bqRec, bqRec2];
+        } catch (err) {
+            console.log("generateCallBqRec", err);
+            return [null, null];
         }
-        */
-        let bqRec = {
-            insertId: `${tableId}_${evmTx.hash}`,
-            json: rec
-        }
-        return bqRec
+
     }
 
-    async process_evm_flush(ts){
+
+    async process_evm_flush(ts) {
         await this.flush_evm_label_candidates(ts)
     }
 
@@ -8783,49 +8782,97 @@ module.exports = class Indexer extends AssetManager {
             families: ["realtime", "label"],
         }];
         let isRowFound = true
+        let isStoredLabelFlound = false
+        let rowData = false
+        let storedLabels = false
+
         try {
             const [row] = await tblRealtime.row(address).get({
                 filter
             });
-            let rowData = row.data;
-            console.log(`**** address ${address} rowData`, rowData)
-        } catch (err){
-            let errorStr = err.toString()
-            if (errorStr.includes("RowError: Unknown row:")){
-                isRowFound = false
+            rowData = row.data;
+            //console.log(`**** address ${address} rowData`, rowData)
+            if (rowData.label != undefined) {
+                storedLabels = rowData.label
+                isStoredLabelFlound = true
             }
-            console.log(`err`,  err.toString())
+        } catch (err) {
+            if (err && err.code == 404) {
+                isRowFound = false
+            } else {
+                console.log(`err`, err.toString())
+            }
         }
         let btLabelRowsToInsert = []
         // TODO: (2) if there is a row miss, label = "create", and add a new row of the asset_type, return true
-        if (!isRowFound){
-            console.log(`address [${address}] labels missing`)
+        if (!isRowFound || !isStoredLabelFlound) {
+            console.log(`address [${address}] isRowFound=${isRowFound}, isStoredLabelFlound=${isStoredLabelFlound}`)
             let hres = {
                 key: address.toLowerCase(),
                 data: {
                     label: {}
                 }
             }
-            for (const candidate_label of Object.keys(candidate_labels_map)){
+            for (const candidate_label of Object.keys(candidate_labels_map)) {
                 let btRec = candidate_labels_map[candidate_label]
                 hres['data']['label'][candidate_label] = {
                     value: JSON.stringify(btRec),
                     timestamp: ts * 1000000
                 }
             }
-            console.log(`address ${address} hres***`, hres)
+            //console.log(`address ${address} hres***`, hres)
             btLabelRowsToInsert.push(hres)
-        }else{
+        } else if (Array.isArray(Object.keys(storedLabels))) {
             // TODO: (3) if there is a row hit, get account labels and for any label in candidate_labels, if any are missing, then stream new labels (including { signature, fingerprint_id, method_id }) and return false
+            let hres = {
+                key: address.toLowerCase(),
+                data: {
+                    label: {}
+                }
+            }
+            let labelMap = []
+            let knownLabels = Object.keys(storedLabels)
+            let duplicateLabels = []
+            let newLabelFound = false
+            console.log(`address [${address}] knownLabels`, knownLabels)
+            for (const candidate_label of Object.keys(candidate_labels_map)) {
+                let storedLabel = storedLabels[candidate_label]
+                if (storedLabel == undefined) {
+                    let btRec = candidate_labels_map[candidate_label]
+                    hres['data']['label'][candidate_label] = {
+                        value: JSON.stringify(btRec),
+                        timestamp: ts * 1000000
+                    }
+                    newLabelFound = true
+                } else {
+                    //console.log(`existing storedLabel`, storedLabel)
+                    if (storedLabel.timestamp / 1000000 > ts) {
+                        /*
+                        TODO: we have found new candidate label with earlier timestamp.
+                        This likely happens due to us indexing the evm blocks in random order,
+                        Should we update the label with earliest observed ts possible?
+                        */
+                    }
+                    duplicateLabels.push(candidate_label)
+                }
+            }
+            if (newLabelFound) {
+                console.log(`address ${address} new labels ***`, hres)
+                btLabelRowsToInsert.push(hres)
+            } else {
+                //console.log(`address ${address} duplicateLabels`, duplicateLabels)
+            }
         }
-        await tblRealtime.insert(btLabelRowsToInsert);
+        if (btLabelRowsToInsert.length > 0) {
+            await tblRealtime.insert(btLabelRowsToInsert);
+        }
     }
 
-    async flush_evm_label_candidates(ts){
+    async flush_evm_label_candidates(ts) {
         let addressLabelCandidates = this.addressLabelCandidates
-        for (const address of Object.keys(addressLabelCandidates)){
+        for (const address of Object.keys(addressLabelCandidates)) {
             let candidate_labels_map = addressLabelCandidates[address]
-            console.log(`flush_evm_label_candidates [${address}] candidate_labels_map`, candidate_labels_map)
+            //console.log(`flush_evm_label_candidates [${address}] candidate_labels_map`, candidate_labels_map)
             await this.update_account_labels(address, candidate_labels_map, ts)
         }
         this.addressLabelCandidates = {}
@@ -8877,7 +8924,7 @@ module.exports = class Indexer extends AssetManager {
                 transaction_count: block.transactions.length
             }
         }
-        console.log(`bqEvmBlock`, bqEvmBlock)
+        //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
 
         for (let i = 0; i < evmFullBlock.transactions.length; i++) {
@@ -8902,8 +8949,8 @@ module.exports = class Indexer extends AssetManager {
                 hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                 nonce: tx.nonce,
                 transaction_index: tx.transactionIndex,
-                from_address: tx.from,
-                to_address: tx.to,
+                from_address: tx.from.toLowerCase(),
+                to_address: (tx.to != undefined) ? tx.to.toLowerCase() : null,
                 value: rawTx.value,
                 gas: rawTx.gas,
                 gas_price: rawTx.gasPrice,
@@ -8931,35 +8978,50 @@ module.exports = class Indexer extends AssetManager {
                     // try to find tableID
                     if (methodID != null) { //skip nativeTransfer
                         let acctAddr = tx.from.toLowerCase() // signer of the tx
-                        let tableID = this.getTableIDFromFingerprintID(methodID)
-                        let bqCall = false
-                        let isNewSchema = false
-                        let schemaInfo = false
-                        if (tableID) {
-                            bqCall = this.generateCallBqRec(tableID, methodID, evmTx, acctAddr)
 
+                        let [tableID, projectTableInfo] = this.getTableIDFromFingerprintID(methodID, tx.to);
+                        if (tableID) {
+                            let [bqCall, bqCall2] = this.generateCallBqRec(tableID, projectTableInfo, methodID, evmTx, acctAddr)
+                            if (bqCall) {
+                                //console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push(bqCall)
+                            }
+                            // if there is no projectTableInfo set up yet, set it up with the same schema
+                            if (projectTableInfo) {
+                                let subtableID = projectTableInfo.subtableId;
+                                if (projectTableInfo.status == "Unknown") {
+                                    let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures);
+                                    if (schemaInfo) {
+                                        auto_evm_schema_map[subtableID] = schemaInfo
+                                        console.log("*******1 CREATING SUBTABLEID", subtableID, schemaInfo);
+                                    }
+                                } else if (bqCall2) {
+                                    if (auto_evm_rows_map[subtableID] == undefined) {
+                                        auto_evm_rows_map[subtableID] = []
+                                    }
+                                    auto_evm_rows_map[subtableID].push(bqCall2)
+                                    console.log("*******2 ADDING ROW SUBTABLEID", subtableID, bqCall2);
+                                }
+                            }
                         } else {
-                            schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
                             if (schemaInfo) {
                                 tableID = schemaInfo.schema.tableId
-                                bqCall = this.generateCallBqRec(tableID, methodID, evmTx, acctAddr)
-                                isNewSchema = true
+                                let [bqCall, bqCall2] = this.generateCallBqRec(tableID, projectTableInfo, methodID, evmTx, acctAddr)
+                                // TODO: bqCall's label
+                                if (schemaInfo && tableID) {
+                                    console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
+                                    auto_evm_schema_map[tableID] = schemaInfo
+                                }
                             } else {
                                 //shouldn't get here?
                                 console.log(`Unknown methodID ${methodID}\n`)
                             }
                         }
-                        if (bqCall && tableID) {
-                            console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
-                            if (auto_evm_rows_map[tableID] == undefined) {
-                                auto_evm_rows_map[tableID] = []
-                            }
-                            auto_evm_rows_map[tableID].push(bqCall)
-                        }
-                        if (isNewSchema && schemaInfo && tableID) {
-                            console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
-                            auto_evm_schema_map[tableID] = schemaInfo
-                        }
+
                     }
                 }
             }
@@ -8967,7 +9029,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            console.log(`bq+`, bqEvmTransaction)
+            //console.log(`bq+`, bqEvmTransaction)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
@@ -8980,7 +9042,7 @@ module.exports = class Indexer extends AssetManager {
                         log_index: l.logIndex,
                         transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                         transaction_index: i,
-                        address: l.address,
+                        address: l.address.toLowerCase(),
                         data: l.data,
                         topics: l.topics,
                         block_timestamp: block.timestamp,
@@ -8993,47 +9055,59 @@ module.exports = class Indexer extends AssetManager {
                         insertId: `${tx.transactionHash}_${l.logIndex}`,
                         json: evmLog
                     }
-                    console.log(`bqEvmLog`, bqEvmLog)
+                    //console.log(`bqEvmLog`, bqEvmLog)
                     rows_logs.push(bqEvmLog);
 
                     // write specific evt_ table
                     if (eSig) {
                         // try to find tableID
                         let acctAddr = tx.from.toLowerCase() // signer of the tx
-                        let tableID = this.getTableIDFromFingerprintID(eFingerprintID)
-                        let bqEvent = false
-                        let isNewSchema = false
-                        let schemaInfo = false
-                        if (tableID) {
-                            bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog, acctAddr)
-                        } else {
-                            //do the abi lookup
-                            schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                        let [tableID, projectTableInfo] = this.getTableIDFromFingerprintID(eFingerprintID, l.address)
+
+                        if (tableID) { // existing table
+                            let [bqEvent, bqEvent2] = this.generateEventBqRec(tableID, projectTableInfo, eFingerprintID, evmLog, acctAddr)
+                            if (bqEvent && tableID) {
+                                //console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push(bqEvent)
+                            }
+                            if (projectTableInfo) {
+                                let subtableID = projectTableInfo.subtableId;
+                                if (projectTableInfo.status == "Unknown") {
+                                    console.log("*******3 CREATE PROJECT EVENTS TABLE", subtableID)
+                                    let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                                    if (schemaInfo) {
+                                        auto_evm_schema_map[subtableID] = schemaInfo
+                                    }
+                                } else if (bqEvent2) {
+                                    console.log(`*******4 PROJECTS EVENTS ROW ${subtableID}\n`, bqEvent2)
+                                    if (auto_evm_rows_map[subtableID] == undefined) {
+                                        auto_evm_rows_map[subtableID] = []
+                                    }
+                                    auto_evm_rows_map[subtableID].push(bqEvent2)
+                                }
+                            }
+                        } else { // do the abi lookup
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
                             if (schemaInfo) {
-                                isNewSchema = true
                                 tableID = schemaInfo.schema.tableId
-                                bqEvent = this.generateEventBqRec(tableID, eFingerprintID, evmLog, acctAddr)
+                                let [bqEvent, bqEvent2] = this.generateEventBqRec(tableID, projectTableInfo, eFingerprintID, evmLog, acctAddr)
                                 if (auto_evm_rows_map[tableID] == undefined) {
                                     auto_evm_rows_map[tableID] = []
                                 }
                                 auto_evm_rows_map[tableID].push()
-                            } else {
-                                //shouldn't get here?
+                                if (schemaInfo && tableID) {
+                                    console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
+                                    auto_evm_schema_map[tableID] = schemaInfo
+                                }
+                            } else { //shouldn't get here?
                                 console.log(`Unknown eFingerprintID ${eFingerprintID}\n`, eSig)
                             }
                         }
-                        if (bqEvent && tableID) {
-                            console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
-                            if (auto_evm_rows_map[tableID] == undefined) {
-                                auto_evm_rows_map[tableID] = []
-                            }
-                            auto_evm_rows_map[tableID].push(bqEvent)
-                        }
 
-                        if (isNewSchema && schemaInfo && tableID) {
-                            console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
-                            auto_evm_schema_map[tableID] = schemaInfo
-                        }
+
                     }
                 }
             }
@@ -9041,8 +9115,11 @@ module.exports = class Indexer extends AssetManager {
             this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
         }
 
-        //TODO: update bt after process process_evm_transaction
-        await this.process_evm_flush(blockTS)
+        if (blockTS) {
+            // crawl any token addresses, write to btRealtime
+            await this.crawl_erc_tokens(evm_blk_num, blockTS, chainID);
+            await this.process_evm_flush(blockTS)
+        }
 
         // stream into blocks, transactions
         try {
@@ -9094,7 +9171,7 @@ module.exports = class Indexer extends AssetManager {
                     .dataset(evmDatasetID)
                     .createTable(schemaTableId, {
                         schema: sch,
-                        location: 'us-central1',
+                        location: this.evmBQLocation,
                         timePartitioning: timePartitioning,
                     });
             } catch (err) {
@@ -9114,30 +9191,48 @@ module.exports = class Indexer extends AssetManager {
 
         // stream into call_ ,  evt_ table
         console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
+
+        let tableIds = Object.keys(auto_evm_rows_map)
+        let autoEvmRowPromise = []
+        let autoEvmRowPromiseTableId = []
         for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
             //console.log(`${evmDatasetID}:${tableId} row`, rows)
-            try {
-                if (rows && rows.length > 0) {
-                    await bigquery
-                        .dataset(evmDatasetID)
-                        .table(tableId)
-                        .insert(rows, {
-                            raw: true
-                        });
-                    console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
-                }
-            } catch (err) {
-                let errorStr = err.toString()
-                if (!errorStr.includes('Already Exists')) {
-                    console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
-                    await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
-                    this.logger.error({
-                        op: "auto_evm_row_insert",
-                        tableId: `${tableId}`,
-                        error: errorStr,
-                        rows: rows
-                    })
+            if (rows && rows.length > 0) {
+                autoEvmRowPromiseTableId.push(tableId)
+                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {raw: true}))
+            }
+        }
+        let autoEvmRowStates;
+        try {
+            autoEvmRowStates = await Promise.allSettled(autoEvmRowPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
+            this.log_manager_error(e, "batchCrawlerInit", "Promise.allSettled");
+        }
+        for (let i = 0; i < autoEvmRowStates.length; i += 1) {
+            let autoEvmRowState = autoEvmRowStates[i]
+            let tableId = autoEvmRowPromiseTableId[i]
+            let rows = auto_evm_rows_map[tableId]
+            if (autoEvmRowState.status != undefined && autoEvmRowState.status == "fulfilled") {
+                //console.log(`autoEvmRowState[${i}] fulfilled`, autoEvmRowState)
+                console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
+            } else {
+                let rejectedReason = JSON.parse(JSON.stringify(autoEvmRowState['reason']))
+                let errorStr = rejectedReason.message
+                if (errorStr){
+                    if (!errorStr.includes('Already Exists')) {
+                        console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
+                        await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
+                        this.logger.error({
+                            op: "auto_evm_row_insert",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            rows: rows
+                        })
+                    }
                 }
             }
         }
@@ -9154,30 +9249,15 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async retryWithDelay(operation, maxRetries = 10, delay = 500, ctx = "") {
-      for (let i = 0; i < maxRetries; i++) {
-        const result = await operation();
-        if (result !== false) {
-          console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
-          return result;
-        }
-        if (i < maxRetries - 1) {
-          await new Promise((resolve) => setTimeout(resolve, delay));
-        }
-      }
-      console.log(`retryWithDelay Failed maxRetries(${maxRetries}) reached`)
-      return false;
-    }
-
-    async crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber, timeoutMS = 20000) {
-        if (!evmRPCBlockReceipts) {
+    async crawlEvmBlockTraces(evmRPCInternal, blockNumber, timeoutMS = 20000) {
+        if (!evmRPCInternal) {
             return (false);
         }
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceipts)
+        console.log(`crawlEvmBlockTraces crawlEvmBlockTraces`, evmRPCInternal)
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
-        if (hexBlocknumber.substr(0,3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
-        let cmd = `curl ${evmRPCBlockReceipts}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
         //console.log(`crawlEvmBlockReceipts`, cmd)
         try {
             const {
@@ -9191,8 +9271,123 @@ module.exports = class Indexer extends AssetManager {
                 console.log(blockNumber, receiptData.result.length, cmd);
                 return (receiptData.result);
             }
+            if (receiptData.error){
+                console.log(`debug_traceBlockByNumber cmd`, cmd)
+                console.log(`debug_traceBlockByNumber error`, receiptData.error)
+                return false
+            }
             //console.log(`crawlEvmBlockReceipts`, cmd)
-            return (null);
+            return false;
+        } catch (error) {
+            this.logger.warn({
+                "op": "debug_traceBlockByNumber",
+                "cmd": cmd,
+                "err": error
+            })
+            console.log(error);
+        }
+        return false;
+    }
+
+    async retryWithDelay(operation, maxRetries = 10, delay = 500, ctx = "", expectedNum = 0) {
+        for (let i = 0; i < maxRetries; i++) {
+            const result = await operation();
+            //console.log(`retryWithDelay retry#${i} result`, result)
+            if (result) {
+                if (ctx.includes("crawlEvmBlockReceipts")){
+                    console.log(`retryWithDelay`, result)
+                    console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
+                    return result;
+                }else{
+                    console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
+                    return result;
+                }
+            }
+            if (i < maxRetries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        console.log(`retryWithDelay Failed maxRetries(${maxRetries}) reached`)
+        return false;
+    }
+
+    async crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi +++`, evmRPCBlockReceiptsApi)
+        if (!evmRPCBlockReceiptsApi) {
+            return (false);
+        }
+        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceiptsApi)
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCBlockReceiptsApi}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+
+        for (let i = 0; i < maxRetries; i++) {
+            console.log(`crawlEvmBlockReceipts try#${i}`)
+            try {
+                const {
+                    stdout,
+                    stderr
+                } = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                let receiptData = JSON.parse(stdout);
+                if (receiptData.result) {
+                    console.log(blockNumber, receiptData.result.length, cmd);
+                    return (receiptData.result);
+                }
+                if (receiptData.error){
+                    console.log(`crawlEvmBlockReceipts cmd`, cmd)
+                    console.log(`crawlEvmBlockReceipts error`, receiptData.error)
+                }
+                //console.log(`crawlEvmBlockReceipts`, cmd)
+            } catch (error) {
+                this.logger.warn({
+                    "op": "crawlEvmBlockReceipts",
+                    "cmd": cmd,
+                    "err": error
+                })
+                console.log(error);
+            }
+            if (i < maxRetries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        console.log(`retryWithDelay Failed maxRetries(${maxRetries}) reached`)
+        return false;
+    }
+
+    async crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi +++`, evmRPCBlockReceipts)
+        if (!evmRPCBlockReceipts) {
+            return (false);
+        }
+        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceipts)
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCBlockReceipts}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+        console.log(`crawlEvmBlockReceipts`, cmd)
+
+        try {
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd, {
+                maxBuffer: 1024 * 64000
+            });
+            let receiptData = JSON.parse(stdout);
+            if (receiptData.result) {
+                console.log(blockNumber, receiptData.result.length, cmd);
+                return (receiptData.result);
+            }
+            if (receiptData.error){
+                console.log(`crawlEvmBlockReceipts cmd`, cmd)
+                console.log(`crawlEvmBlockReceipts error`, receiptData.error)
+                return false
+            }
+            //console.log(`crawlEvmBlockReceipts`, cmd)
+            return false;
         } catch (error) {
             this.logger.warn({
                 "op": "crawlEvmBlockReceipts",
@@ -9237,13 +9432,13 @@ module.exports = class Indexer extends AssetManager {
         startConnection();
         const web3 = new Web3(provider);
         this.web3Api = web3;
-        if (chain.evmRPCBlockReceipts != undefined){
+        if (chain.evmRPCBlockReceipts != undefined) {
             this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
         }
-        if (chain.evmRPCInternal != undefined){
+        if (chain.evmRPCInternal != undefined) {
             this.evmRPCInternal = chain.evmRPCInternal
         }
-        if (chain.evmRPC != undefined){
+        if (chain.evmRPC != undefined) {
             this.evmRPC = chain.evmRPC
         }
         this.contractABIs = await this.getContractABI();
@@ -9252,7 +9447,8 @@ module.exports = class Indexer extends AssetManager {
         let contractABISignatures = this.contractABISignatures;
         await this.assetManagerInit()
 
-        let evmRPCBlockReceipts = this.evmRPCBlockReceipts
+        let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
+        let evmRPCInternalApi = this.evmRPCInternal
 
         let blockNumber = blkNum;
         let block = null;
@@ -9264,7 +9460,8 @@ module.exports = class Indexer extends AssetManager {
         let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
         let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
         block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-        console.log(`blk #${blockNumber}`, block)
+        //console.log(`blk #${blockNumber}`, block)
+        //TODO: ethereum has withdrawals flds
         let numTransactions = block && block.transactions ? block.transactions.length : 0;
         console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
         let rows_blocks = [];
@@ -9275,23 +9472,34 @@ module.exports = class Indexer extends AssetManager {
             if (numTransactions > 0) {
                 let isParallel = true
                 let log_retry_max = 10
-                let log_retry_ms = 500
+                let log_retry_ms = 2000
+                let log_timeout_ms = 5000
                 let evmReceipts = false
 
-                let evmReceiptsFunc = (evmRPCBlockReceipts)? this.crawlEvmBlockReceipts(evmRPCBlockReceipts, block.number): ethTool.crawlEvmReceipts(web3, block, isParallel)
-                let evmReceiptsCtx = (evmRPCBlockReceipts)? `this.crawlEvmBlockReceipts(evmRPCBlockReceipts, ${block.number})`: `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                if (evmRPCBlockReceiptsApi){
+                    evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                } else{
+                    let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
+                    let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                    evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                }
 
-                evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
                 if (!evmReceipts) evmReceipts = [];
                 console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
 
-                if (!evmReceipts) evmReceipts = [];
                 var statusesPromise = Promise.all([
                     ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
                     ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                 ])
                 let [dTxns, dReceipts] = await statusesPromise
+
                 let evmTrace = false
+                if (evmRPCInternalApi){
+                    let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
+                    let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
+                    evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
+                    //console.log(`[${block.number}] evmTrace`, evmTrace)
+                }
                 await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
             }
         } catch (err) {

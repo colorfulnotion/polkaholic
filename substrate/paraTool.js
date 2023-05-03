@@ -32,6 +32,10 @@ const {
     hexToString,
     stringToHex
 } = require("@polkadot/util");
+
+const Big = require('big.js');
+const Decimal = require('decimal.js');
+
 const {
     signatureVerify,
     evmToAddress,
@@ -94,6 +98,42 @@ async function initPolkadotAPI() {
     console.log(`initiated polkadotjs api`)
 }
 */
+
+function sqrtPriceX96ToPriceWithDecimals(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
+    var sqrtPriceX96BN = new Big(toIntegerStr(sqrtPriceX96))
+    var sqar2X96BN = new Big('79228162514264337593543950336')
+    var sqar2X192BN = new Big('6277101735386680763835789423207666416102355444464034512896')
+
+    /*
+    Method 1:
+    price_token0_in_token1 = sqrtRatioX96 ** 2 / 2 ** 192
+    var price_token0_in_token1 = sqrtPriceX96BN.pow(2).div(sqar2X192BN)
+
+    We lose precision when doing BIG.div(BIG)  comparing to method2. No idea why
+    */
+
+    /*
+    Method 2:
+    sqrtPriceX96_decimal = sqrtPriceX96 / 2^96
+    price_token0_in_token1 = (sqrtPriceX96_decimal ^ 2)
+    */
+
+    var sqrtPriceX96_decimal = sqrtPriceX96BN.div(sqar2X96BN)
+    //console.log(`sqrtPriceX96_decimal ${sqrtPriceX96_decimal.toFixed()}`)
+    var price_token0_in_token1 = sqrtPriceX96_decimal.pow(2)
+    var decimalsAdj = new Big(10).pow(token0Decimals).div(new Big(10).pow(token1Decimals))
+    return price_token0_in_token1.mul(decimalsAdj).toFixed()
+}
+
+function tickToPriceWithDecimals(tick, token0Decimals = 18, token1Decimals = 18) {
+    let base = new Decimal(1.0001);
+    let tickDecimal = new Decimal(tick);
+    let decimalsDifference = new Decimal(token0Decimals - token1Decimals);
+    let base10 = new Decimal(10);
+    let decimalsAdj = base10.pow(decimalsDifference)
+    let price = base.pow(tickDecimal).mul(decimalsAdj);
+    return price.toFixed();
+}
 
 function isNumeric(str) {
     if (typeof str != "string") return false // we only process strings!
@@ -1412,6 +1452,9 @@ module.exports = {
     debugVerbose: 3,
     debugTracing: 4,
 
+    BQUSCentral1: "us-central1",
+    BQUSMulti: "us",
+
     // Kusama parachains
     chainIDStatemine: 21000,
     chainIDEncointer: 21001,
@@ -1513,6 +1556,18 @@ module.exports = {
     // polkadot/kusama
     chainIDPolkadot: 0,
     chainIDKusama: 2,
+
+    // other evm
+    chainIDEthereum: 1,
+    chainIDOptimism: 10,
+    chainIDBsc: 56,
+    chainIDPolygon: 137,
+    chainIDZksync: 324,
+    chainIDAstarEVM: 592,
+    chainIDMoonbeamEVM: 1284,
+    chainIDMoonriverEVM: 1285,
+    chainIDArbitrum: 42161,
+    chainIDAvalanche: 43114,
 
     // assetSource
     assetSourceCoingecko: 'coingecko',
@@ -1634,6 +1689,12 @@ module.exports = {
         var res = signatureVerify(signedMessage, signature, address)
         return res.isValid;
 
+    },
+    sqrtPriceX96ToPriceWithDecimals: function(sqrtPriceX96, token0Decimals = 18, token1Decimals = 18) {
+        return sqrtPriceX96ToPriceWithDecimals(sqrtPriceX96, token0Decimals, token1Decimals)
+    },
+    tickToPriceWithDecimals: function(tick, token0Decimals = 18, token1Decimals = 18) {
+        return tickToPriceWithDecimals(tick, token0Decimals, token1Decimals)
     },
     dechexToInt: function(number) {
         return dechexToInt(number);
@@ -1962,7 +2023,7 @@ module.exports = {
     },
     sha1_4bytes: function(s) {
         let hex = sha1(s)
-        return hex.substr(0,8)
+        return hex.substr(0, 8)
     },
     parseSectionMethod: function(e) {
         return parseSectionMethod(e)

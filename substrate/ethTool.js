@@ -290,8 +290,12 @@ async function getTokenTotalSupply(web3Api, contractAddress, bn = 'latest', deci
 }
 
 
-//return symbol, name, deciaml, totalSupply
-async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest') {
+//return symbol, name, decimal, totalSupply
+async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest', RPCBackfill = null) {
+    let x = RPCBackfill ? get_proxy_address(contractAddress, chainID, RPCBackfill) : null;
+    if (x) {
+        contractAddress = x;
+    }
     let checkSumContractAddr = web3.utils.toChecksumAddress(contractAddress)
     let erc20Contract = initContract(web3Api, erc20ABI, checkSumContractAddr)
     if (bn == 'latest') {
@@ -302,22 +306,46 @@ async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest') {
             erc20Contract.methods.name().call({}, bn),
             erc20Contract.methods.symbol().call({}, bn),
             erc20Contract.methods.decimals().call({}, bn),
-            erc20Contract.methods.totalSupply().call({}, bn)
+            erc20Contract.methods.totalSupply().call({}, bn),
         ]);
         // for a contract to be erc20, {name, symbol, decimals, totalSupply} call return successful
         let tokenInfo = {
             blockNumber: bn,
-            tokenAddress: checkSumContractAddr,
             tokenType: 'ERC20',
-            name: name,
-            symbol: symbol,
-            decimal: decimals,
-            totalSupply: totalSupply / 10 ** decimals,
-            numHolders: 0
+            name,
+            symbol,
+            decimals,
+            totalSupply
+        }
+        try {
+            let swapContract = initContract(web3Api, swapABI, checkSumContractAddr)
+            var [token0, token1] = await Promise.all([
+                swapContract.methods.token0().call({}, bn),
+                swapContract.methods.token1().call({}, bn)
+            ]);
+            if (token0 && token1) {
+                let erc20Contract0 = initContract(web3Api, erc20ABI, web3.utils.toChecksumAddress(token0))
+                let erc20Contract1 = initContract(web3Api, erc20ABI, web3.utils.toChecksumAddress(token1))
+                var [token0Symbol, token0Decimals, token1Symbol, token1Decimals] = await Promise.all([
+                    erc20Contract0.methods.symbol().call({}, bn),
+                    erc20Contract0.methods.decimals().call({}, bn),
+                    erc20Contract1.methods.symbol().call({}, bn),
+                    erc20Contract1.methods.decimals().call({}, bn)
+                ]);
+                tokenInfo.tokenType = 'ERC20LP';
+                tokenInfo.token0 = token0;
+                tokenInfo.token1 = token1;
+                tokenInfo.token0Symbol = token0Symbol;
+                tokenInfo.token1Symbol = token1Symbol;
+                tokenInfo.token0Decimals = token0Decimals;
+                tokenInfo.token1Decimals = token1Decimals;
+            }
+        } catch (err) {
+            //console.log("T01", err);
         }
         return tokenInfo
     } catch (err) {
-        //console.log(`getERC20TokenInfo ERROR ${checkSumContractAddr}`, err)
+        //console.log(err);
         return false
     }
 }
@@ -390,7 +418,7 @@ async function getERC20LiquidityPairTokenInfo(web3Api, contractAddress, bn = 'la
         }
 
     } catch (err) {
-        console.log(`warning ${contractAddress} does not implement DOMAIN_SEPARATOR and/or PERMIT_TYPEHASH`)
+        //console.log(`warning ${contractAddress} does not implement DOMAIN_SEPARATOR and/or PERMIT_TYPEHASH`)
         //return false
     }
 
@@ -558,6 +586,24 @@ async function getTokenHoldersRawBalances(web3Api, contractAddress, holders, tok
     return res
 }
 
+
+function get_address_from_storage_value(storageVal) {
+    return storageVal.length < 40 ? storageVal : "0x" + storageVal.slice(-40);
+}
+
+async function get_proxy_address(address, chainID, RPCBackfill) {
+    // https://eips.ethereum.org/EIPS/eip-1967
+    const contract = new ethers.Contract(address, [], new ethers.providers.JsonRpcProvider(RPCBackfill));
+    let logicValue = await contract.provider.getStorageAt(address, "0x360894a13ba1a3210667c828492db98dca3e2076cc3735a920a3ca505d382bbc", RPCBackfill);
+    let beaconValue = await contract.provider.getStorageAt(address, "0xa3f0ad74e5423aebfd80d3ef4346578335a9a72aeaee59ff6cb3582b35133d50", RPCBackfill);
+    if (logicValue != "0x0000000000000000000000000000000000000000000000000000000000000000") {
+        return get_address_from_storage_value(logicValue);
+    }
+    if (beaconValue != "0x0000000000000000000000000000000000000000000000000000000000000000") {
+        return get_address_from_storage_value(beaconValue);
+    }
+    return (false);
+}
 
 // this function decorates and generate a "full" txn using decodedTxn and decodedReceipts
 function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
@@ -1344,6 +1390,40 @@ function getMethodSignature(e) {
     return [`${e.name}(${inputs.join(', ')})`, topicLen]
 }
 
+function getMethodSignatureFlds(e) {
+    var flds = []
+    var indexedCnt = 0 //topic0 is signatureID
+    for (const inp of e.inputs) {
+        let isIndexed = false
+        if (inp.indexed != undefined) {
+            isIndexed = inp.indexed
+        }
+        let typeName;
+        if (Array.isArray(inp.components)) {
+            let t = []
+            let tupleType = inp.type
+            for (const c of inp.components) {
+                let cName = `${c.name}`.trim()
+                t.push(cName)
+            }
+            let componentsType = `(${t.join(', ')})`
+            if (tupleType == 'tuple[]') {
+                componentsType += `[]`
+            }
+            typeName = `${inp.name}`
+        } else {
+            typeName = `${inp.name}`.trim()
+        }
+        if (isIndexed) {
+            indexedCnt++
+            flds.push(`${typeName}`)
+        } else {
+            flds.push(typeName)
+        }
+    }
+    return flds
+}
+
 // goal: generate uniqueID for func + indexed events
 function getMethodFingureprint(e) {
     var inputs = []
@@ -1432,6 +1512,7 @@ function parseAbiSignature(abiStrArr) {
             let signatureRaw = getMethodSignatureRaw(e)
             let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
             let fingerprint = getMethodFingureprint(e)
+            let flds = getMethodSignatureFlds(e)
             /*
             previous fingerprintID is now secondaryID, which is NOT unique
             New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
@@ -1440,7 +1521,7 @@ function parseAbiSignature(abiStrArr) {
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
             let abiStr = JSON.stringify([e])
             output.push({
-                stateMutability,
+                stateMutability: (stateMutability)? stateMutability: null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
                 secondaryID: secondaryID,
@@ -1450,7 +1531,8 @@ function parseAbiSignature(abiStrArr) {
                 name: firstCharUpperCase(e.name),
                 abi: abiStr,
                 abiType,
-                topicLength: topicLen
+                topicLength: topicLen,
+                flds: flds
             })
         });
     } catch (err) {}
@@ -1511,7 +1593,7 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
         let dReceipt = dReceipts[i]
         let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
         let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
-        if (fTxn){
+        if (fTxn) {
             fTxns.push(fTxn)
             //write connected txn
             if (fTxn.isConnectedCall) {
@@ -1672,11 +1754,13 @@ function categorizeTokenSwaps(dLog) {
     if (dLog.decodeStatus == "success") {
         let dSig = dLog.signature
         let dEvents = dLog.events
+        let fingerprintID = dLog.fingerprintID
 
         // swap xxx (token0) for yyy (token1) [sender='taker', to='maker']
-        switch (dSig) {
+        switch (fingerprintID) {
             //0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822-3-0x1cdd7c22 (uniswamp v2), 6 args
-            case 'Swap(index_topic_1 address sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, index_topic_2 address to)':
+            //'Swap(index_topic_1 address sender, uint256 amount0In, uint256 amount1In, uint256 amount0Out, uint256 amount1Out, index_topic_2 address to)'
+            case '0xd78ad95fa46c994b6551d0da85fc275fe613ce37657fb8d5e3d130840159d822-3':
                 /*
                 {
                     "decodeStatus": "success",
@@ -1736,12 +1820,74 @@ function categorizeTokenSwaps(dLog) {
                 return uniswapV2
                 break;
 
+                //Swap(index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)
+            case '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67-3':
+                /*
+                {
+                  decodeStatus: 'success',
+                  address: '0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640',
+                  transactionLogIndex: '0x1c',
+                  logIndex: '0x91',
+                  data: '0xfffffffffffffffffffffffffffffffffffffffffffffffffffffffddc5c8a0f0000000000000000000000000000000000000000000000004563918244f400000000000000000000000000000000000000005b1a5205020bff95ddfd32673db4000000000000000000000000000000000000000000000001191b54426751a66600000000000000000000000000000000000000000000000000000000000311c1',
+                  topics: [
+                    '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67',
+                    '0x000000000000000000000000ef1c6e67703c7bd7107eed8303fbe6ec2554bf6b',
+                    '0x00000000000000000000000021bd72a7e219b836680201c25b61a4aa407f7bfd'
+                  ],
+                  signature: 'Swap(index_topic_1 address sender, index_topic_2 address recipient, int256 amount0, int256 amount1, uint160 sqrtPriceX96, uint128 liquidity, int24 tick)',
+                  fingerprintID: '0xc42079f94a6350d7e6235f29174924f928cc2ac818eb64fed8004e115fbcca67-3',
+                  events: [
+                    {
+                      name: 'sender',
+                      type: 'address',
+                      value: '0xef1c6e67703c7bd7107eed8303fbe6ec2554bf6b'
+                    },
+                    {
+                      name: 'recipient',
+                      type: 'address',
+                      value: '0x21bd72a7e219b836680201c25b61a4aa407f7bfd'
+                    },
+                    { name: 'amount0', type: 'int256', value: '-9187849713' },
+                    { name: 'amount1', type: 'int256', value: '5000000000000000000' },
+                    {
+                      name: 'sqrtPriceX96',
+                      type: 'uint160',
+                      value: '1847784589982773393746294154411444'
+                    },
+                    {
+                      name: 'liquidity',
+                      type: 'uint128',
+                      value: '20255876393206916710'
+                    },
+                    { name: 'tick', type: 'int24', value: '201153' }
+                  ]
+                }
+                */
+                let amount0 = dEvents[2].value
+                let amount1 = dEvents[3].value
+                //convert to uniswapV2 style
+                let uniswapV3 = {
+                    type: 'swapV3',
+                    maker: dEvents[0].value, //sender
+                    taker: dEvents[1].value, //recipient
+                    amount0In: (amount0 > 0) ? amount0 : 0,
+                    amount1In: (amount1 > 0) ? amount1 : 0,
+                    amount0Out: (amount0 < 0) ? amount0 : 0,
+                    amount1Out: (amount1 < 0) ? amount1 : 0,
+                    sqrtPriceX96: dEvents[4].value,
+                    path: (amount0 > '0' && amount1 < '0') ? 'token0 -> token1' : 'token1 -> token0',
+                    lpTokenAddress: dLog.address
+                }
+                console.log(`categorizeTokenSwaps uniswapV3`, uniswapV3)
+                return uniswapV3
+                break;
             default:
                 break;
         }
     }
     return false
 }
+
 
 function categorizeTokenTransfers(dLog) {
     if (dLog.decodeStatus == "success") {
@@ -2397,6 +2543,13 @@ function mapABITypeToBqType(typ) {
     switch (typ) {
         case "address":
             return "STRING";
+        case "int128":
+        case "uint128":
+            return "STRING";
+        case "int160":
+        case "uint160":
+            return "STRING";
+        case "int256":
         case "uint256":
             return "STRING";
         case "string":
@@ -2422,8 +2575,16 @@ function mapABITypeToBqType(typ) {
         case "tuple":
             return "JSON";
             break;
-        default:
-            return "JSON";
+            /*
+            default:
+                return "JSON";
+            */
+    }
+    if (typ.includes('int') && !typ.includes('(') && !typ.includes(')')) {
+        //this exclude tuple type like (address from, address to, uint256 value, uint256 gas, uint256 nonce, bytes data)
+        return "STRING"
+    } else {
+        return "JSON";
     }
 }
 
@@ -2516,6 +2677,11 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
                     "mode": "REQUIRED"
                 });
                 sch.push({
+                    "name": "call_tx_index",
+                    "type": "integer",
+                    "mode": "REQUIRED"
+                });
+                sch.push({
                     "name": "call_trace_address",
                     "type": "JSON",
                     "mode": "NULLABLE"
@@ -2602,6 +2768,7 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
     }
 }
 
+// this works for both project-specific tables (call_project_..., evt_project_) and general tables (call_, evt_) since the last 1-2 components are positioned the same way
 function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf530ef35114732d8f7598a2938621008a16d9bb235a8c84fe82e4841e_3') {
     let fingerprintID = false
     if (tableID.substr(0, 5) == 'call_') {
@@ -2613,6 +2780,42 @@ function getFingerprintIDFromTableID(tableID = 'evt_RedeemSeniorBond_0xfa51bdcf5
         fingerprintID = `${topic0}-${topicLen}`
     }
     return fingerprintID
+}
+
+//0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92 -> evt_PoolCreated_0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118_4
+function computeTableIDFromFingerprintIDAndName(fingerprintID = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92', name = 'PoolCreated') {
+    //evtLen = 79; callLen = 21
+    let tableId = false
+    let typ = null
+    let pieces = fingerprintID.split('-')
+    if (fingerprintID.length == '79'){
+        typ = 'evt'
+        tableId = `${typ}_${name}_${pieces[0]}_${pieces[1]}`
+    }else if (fingerprintID.length == '21'){
+        typ = 'call'
+        tableId = `${typ}_${name}_${pieces[0]}`
+    }
+    return tableId
+}
+
+function computeModifiedFingerprintID(fingerprintID = '0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118-4-0x4d1d4f92') {
+    //evtLen = 79; callLen = 21
+    let modifiedFingerprintID = false
+    let typ = null
+    let pieces = fingerprintID.split('-')
+    if (fingerprintID.length == '79'){
+        typ = 'evt'
+        modifiedFingerprintID = `${pieces[0]}_${pieces[1]}`
+    }else if (fingerprintID.length == '21'){
+        typ = 'call'
+        modifiedFingerprintID = `${pieces[0]}`
+    }
+    return modifiedFingerprintID
+}
+
+
+async function detect_contract_labels(web3Api, contractAddress, bn) {
+
 }
 
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
@@ -2665,6 +2868,12 @@ module.exports = {
     },
     crawlEvmReceipts: async function(web3Api, blk, isParallel = true) {
         return crawl_evm_receipts(web3Api, blk, isParallel)
+    },
+    detect_contract_labels: async function(web3Api, blk, isParallel = true) {
+        return crawl_evm_receipts(web3Api, blk, isParallel)
+    },
+    detectContractLabels: async function(web3Api, contractAddress, bn) {
+        return detect_contract_labels(web3Api, contractAddress, bn)
     },
     getERC20TokenInfo: async function(web3Api, contractAddress, bn) {
         return getERC20TokenInfo(web3Api, contractAddress, bn)
@@ -2820,5 +3029,7 @@ module.exports = {
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
+    computeTableIDFromFingerprintIDAndName: computeTableIDFromFingerprintIDAndName,
+    computeModifiedFingerprintID: computeModifiedFingerprintID,
     getEVMFlds: getEVMFlds
 };
