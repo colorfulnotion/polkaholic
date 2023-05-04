@@ -9380,7 +9380,7 @@ module.exports = class Indexer extends AssetManager {
                 } = await exec(cmd, {
                     maxBuffer: 1024 * 640000
                 });
-                console.log(`stdout`, stdout)
+                //console.log(`stdout`, stdout)
                 let receiptData = JSON.parse(stdout);
                 if (receiptData.result) {
                     console.log(`crawlEvmBlockTracesWithRetry ${blockNumber} DONE`, cmd);
@@ -9559,10 +9559,12 @@ module.exports = class Indexer extends AssetManager {
         if (res && res.block != undefined && res.receipts != undefined){
             console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
             //block = res.block
+            /*
             let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
             let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
             block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-
+            */
+            block = ethTool.standardizeRPCBlock(res.block)
             let evmReceipts = res.receipts
             let evmTrace = false
             if (evmRPCInternalApi){

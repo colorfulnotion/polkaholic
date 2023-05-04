@@ -2125,9 +2125,12 @@ module.exports = class Crawler extends Indexer {
                 if (res && res.block != undefined && res.receipts != undefined){
                     console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
                     //block = res.block
+                    /*
                     let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
                     let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
                     block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+                    */
+                    block = ethTool.standardizeRPCBlock(res.block)
 
                     let evmReceipts = res.receipts
                     let evmTrace = false

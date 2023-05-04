@@ -653,7 +653,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
 
     let fTxn = {
-        chainID: chainID,
+        chainID: (chainID)? chainID: paraTool.dechexToInt(dTxn.chainId),
         transactionHash: dTxn.hash,
         substrate: null,
         status: dReceipt.status,
@@ -945,7 +945,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     let decodedTxnInput = {};
     let output = txn
     //TODO: need to handle both RPC and WS format
-    
+
     if (!contractcreationAddress) {
         if (txInput.length >= 10) {
             methodID = txInput.slice(0, 10)
@@ -998,7 +998,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             decodedTxnInput.params = []
         }
     }
-    output.chainID = chainID
+    output.chainID = (chainID)? chainID: paraTool.dechexToInt(txn.chainId)
     output.decodedInput = decodedTxnInput
     output.signature = {
         r: txn.r,
@@ -2851,6 +2851,26 @@ function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     }
 }
 
+function standardizeRPCBlock(blk){
+    let blockIntegerFlds = ["baseFeePerGas", "difficulty", "gasLimit", "gasUsed", "number", "size", "timestamp", "totalDifficulty"]
+    for (const blockFld of Object.keys(blk)){
+        if (blockIntegerFlds.includes(blockFld)){
+            if (blk[blockFld]) blk[blockFld] = paraTool.dechexToInt(blk[blockFld])
+        }
+    }
+    let txnIntegerFlds =["blockNumber", "gas", "gasPrice", "nonce", "transactionIndex", "value", "type", "maxFeePerGas", "maxPriorityFeePerGas", "chainId"]
+    for (let i = 0; i < blk.transactions.length; i++) {
+        let txn = blk.transactions[i]
+        for (const txnFld of Object.keys(txn)){
+            if (txnIntegerFlds.includes(txnFld)){
+                if (txn[txnFld]) txn[txnFld] = paraTool.dechexToInt(txn[txnFld])
+            }
+        }
+        blk.transactions[i] = txn
+    }
+    return blk
+}
+
 module.exports = {
     toHex: function(bytes) {
         return toHex(bytes);
@@ -2864,6 +2884,7 @@ module.exports = {
     crawlEvmBlock: async function(web3Api, bn) {
         return crawl_evm_block(web3Api, bn)
     },
+    standardizeRPCBlock: standardizeRPCBlock,
     crawlEvmLogs: async function(web3Api, bn) {
         return crawl_evm_logs(web3Api, bn)
     },
