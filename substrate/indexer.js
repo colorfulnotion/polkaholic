@@ -9256,52 +9256,6 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async crawlEvmBlockTracesWithRetry(evmRPCInternal, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
-        console.log(`crawlEvmBlockTracesWithRetry evmRPCInternal +++`, evmRPCInternal)
-        if (!evmRPCInternal) {
-            return (false);
-        }
-        console.log(`crawlEvmBlockTracesWithRetry evmRPCInternal`, evmRPCInternal)
-        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
-        //eth does not support hex padding: 0x01047025 -> 0x1047025
-        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
-        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
-
-        for (let i = 0; i < maxRetries; i++) {
-            console.log(`crawlEvmBlockTracesWithRetry try#${i}`)
-            try {
-                const {
-                    stdout,
-                    stderr
-                } = await exec(cmd, {
-                    maxBuffer: 1024 * 640000
-                });
-                let receiptData = JSON.parse(stdout);
-                if (receiptData.result) {
-                    console.log(`crawlEvmBlockTracesWithRetry ${blockNumber} DONE`, cmd);
-                    return (receiptData.result);
-                }
-                if (receiptData.error){
-                    console.log(`crawlEvmBlockTracesWithRetry cmd`, cmd)
-                    console.log(`crawlEvmBlockTracesWithRetry error`, receiptData.error)
-                }
-                //console.log(`crawlEvmBlockReceipts`, cmd)
-            } catch (error) {
-                this.logger.warn({
-                    "op": "crawlEvmBlockTracesWithRetry",
-                    "cmd": cmd,
-                    "err": error
-                })
-                console.log(error);
-            }
-            if (i < maxRetries - 1) {
-                await new Promise((resolve) => setTimeout(resolve, delay));
-            }
-        }
-        console.log(`crawlEvmBlockTracesWithRetry Failed maxRetries(${maxRetries}) reached`)
-        return false;
-    }
-
     async crawlEvmBlockTraces(evmRPCInternal, blockNumber, timeoutMS = 20000) {
         if (!evmRPCInternal) {
             return (false);
@@ -9365,18 +9319,16 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
-        console.log(`crawlEvmBlockAndReceiptsWithRetry evmRPCInternalApi +++`, evmRPCInternalApi)
         if (!evmRPCInternalApi) {
             return (false);
         }
-        console.log(`crawlEvmBlockAndReceiptsWithRetry evmRPCInternalApi`, evmRPCInternalApi)
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
         if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
         let cmd = `curl ${evmRPCInternalApi}  -X POST -H "Content-Type: application/json" --data '{"method":"qn_getBlockWithReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
-            console.log(`crawlQNEvmBlockAndReceiptsWithRetry [${blockNumber}] try#${i}`)
+            console.log(`crawlQNEvmBlockAndReceiptsWithRetry [${blockNumber}] try#${i}\n${cmd}`)
             try {
                 const {
                     stdout,
@@ -9410,19 +9362,62 @@ module.exports = class Indexer extends AssetManager {
         return false;
     }
 
+    async crawlEvmBlockTracesWithRetry(evmRPCInternal, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        if (!evmRPCInternal) {
+            return (false);
+        }
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+
+        for (let i = 0; i < maxRetries; i++) {
+            console.log(`crawlEvmBlockTracesWithRetry try#${i}\n${cmd}`)
+            try {
+                const {
+                    stdout,
+                    stderr
+                } = await exec(cmd, {
+                    maxBuffer: 1024 * 640000
+                });
+                console.log(`stdout`, stdout)
+                let receiptData = JSON.parse(stdout);
+                if (receiptData.result) {
+                    console.log(`crawlEvmBlockTracesWithRetry ${blockNumber} DONE`, cmd);
+                    return (receiptData.result);
+                }
+                if (receiptData.error){
+                    console.log(`crawlEvmBlockTracesWithRetry cmd`, cmd)
+                    console.log(`crawlEvmBlockTracesWithRetry error`, receiptData.error)
+                }
+                //console.log(`crawlEvmBlockReceipts`, cmd)
+            } catch (error) {
+                this.logger.warn({
+                    "op": "crawlEvmBlockTracesWithRetry",
+                    "cmd": cmd,
+                    "err": error
+                })
+                console.log(error);
+            }
+            if (i < maxRetries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        console.log(`crawlEvmBlockTracesWithRetry Failed maxRetries(${maxRetries}) reached`)
+        return false;
+    }
+
     async crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi +++`, evmRPCBlockReceiptsApi)
         if (!evmRPCBlockReceiptsApi) {
             return (false);
         }
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceiptsApi)
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
         if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
         let cmd = `curl ${evmRPCBlockReceiptsApi}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
-            console.log(`crawlEvmBlockReceipts try#${i}`)
+            console.log(`crawlEvmBlockReceipts try#${i}\n${cmd}`)
             try {
                 const {
                     stdout,
@@ -9457,17 +9452,14 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi +++`, evmRPCBlockReceipts)
         if (!evmRPCBlockReceipts) {
             return (false);
         }
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceipts)
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
         if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
         let cmd = `curl ${evmRPCBlockReceipts}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
-        console.log(`crawlEvmBlockReceipts`, cmd)
-
+        console.log(`[${cmd}] crawlEvmBlockReceipts\n${cmd}`)
         try {
             const {
                 stdout,
@@ -9559,8 +9551,11 @@ module.exports = class Indexer extends AssetManager {
         let log_retry_ms = 2000
         let log_timeout_ms = 5000
 
-        let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
-        //let res = false
+        let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let res = false
+        if (qnSupportedChainIDs.includes(chainID)){
+            let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+        }
         if (res && res.block != undefined && res.receipts != undefined){
             console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
             //block = res.block

@@ -2117,7 +2117,11 @@ module.exports = class Crawler extends Indexer {
                 let log_retry_ms = 2000
                 let log_timeout_ms = 5000
 
-                let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+                let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+                let res = false
+                if (qnSupportedChainIDs.includes(chainID)){
+                    let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+                }
                 if (res && res.block != undefined && res.receipts != undefined){
                     console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
                     //block = res.block
@@ -2206,6 +2210,7 @@ module.exports = class Crawler extends Indexer {
                 console.error(error);
             }
         });
+        /*
         web3.eth.subscribe('logs', (error, result) => {
             if (!error) {
                 //console.log("LOGS", result);
@@ -2213,6 +2218,7 @@ module.exports = class Crawler extends Indexer {
                 console.error(error);
             }
         });
+        */
 
         let lastHeaderReceivedSecAgoExitThreshold = 40
         setInterval(() => {
