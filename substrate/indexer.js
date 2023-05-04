@@ -9554,7 +9554,7 @@ module.exports = class Indexer extends AssetManager {
         let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
         let res = false
         if (qnSupportedChainIDs.includes(chainID)){
-            let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+            res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
         }
         if (res && res.block != undefined && res.receipts != undefined){
             console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
@@ -9565,7 +9565,8 @@ module.exports = class Indexer extends AssetManager {
             block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
             */
             block = ethTool.standardizeRPCBlock(res.block)
-            let evmReceipts = res.receipts
+            let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
+            //let evmReceipts = res.receipts
             let evmTrace = false
             if (evmRPCInternalApi){
                 /*
@@ -9609,8 +9610,8 @@ module.exports = class Indexer extends AssetManager {
                     }
 
                     if (!evmReceipts) evmReceipts = [];
+                    evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
                     console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
-
                     var statusesPromise = Promise.all([
                         ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)

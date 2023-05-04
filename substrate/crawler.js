@@ -2120,7 +2120,7 @@ module.exports = class Crawler extends Indexer {
                 let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
                 let res = false
                 if (qnSupportedChainIDs.includes(chainID)){
-                    let res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+                    res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
                 }
                 if (res && res.block != undefined && res.receipts != undefined){
                     console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
@@ -2132,7 +2132,9 @@ module.exports = class Crawler extends Indexer {
                     */
                     block = ethTool.standardizeRPCBlock(res.block)
 
-                    let evmReceipts = res.receipts
+
+                    let evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                    //let evmReceipts = res.receipts
                     let evmTrace = false
                     if (evmRPCInternalApi){
                         /*
@@ -2187,6 +2189,7 @@ module.exports = class Crawler extends Indexer {
                             }
 
                             if (!evmReceipts) evmReceipts = [];
+                            evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
                             console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                             let evmTrace = false
                             if (evmRPCInternalApi){

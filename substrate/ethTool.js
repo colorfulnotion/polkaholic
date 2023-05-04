@@ -2853,12 +2853,12 @@ function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
 
 function standardizeRPCBlock(blk){
     let blockIntegerFlds = ["baseFeePerGas", "difficulty", "gasLimit", "gasUsed", "number", "size", "timestamp", "totalDifficulty"]
+    let txnIntegerFlds =["blockNumber", "gas", "gasPrice", "nonce", "transactionIndex", "value", "type", "maxFeePerGas", "maxPriorityFeePerGas", "chainId"]
     for (const blockFld of Object.keys(blk)){
         if (blockIntegerFlds.includes(blockFld)){
             if (blk[blockFld]) blk[blockFld] = paraTool.dechexToInt(blk[blockFld])
         }
     }
-    let txnIntegerFlds =["blockNumber", "gas", "gasPrice", "nonce", "transactionIndex", "value", "type", "maxFeePerGas", "maxPriorityFeePerGas", "chainId"]
     for (let i = 0; i < blk.transactions.length; i++) {
         let txn = blk.transactions[i]
         for (const txnFld of Object.keys(txn)){
@@ -2870,6 +2870,31 @@ function standardizeRPCBlock(blk){
     }
     return blk
 }
+
+function standardizeRPCReceiptLogs(receipts){
+    let receiptIntegerFlds = ["blockNumber", "cumulativeGasUsed", "effectiveGasPrice", "gasUsed"]
+    let logIntegerFlds =["blockNumber", "transactionIndex", "logIndex"]
+    for (let i = 0; i < receipts.length; i++){
+        let receipt = receipts[i]
+        for (const receiptFld of Object.keys(receipt)){
+            if (receiptIntegerFlds.includes(receiptFld)){
+                if (receipt[receiptFld]) receipt[receiptFld] = paraTool.dechexToInt(receipt[receiptFld])
+            }
+        }
+        for (let i = 0; i < receipt.logs.length; i++) {
+            let log = receipt.logs[i]
+            for (const logFld of Object.keys(log)){
+                if (logIntegerFlds.includes(logFld)){
+                    if (log[logFld]) log[logFld] = paraTool.dechexToInt(log[logFld])
+                }
+            }
+            receipt.logs[i] = log
+        }
+        receipts[i] = receipt
+    }
+    return receipts
+}
+
 
 module.exports = {
     toHex: function(bytes) {
@@ -2885,6 +2910,7 @@ module.exports = {
         return crawl_evm_block(web3Api, bn)
     },
     standardizeRPCBlock: standardizeRPCBlock,
+    standardizeRPCReceiptLogs: standardizeRPCReceiptLogs,
     crawlEvmLogs: async function(web3Api, bn) {
         return crawl_evm_logs(web3Api, bn)
     },
