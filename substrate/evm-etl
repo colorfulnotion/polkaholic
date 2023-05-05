@@ -249,6 +249,73 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('blcp')
+        .option('-c', 1, null)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID ? opt.chainID : 1;
+            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.blcp(dt, chainID);
+                    }
+		} else {
+                    await evmetl.blcp(logDT, chainID);
+		}
+	    }
+	    
+            process.exit(0);
+        });
+
+    program.command('backfill')
+        .option('-c', 1, null)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID ? opt.chainID : 1;
+            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.backfill(dt, chainID);
+                    }
+		} else {
+                    await evmetl.backfill(logDT, chainID);
+		}
+	    }
+            process.exit(0);
+        });
+    
+    program.command('indexchain')
+        .option('-c', 1, null)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID ? opt.chainID : 1;
+            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.indexchain(dt, chainID);
+                    }
+		} else {
+                    await evmetl.indexchain(logDT, chainID);
+		}
+	    }
+            process.exit(0);
+        });
+    
 
     await program.parseAsync(process.argv);
 }

@@ -1244,7 +1244,7 @@ mysql> desc projectcontractabi;
         let relayChain = "evm"
 
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "contracts", "logs", "token_transfers", "tokens", "traces", "transactions"]
+        let tbls = ["blocks", "logs", "token_transfers", "tokens", "traces", "transactions"]
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where ( isEVM =1 or relayChain in ('ethereum', 'evm') ) ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
@@ -1660,6 +1660,151 @@ mysql> desc projectcontractabi;
                 }
             }
         }
+    }
+
+    getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true) {
+        let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
+        let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
+        if (startLogDT == null) {
+            //startLogDT = (relayChain == "kusama") ? "2021-07-01" : "2022-05-04";
+            startLogDT = "2023-02-01"
+        }
+        let ts = this.getCurrentTS();
+        if (endLogDT != undefined) {
+            let endTS = paraTool.logDT_hr_to_ts(endLogDT, 0) + 86400
+            if (ts > endTS) ts = endTS
+        }
+        let logDTRange = []
+        while (true) {
+            ts = ts - 86400;
+            let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+            logDTRange.push(logDT)
+            if (logDT == startDT) {
+                break;
+            }
+        }
+        if (isAscending) {
+            return logDTRange.reverse();
+        } else {
+            return logDTRange
+        }
+    }
+
+    getTimeFormat(logDT) {
+        //2020-12-01 -> [TS, '20221201', '2022-12-01', '2022-11-30']
+        //20201201 -> [TS, '20221201', '2022-12-01', '2022-11-30']
+        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
+        let logYYYYMMDD = logDT.replaceAll('-', '')
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
+        return [logTS, logYYYYMMDD, currDT, prevDT]
+    }
+
+    async blcp(dt, chainID, id = "eth") {
+	let srcprojectID, srcdataset;
+	switch ( chainID ) {
+	case 1:
+	    srcprojectID = "bigquery-public-data";
+	    srcdataset = "crypto_ethereum";
+	    break;
+	case 137:
+	    srcprojectID = "public-data-finance";
+	    srcdataset = "crypto_polygon";
+	    break;
+	}
+
+	let tables = {"blocks": { "ts": "timestamp",
+				  "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${dt}"` },
+		      "contracts": { "ts": "block_timestamp",
+				     "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${dt}"`},
+		      "logs": { "ts": "block_timestamp",
+				"sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${dt}"`},
+		      "token_transfers": { "ts": "block_timestamp",
+					   "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${dt}"`},
+		      "tokens": {"ts": "block_timestamp",
+				 "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${dt}"`},
+		      "traces": {"ts": "block_timestamp",
+				 "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${dt}"`},
+		      "transactions": {"ts": "block_timestamp",
+				       "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${dt}"`},
+		     };
+	let projectID = `substrate-etl`
+	for (const tbl  of Object.keys(tables)) {
+	    let t = tables[tbl];
+	    let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(dt)
+	    let destinationTbl = `crypto_ethereum.${tbl}$${logYYYYMMDD}`
+	    let partitionedFld = t.ts; 
+	    let targetSQL = t.sql; 
+	    let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+	    //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
+	    console.log(bqCmd);
+            try {
+		await exec(bqCmd, {maxBuffer: 1024 * 50000});
+            } catch (e) {
+		console.log(e);
+		// TODO optimization: do not create twice
+            }
+	}
+
+    }
+
+    // cbt createtable  evmchain1      "families=blocks:maxversions=1,contracts:maxversions=1,logs:maxversions=1,token_transfers:maxversions=1,traces:maxversions=1,transactions:maxversions=1"
+    async backfill(dt, chainID, id = "eth") {
+	let projectID = "substrate-etl";
+	let dataset = null;
+	switch ( chainID ) {
+	case 1:
+	    dataset = "crypto_ethereum";
+	    break;
+	case 137:
+	    dataset = "crypto_polygon";
+	    break;
+	}
+	let tbl = this.instance.table("evmchain" + chainID);
+	let families = ["blocks", "logs", "token_transfers", "traces", "transactions"]; 
+	console.log("HI");
+	for ( const f of families ) {
+	    // bq extract --location=US --destination_format JSON  project_id:dataset.table gs://bucket/filename.ext
+	    let partitionField = f == "blocks" ? "timestamp" : "block_timestamp";
+	    let n = f == "blocks" ? "number" : "block_number";
+	    let query = `select * from \`${projectID}.${dataset}.${f}\` where date(${partitionField}) = "${dt}" order by ${n}`
+	    console.log(f, query);
+            let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+	    let rows = [];
+	    for ( const r of recs ) {
+		let bn = null;
+		let blockTS = null;
+		if ( r.number ) {
+		    bn = r.number;
+		} else if ( r.block_number ) {
+		    bn = r.block_number;
+		}
+		if ( r[partitionField] ) {
+		    blockTS = r[partitionField]
+		}
+		if ( bn ) {
+		    let cres = {
+			key: paraTool.blockNumberToHex(bn),
+			data: {
+			}
+		    };
+		    cres['data'][f] = {}
+		    
+		    cres['data'][f]["data"] = {
+			value: JSON.stringify(r),
+			timestamp: blockTS * 1000000
+		    };
+                    rows.push(cres);
+                    if (rows.length > 100) {
+                        await this.insertBTRows(tbl, rows, "evmchain");
+                        rows = [];
+                    }
+		}
+	    }
+            if ( rows.length > 0 ) {
+		await this.insertBTRows(tbl, rows, "evmchain");
+	    }
+	}
     }
 
     async dryrun(query = "SELECT count(`extrinsic_id`) AS `COUNT_extrinsic_id__a7d70` FROM `contracts`.`contractscall` LIMIT 50000") {
