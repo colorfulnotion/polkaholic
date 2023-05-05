@@ -1830,12 +1830,13 @@ mysql> desc projectcontractabi;
         let rows = {};
         for (const r of recs) {
             let bn = r.number;
-            let blockTS = null;
+            let blockTS = r.timestamp;
             if (min_bn == null) min_bn = bn;
             max_bn = bn;
             rows[bn] = {
-                blockTS: r.timestamp,
+                blockTS: `${blockTS}`,
                 blockHash: r.hash,
+                blockNumber: r.number,
                 blocks: r,
                 logs: [],
                 token_transfers: [],
@@ -1852,8 +1853,8 @@ mysql> desc projectcontractabi;
 
         for (let n = min_bn; n <= max_bn; n += 50) {
             let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
-            //let families = ["transactions", "logs", "token_transfers", "traces"];
-            let families = ["token_transfers"];
+            let families = ["transactions", "logs", "token_transfers", "traces", "contracts"];
+            //let families = ["transactions"];
             for (const f of families) {
                 let tableFlds =  tableQuery[f]["flds"]
                 let query = `select ${tableFlds} from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
@@ -1861,7 +1862,7 @@ mysql> desc projectcontractabi;
                 let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
                 for (const r of recs) {
                     let bn = r.block_number;
-                    console.log(`[${f}] BN=${bn}, r`, r)
+                    //console.log(`[${f}] BN=${bn}, r`, r)
                     try {
                         if (bn && rows[bn]) {
                             rows[bn][f].push(r);
@@ -1873,89 +1874,48 @@ mysql> desc projectcontractabi;
                     }
                 }
             }
-
-            //exit
-            process.exit(0)
-
             let out = [];
             for (let bn = n; bn <= nmax; bn++) {
                 let r = rows[bn];
-                let blockTS = this.getCurrentTS() * 1000000;
+                let blockTS = r.blockTS * 1000000
+                let blockHash = r.blockHash
                 let cres = {
-                    key: paraTool.blockNumberToHex(blockNumber),
+                    key: paraTool.blockNumberToHex(r.blockNumber),
                     data: {
                         blocks: {},
                         logs: {},
                         token_transfers: {},
                         traces: {},
                         transactions: {},
+                        contracts: {},
                     }
                 };
 
                 cres['data']['blocks'][blockHash] = {
                     value: JSON.stringify(rows[bn].blocks),
-                    timestamp: blockTS * 1000000
+                    timestamp: blockTS
                 };
                 cres['data']['logs'][blockHash] = {
                     value: JSON.stringify(rows[bn].logs),
-                    timestamp: blockTS * 1000000
+                    timestamp: blockTS
                 };
                 cres['data']['token_transfers'][blockHash] = {
                     value: JSON.stringify(rows[bn].token_transfers),
-                    timestamp: blockTS * 1000000
+                    timestamp: blockTS
                 };
                 cres['data']['traces'][blockHash] = {
                     value: JSON.stringify(rows[bn].traces),
-                    timestamp: blockTS * 1000000
+                    timestamp: blockTS
                 };
-                cres['data']['transactions'][blockHash] = {
-                    value: JSON.stringify(rows[bn].transactions),
-                    timestamp: blockTS * 1000000
+                cres['data']['contracts'][blockHash] = {
+                    value: JSON.stringify(rows[bn].contracts),
+                    timestamp: blockTS
                 };
                 console.log(`cres['data']`, cres['data'])
-                /*
-                let cres = {
-                    key: paraTool.blockNumberToHex(bn),
-                    data: {
-                        blocks: {
-                            {
-                                value: JSON.stringify(rows[bn].blocks),
-                                timestamp: blockTS
-                            }
-                        },
-                        logs: {
-
-
-                            {
-                                value: JSON.stringify(rows[bn].logs),
-                                timestamp: blockTS
-                            }
-                        },
-                        token_transfers: {
-                            data: {
-                                value: JSON.stringify(rows[bn].token_transfers),
-                                timestamp: blockTS
-                            }
-                        },
-                        traces: {
-                            data: {
-                                value: JSON.stringify(rows[bn].traces),
-                                timestamp: blockTS
-                            }
-                        },
-                        transactions: {
-                            data: {
-                                value: JSON.stringify(rows[bn].transactions),
-                                timestamp: blockTS
-                            }
-                        }
-                    }
-                }
-                */
                 out.push(cres);
             }
             try {
-                //await this.insertBTRows(tbl, out, "evmchain");
+                await this.insertBTRows(tbl, out, "evmchain");
             } catch (e) {
                 console.log(e);
             }
