@@ -8563,7 +8563,7 @@ module.exports = class Indexer extends AssetManager {
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
         let tableID = null;
         let subTableIDInfo = null;
-        let a = (to_address) ? to_address.toLowerCase(): '';
+        let a = (to_address) ? to_address.toLowerCase() : '';
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID].tableId
             if (this.evmFingerprintMap[fingerprintID].addresses) {
@@ -8691,7 +8691,7 @@ module.exports = class Indexer extends AssetManager {
                 chain_id: evmTx.id, //string
                 evm_chain_id: evmTx.chain_id, //integer
                 contract_address: evmTx.to_address,
-                call_success: (evmTx.receipt_status == 1)? true: false, //TODO
+                call_success: (evmTx.receipt_status == 1) ? true : false, //TODO
                 call_tx_hash: evmTx.hash,
                 call_tx_index: evmTx.transaction_index,
                 call_block_time: evmTx.block_timestamp,
@@ -9207,7 +9207,9 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`${evmDatasetID}:${tableId} row`, rows)
             if (rows && rows.length > 0) {
                 autoEvmRowPromiseTableId.push(tableId)
-                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {raw: true}))
+                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {
+                    raw: true
+                }))
             }
         }
         let autoEvmRowStates;
@@ -9229,7 +9231,7 @@ module.exports = class Indexer extends AssetManager {
             } else {
                 let rejectedReason = JSON.parse(JSON.stringify(autoEvmRowState['reason']))
                 let errorStr = rejectedReason.message
-                if (errorStr){
+                if (errorStr) {
                     if (!errorStr.includes('Already Exists')) {
                         console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
                         await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
@@ -9278,7 +9280,7 @@ module.exports = class Indexer extends AssetManager {
                 console.log(blockNumber, receiptData.result.length, cmd);
                 return (receiptData.result);
             }
-            if (receiptData.error){
+            if (receiptData.error) {
                 console.log(`debug_traceBlockByNumber cmd`, cmd)
                 console.log(`debug_traceBlockByNumber error`, receiptData.error)
                 return false
@@ -9301,11 +9303,11 @@ module.exports = class Indexer extends AssetManager {
             const result = await operation();
             //console.log(`retryWithDelay retry#${i} result`, result)
             if (result) {
-                if (ctx.includes("crawlEvmBlockReceipts")){
+                if (ctx.includes("crawlEvmBlockReceipts")) {
                     console.log(`retryWithDelay`, result)
                     console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
                     return result;
-                }else{
+                } else {
                     console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
                     return result;
                 }
@@ -9341,7 +9343,7 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`qn_getBlockWithReceipts ${blockNumber} DONE`, cmd);
                     return (receiptData.result);
                 }
-                if (receiptData.error){
+                if (receiptData.error) {
                     console.log(`qn_getBlockWithReceipts cmd`, cmd)
                     console.log(`qn_getBlockWithReceipts error`, receiptData.error)
                 }
@@ -9386,7 +9388,7 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`crawlEvmBlockTracesWithRetry ${blockNumber} DONE`, cmd);
                     return (receiptData.result);
                 }
-                if (receiptData.error){
+                if (receiptData.error) {
                     console.log(`crawlEvmBlockTracesWithRetry cmd`, cmd)
                     console.log(`crawlEvmBlockTracesWithRetry error`, receiptData.error)
                 }
@@ -9430,7 +9432,7 @@ module.exports = class Indexer extends AssetManager {
                     console.log(`eth_getBlockReceipts ${blockNumber} DONE`, cmd);
                     return (receiptData.result);
                 }
-                if (receiptData.error){
+                if (receiptData.error) {
                     console.log(`crawlEvmBlockReceipts cmd`, cmd)
                     console.log(`crawlEvmBlockReceipts error`, receiptData.error)
                 }
@@ -9472,7 +9474,7 @@ module.exports = class Indexer extends AssetManager {
                 console.log(`eth_getBlockReceipts ${blockNumber} DONE`, cmd);
                 return (receiptData.result);
             }
-            if (receiptData.error){
+            if (receiptData.error) {
                 console.log(`crawlEvmBlockReceipts cmd`, cmd)
                 console.log(`crawlEvmBlockReceipts error`, receiptData.error)
                 return false
@@ -9553,10 +9555,10 @@ module.exports = class Indexer extends AssetManager {
 
         let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
         let res = false
-        if (qnSupportedChainIDs.includes(chainID)){
+        if (qnSupportedChainIDs.includes(chainID)) {
             res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
         }
-        if (res && res.block != undefined && res.receipts != undefined){
+        if (res && res.block != undefined && res.receipts != undefined) {
             console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
             //block = res.block
             /*
@@ -9568,7 +9570,7 @@ module.exports = class Indexer extends AssetManager {
             let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
             //let evmReceipts = res.receipts
             let evmTrace = false
-            if (evmRPCInternalApi){
+            if (evmRPCInternalApi) {
                 /*
                 let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
                 let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
@@ -9584,7 +9586,7 @@ module.exports = class Indexer extends AssetManager {
             let [dTxns, dReceipts] = await statusesPromise
             console.log(`dTxns`, dTxns)
             await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
-        }else{
+        } else {
             let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
             let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
             block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
@@ -9601,9 +9603,9 @@ module.exports = class Indexer extends AssetManager {
                     let isParallel = true
                     let evmReceipts = false
 
-                    if (evmRPCBlockReceiptsApi){
+                    if (evmRPCBlockReceiptsApi) {
                         evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                    } else{
+                    } else {
                         let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
                         let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
                         evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
@@ -9619,7 +9621,7 @@ module.exports = class Indexer extends AssetManager {
                     let [dTxns, dReceipts] = await statusesPromise
                     console.log(`dTxns`, dTxns)
                     let evmTrace = false
-                    if (evmRPCInternalApi){
+                    if (evmRPCInternalApi) {
                         /*
                         let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
                         let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`

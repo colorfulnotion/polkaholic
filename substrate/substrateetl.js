@@ -5287,9 +5287,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         try {
             const resp = await axios.get(url);
             let assets = resp.data.assets;
-	    let out = {}
+            let out = {}
             for (const relayChain of Object.keys(assets)) {
-		out[relayChain] = {}
+                out[relayChain] = {}
                 let rcassets = assets[relayChain];
                 for (const c of rcassets) {
                     let paraID = c.paraID;
@@ -5300,14 +5300,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         if (currencyID == null && typeof a.asset == "object") {
                             currencyID = JSON.stringify(a.asset);
                         }
-			if ( out[relayChain][paraID] == undefined ) {
-			    out[relayChain][paraID] = {}
-			}
-			out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
+                        if (out[relayChain][paraID] == undefined) {
+                            out[relayChain][paraID] = {}
+                        }
+                        out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
                     }
                 }
-	    }
-	    let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
+            }
+            let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
 if ( m[relayChain] && m[relayChain][paraID] && m[relayChain][paraID][currencyID] ) {
  let x = m[relayChain][paraID][currencyID]; return { symbol: x[0], name: x[1], decimals: x[2] }
 }
@@ -5317,7 +5317,7 @@ function xcmgarsymbol(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayC
 function xcmgarname(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.name : null )};
 function xcmgardecimals(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.decimals: null )}`;
             let fn = "xcmgarlib3.js";
-	    let f = fs.openSync(fn, 'w', 0o666);
+            let f = fs.openSync(fn, 'w', 0o666);
             fs.writeSync(f, xcmgarlibrary);
         } catch (err) {
             console.log("ERROR", err);

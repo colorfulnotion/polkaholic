@@ -174,7 +174,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 
         let chain = await this.getChain(chainID);
         //console.log(`chain`, chain)
-        let evm_chain_name = (chain && chain.id && chain.isEVM)? chain.id : false
+        let evm_chain_name = (chain && chain.id && chain.isEVM) ? chain.id : false
         console.log(`evm_chain_name`, evm_chain_name)
 
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
@@ -188,30 +188,30 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`generateProject sql`, sql)
         let sqlRecs = await this.poolREADONLY.query(sql);
         let projectInfo = false
-        if (sqlRecs.length == 1){
+        if (sqlRecs.length == 1) {
             projectInfo = sqlRecs[0]
-        }else{
+        } else {
             console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectInfo NOT FOUND`)
             return false
         }
         console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectInfo`, projectInfo)
         let projectContractName = projectInfo.address.toLowerCase() //If projectName is unknown everywhere, use contractAddress
-        if (projectInfo.etherscanContractName){
+        if (projectInfo.etherscanContractName) {
             // Contract parser by default fetch the etherscanContractName as contractName
             projectContractName = projectInfo.etherscanContractName
         }
-        if (projectInfo.contractName){
+        if (projectInfo.contractName) {
             // Overwrite with our contractName if specified
             projectContractName = projectInfo.contractName
         }
-        if (projectInfo.customContractName){
+        if (projectInfo.customContractName) {
             // Overwrite with our customContractName if specified
             projectContractName = projectInfo.customContractName
             //TODO: need to link to other virtual table
         }
 
         var sigs = {};
-        let contractABIStr = (projectInfo.proxyAbiRaw)?  projectInfo.proxyAbiRaw : projectInfo.abiRaw
+        let contractABIStr = (projectInfo.proxyAbiRaw) ? projectInfo.proxyAbiRaw : projectInfo.abiRaw
         var output = ethTool.parseAbiSignature(contractABIStr)
         console.log(`output`, output)
 
@@ -228,11 +228,11 @@ module.exports = class EVMETL extends PolkaholicDB {
         */
         let eventMap = {}
         let callMap = {}
-        for (const e of output){
+        for (const e of output) {
             var fingerprintID = e.fingerprintID
             let modifiedFingerprintID = ethTool.computeModifiedFingerprintID(fingerprintID)
             sigs[fingerprintID] = e;
-            if (e.abiType == 'function' && e.stateMutability != 'view'){
+            if (e.abiType == 'function' && e.stateMutability != 'view') {
                 let k = `${projectContractName}_call_${e.name}`
                 let devTabelId = ethTool.computeTableId(JSON.parse(e.abi), modifiedFingerprintID)
                 //let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
@@ -250,14 +250,14 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devFlds = devFlds
                 e.etlFlds = e.flds
                 delete e.flds
-                if (callMap[k] == undefined){
+                if (callMap[k] == undefined) {
                     callMap[k] = e
-                }else{
+                } else {
                     console.log(`WARNING k not unique! modifiedFingerprintID`, modifiedFingerprintID)
                     callMap[k] = e
                 }
 
-            }else if (e.abiType == 'event'){
+            } else if (e.abiType == 'event') {
                 let k = `${projectContractName}_event_${e.name}`
                 let devTabelId = ethTool.computeTableId(JSON.parse(e.abi), modifiedFingerprintID)
                 //let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
@@ -275,9 +275,9 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devFlds = devFlds
                 e.etlFlds = e.flds
                 delete e.flds
-                if (eventMap[k] == undefined){
+                if (eventMap[k] == undefined) {
                     eventMap[k] = e
-                }else{
+                } else {
                     console.log(`WARNING k not unique! modifiedFingerprintID`, modifiedFingerprintID)
                     eventMap[k] = e
                 }
@@ -289,42 +289,42 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`event table`, Object.keys(eventMap))
         console.log(`call tabel`, Object.keys(callMap))
 
-        let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
+        let datasetID = (evm_chain_name) ? `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
 
         //TODO: create datasetID when missing
         await this.create_dataset(datasetID)
-        let isAggregate = (projectInfo.isAggregate)? true : false
-        let targetContractAddress = (!isAggregate)? projectInfo.address: null
+        let isAggregate = (projectInfo.isAggregate) ? true : false
+        let targetContractAddress = (!isAggregate) ? projectInfo.address : null
 
         let viewCmds = []
-        for (const eventKey of Object.keys(eventMap)){
+        for (const eventKey of Object.keys(eventMap)) {
             let eventTableInfo = eventMap[eventKey]
-            if (projectInfo.projectName){
+            if (projectInfo.projectName) {
                 let viewCmd = await this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
-                if (viewCmd){
+                if (viewCmd) {
                     viewCmds.push(viewCmd)
                 }
             }
         }
 
-        for (const callKey of Object.keys(callMap)){
+        for (const callKey of Object.keys(callMap)) {
             let callTableInfo = callMap[callKey]
-            if (projectInfo.projectName){
+            if (projectInfo.projectName) {
                 let viewCmd = await this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
-                if (viewCmd){
+                if (viewCmd) {
                     viewCmds.push(viewCmd)
                 }
             }
         }
 
-        for (const cmd of viewCmds){
+        for (const cmd of viewCmds) {
             console.log(cmd);
             try {
                 let res = await exec(cmd, {
                     maxBuffer: 1024 * 64000
                 });
                 console.log(`res`, res)
-            } catch (e){
+            } catch (e) {
                 console.log(`${e.toString()}`)
             }
         }
@@ -333,7 +333,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
         let tableID = null;
         let subTableIDInfo = null;
-        let a = (to_address) ? to_address.toLowerCase(): '';
+        let a = (to_address) ? to_address.toLowerCase() : '';
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID].tableId
             if (this.evmFingerprintMap[fingerprintID].addresses) {
@@ -456,7 +456,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
     */
 
-    async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap'){
+    async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap') {
         const bigquery = this.get_big_query();
         let bqProjectID = `substrate-etl`
         let bqDataset = `${this.evmDatasetID}`
@@ -475,7 +475,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             flds.push(s)
         }
 
-        if (!tableInfo.devFlds){
+        if (!tableInfo.devFlds) {
             // we have not initiated the tableId yet use etl as schema definition
             tableInfo.devFlds = tableInfo.etlFlds
 
@@ -524,15 +524,15 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
 
         let fldStr = flds.join(', ')
-        let timePartitionField = (tableInfo.abiType == 'function')? "call_block_time" : "evt_block_time"
+        let timePartitionField = (tableInfo.abiType == 'function') ? "call_block_time" : "evt_block_time"
 
         let condFilter = ''
-        if (!isAggregate){
+        if (!isAggregate) {
             condFilter = `and Lower(contract_address) = "${contractAddress}"`
         }
         let subTbl = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
         //building view
-        let sql =  `${subTbl} select ${fldStr} from dev`
+        let sql = `${subTbl} select ${fldStr} from dev`
         sql = paraTool.removeNewLine(sql)
         let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
         console.log(sqlViewCmd)
@@ -662,7 +662,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             if (proxyAddress || proxyImplementation) {
                 console.log(`proxyAddress=${proxyAddress}, proxyImplementation=${proxyImplementation}`)
                 if (!proxyAddress) proxyAddress = proxyImplementation
-                if (proxyAddress != address){
+                if (proxyAddress != address) {
                     //0xc36442b4a4522e871399cd717abdd847ab11fe88 has implementation pointed to itself - thus creating nonstop loop..
                     let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
                     if (proxyABI) {
@@ -842,7 +842,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             }
         } else if (abiType == "event") {
             let query = `SELECT * FROM \`substrate-etl.evm.logs\` as logs  where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`;
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             console.log(recs.length, abiType);
             for (const r of recs) {
                 if (r.address) {
@@ -1121,7 +1121,7 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async create_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`){
+    async create_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         //check if exist
         let cmd = `bq ls --project_id=${projectID} --dataset_id=${detasetID}`
         let cmd2 = `bq --location=${this.evmBQLocation} mk --dataset ${projectID}:${detasetID}`
@@ -1135,7 +1135,7 @@ mysql> desc projectcontractabi;
                 console.log(`Create dataset=${projectID}:${detasetID}`)
                 console.log(cmd2)
                 await exec(cmd2);
-            } catch (e2){
+            } catch (e2) {
                 console.log(`e2`, e2.toString())
             }
         }
@@ -1182,7 +1182,7 @@ mysql> desc projectcontractabi;
         if (true) {
             let query = `SELECT signature, count(*) numTransactions FROM \`substrate-etl.evm.transactions\` as transactions where transactions.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)   group by signature order by numTransactions desc;`
             console.log(sql);
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             for (const r of recs) {
                 let sql0 = `update contractabi set numTransactions = '${r.numTransactions}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1191,7 +1191,7 @@ mysql> desc projectcontractabi;
             }
             return (true);
             query = `SELECT signature, count(*) numLogs FROM \`substrate-etl.evm.logs\` as logs  where logs.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)  group by signature order by count(*) desc;`;
-            recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
+            recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             for (const r of recs) {
                 let sql0 = `update contractabi set numLogs = '${r.numLogs}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1701,164 +1701,182 @@ mysql> desc projectcontractabi;
     }
 
     async blcp(dt, chainID, id = "eth") {
-	let srcprojectID, srcdataset;
-	switch ( chainID ) {
-	case 1:
-	    srcprojectID = "bigquery-public-data";
-	    srcdataset = "crypto_ethereum";
-	    break;
-	case 137:
-	    srcprojectID = "public-data-finance";
-	    srcdataset = "crypto_polygon";
-	    break;
-	}
+        let srcprojectID, srcdataset;
+        switch (chainID) {
+            case 1:
+                srcprojectID = "bigquery-public-data";
+                srcdataset = "crypto_ethereum";
+                break;
+            case 137:
+                srcprojectID = "public-data-finance";
+                srcdataset = "crypto_polygon";
+                break;
+        }
 
-	let tables = {"blocks": { "ts": "timestamp",
-				  "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${dt}"` },
-		      "contracts": { "ts": "block_timestamp",
-				     "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${dt}"`},
-		      "logs": { "ts": "block_timestamp",
-				"sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${dt}"`},
-		      "token_transfers": { "ts": "block_timestamp",
-					   "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${dt}"`},
-		      "tokens": {"ts": "block_timestamp",
-				 "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${dt}"`},
-		      "traces": {"ts": "block_timestamp",
-				 "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${dt}"`},
-		      "transactions": {"ts": "block_timestamp",
-				       "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${dt}"`},
-		     };
-	let projectID = `substrate-etl`
-	for (const tbl  of Object.keys(tables)) {
-	    let t = tables[tbl];
-	    let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(dt)
-	    let destinationTbl = `crypto_ethereum.${tbl}$${logYYYYMMDD}`
-	    let partitionedFld = t.ts; 
-	    let targetSQL = t.sql; 
-	    let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-	    //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
-	    console.log(bqCmd);
+        let tables = {
+            "blocks": {
+                "ts": "timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${dt}"`
+            },
+            "contracts": {
+                "ts": "block_timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${dt}"`
+            },
+            "logs": {
+                "ts": "block_timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${dt}"`
+            },
+            "token_transfers": {
+                "ts": "block_timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${dt}"`
+            },
+            "tokens": {
+                "ts": "block_timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${dt}"`
+            },
+            "traces": {
+                "ts": "block_timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${dt}"`
+            },
+            "transactions": {
+                "ts": "block_timestamp",
+                "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${dt}"`
+            },
+        };
+        let projectID = `substrate-etl`
+        for (const tbl of Object.keys(tables)) {
+            let t = tables[tbl];
+            let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(dt)
+            let destinationTbl = `crypto_ethereum.${tbl}$${logYYYYMMDD}`
+            let partitionedFld = t.ts;
+            let targetSQL = t.sql;
+            let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+            //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
+            console.log(bqCmd);
             try {
-		await exec(bqCmd, {maxBuffer: 1024 * 50000});
+                await exec(bqCmd, {
+                    maxBuffer: 1024 * 50000
+                });
             } catch (e) {
-		console.log(e);
-		// TODO optimization: do not create twice
+                console.log(e);
+                // TODO optimization: do not create twice
             }
-	}
+        }
 
     }
 
 
     async backfill(dt, chainID, id = "eth") {
-	let projectID = "substrate-etl";
-	let dataset = null;
-	switch ( chainID ) {
-	case 1:
-	    dataset = "crypto_ethereum";
-	    break;
-	case 137:
-	    dataset = "crypto_polygon";
-	    break;
-	}
-	let tbl = this.instance.table("evmchain" + chainID);
-	console.log("HI");
-	let min_bn = null, max_bn = null;
-	let query = `select * from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
+        let projectID = "substrate-etl";
+        let dataset = null;
+        switch (chainID) {
+            case 1:
+                dataset = "crypto_ethereum";
+                break;
+            case 137:
+                dataset = "crypto_polygon";
+                break;
+        }
+        let tbl = this.instance.table("evmchain" + chainID);
+        console.log("HI");
+        let min_bn = null,
+            max_bn = null;
+        let query = `select * from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
         let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-	let rows = {};
-	for ( const r of recs ) {
-	    let bn = r.number;
-	    let blockTS = null;
-	    if ( min_bn == null ) min_bn = bn;
-	    max_bn = bn;
-	    rows[bn] = {
-		blockTS: r.timestamp,
-		blocks: r,
-		logs: [],
-		token_transfers: [],
-		traces: [],
-		transactions: []
-	    }
-	}
-	let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
-	this.batchedSQL.push(sql);
-	await this.update_batchedSQL();
-	
-	for ( let n = min_bn; n <= max_bn; n += 50 ) {
-	    let nmax = ( n + 50 ) <= max_bn ? n + 50 : max_bn;
-	    let families = ["logs", "token_transfers", "traces", "transactions"];
-	    for ( const f of families ) {
-		let query = `select * from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
-		console.log(f, query);
-		let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-		for ( const r of recs ) {
-		    let bn = r.block_number;
-		    try {
-			if ( bn && rows[bn] ) {
-			    rows[bn][f].push(r);
-			} else {
-			    console.log("problem", bn, f, r);
-			}
-		    } catch (err) {
-			console.log(err);
-		    }
-		}
-	    }
-	    let out = [];
-	    for (let bn = n; bn <= nmax; bn++) {
-		let r = rows[bn];
-		let blockTS = this.getCurrentTS() * 1000000;
-		let cres = {
-		    key: paraTool.blockNumberToHex(bn),
-		    data: {
-			blocks: {
-			    data: {
-				value: JSON.stringify(rows[bn].blocks),
-				timestamp: blockTS
-			    }
-			},
-			logs: {
-			    data: {
-				value: JSON.stringify(rows[bn].logs),
-				timestamp: blockTS
-			    }
+        let rows = {};
+        for (const r of recs) {
+            let bn = r.number;
+            let blockTS = null;
+            if (min_bn == null) min_bn = bn;
+            max_bn = bn;
+            rows[bn] = {
+                blockTS: r.timestamp,
+                blocks: r,
+                logs: [],
+                token_transfers: [],
+                traces: [],
+                transactions: []
+            }
+        }
+        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
 
-			},
-			token_transfers: {
-			    data: {
-				value: JSON.stringify(rows[bn].token_transfers),
-				timestamp: blockTS
-			    }
-			},
-			traces: {
-			    data: {
-				value: JSON.stringify(rows[bn].traces),
-				timestamp: blockTS
-			    }
-			},
-			transactions: {
-			    data: {
-				value: JSON.stringify(rows[bn].transactions),
-				timestamp: blockTS
-			    }
-			}
-		    }
-		}
-		out.push(cres);
-	    }
-	    try {
-		await this.insertBTRows(tbl, out, "evmchain");
-	    } catch (e) {
-		console.log(e);
-	    }
-	}
+        for (let n = min_bn; n <= max_bn; n += 50) {
+            let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
+            let families = ["logs", "token_transfers", "traces", "transactions"];
+            for (const f of families) {
+                let query = `select * from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
+                console.log(f, query);
+                let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+                for (const r of recs) {
+                    let bn = r.block_number;
+                    try {
+                        if (bn && rows[bn]) {
+                            rows[bn][f].push(r);
+                        } else {
+                            console.log("problem", bn, f, r);
+                        }
+                    } catch (err) {
+                        console.log(err);
+                    }
+                }
+            }
+            let out = [];
+            for (let bn = n; bn <= nmax; bn++) {
+                let r = rows[bn];
+                let blockTS = this.getCurrentTS() * 1000000;
+                let cres = {
+                    key: paraTool.blockNumberToHex(bn),
+                    data: {
+                        blocks: {
+                            data: {
+                                value: JSON.stringify(rows[bn].blocks),
+                                timestamp: blockTS
+                            }
+                        },
+                        logs: {
+                            data: {
+                                value: JSON.stringify(rows[bn].logs),
+                                timestamp: blockTS
+                            }
+
+                        },
+                        token_transfers: {
+                            data: {
+                                value: JSON.stringify(rows[bn].token_transfers),
+                                timestamp: blockTS
+                            }
+                        },
+                        traces: {
+                            data: {
+                                value: JSON.stringify(rows[bn].traces),
+                                timestamp: blockTS
+                            }
+                        },
+                        transactions: {
+                            data: {
+                                value: JSON.stringify(rows[bn].transactions),
+                                timestamp: blockTS
+                            }
+                        }
+                    }
+                }
+                out.push(cres);
+            }
+            try {
+                await this.insertBTRows(tbl, out, "evmchain");
+            } catch (e) {
+                console.log(e);
+            }
+        }
     }
 
     async index_evmchain(chainID, logDT) {
-	let jmp = 50;
-	let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
-	let recs = await this.poolREADONLY.query(sql);
-	let currPeriod = recs[0];
+        let jmp = 50;
+        let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
+        let recs = await this.poolREADONLY.query(sql);
+        let currPeriod = recs[0];
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             let startBN = bn
             let endBN = bn + jmp - 1;
@@ -1878,7 +1896,7 @@ mysql> desc projectcontractabi;
             for (let i = 0; i < rows.length; i++) {
                 try {
                     let row = rows[i];
-		    
+
                     //let rRow = this.build_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
                     //let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, true, traceParseTS);
                 } catch (err) {
@@ -1886,7 +1904,7 @@ mysql> desc projectcontractabi;
                 }
             }
         }
-	let indexlogvals = ["numRecords", "lastUpdateDT" ];
+        let indexlogvals = ["numRecords", "lastUpdateDT"];
         await this.upsertSQL({
             "table": "evmlog",
             "keys": ["chainID", "tableID", "logDT"],

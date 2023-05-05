@@ -653,7 +653,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
 
     let fTxn = {
-        chainID: (chainID)? chainID: paraTool.dechexToInt(dTxn.chainId),
+        chainID: (chainID) ? chainID : paraTool.dechexToInt(dTxn.chainId),
         transactionHash: dTxn.hash,
         substrate: null,
         status: dReceipt.status,
@@ -998,7 +998,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             decodedTxnInput.params = []
         }
     }
-    output.chainID = (chainID)? chainID: paraTool.dechexToInt(txn.chainId)
+    output.chainID = (chainID) ? chainID : paraTool.dechexToInt(txn.chainId)
     output.decodedInput = decodedTxnInput
     output.signature = {
         r: txn.r,
@@ -1522,7 +1522,7 @@ function parseAbiSignature(abiStrArr) {
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
             let abiStr = JSON.stringify([e])
             output.push({
-                stateMutability: (stateMutability)? stateMutability: null,
+                stateMutability: (stateMutability) ? stateMutability : null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
                 secondaryID: secondaryID,
@@ -2789,10 +2789,10 @@ function computeTableIDFromFingerprintIDAndName(fingerprintID = '0x783cca1c0412d
     let tableId = false
     let typ = null
     let pieces = fingerprintID.split('-')
-    if (fingerprintID.length == '79'){
+    if (fingerprintID.length == '79') {
         typ = 'evt'
         tableId = `${typ}_${name}_${pieces[0]}_${pieces[1]}`
-    }else if (fingerprintID.length == '21'){
+    } else if (fingerprintID.length == '21') {
         typ = 'call'
         tableId = `${typ}_${name}_${pieces[0]}`
     }
@@ -2804,10 +2804,10 @@ function computeModifiedFingerprintID(fingerprintID = '0x783cca1c0412dd0d695e784
     let modifiedFingerprintID = false
     let typ = null
     let pieces = fingerprintID.split('-')
-    if (fingerprintID.length == '79'){
+    if (fingerprintID.length == '79') {
         typ = 'evt'
         modifiedFingerprintID = `${pieces[0]}_${pieces[1]}`
-    }else if (fingerprintID.length == '21'){
+    } else if (fingerprintID.length == '21') {
         typ = 'call'
         modifiedFingerprintID = `${pieces[0]}`
     }
@@ -2851,18 +2851,18 @@ function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     }
 }
 
-function standardizeRPCBlock(blk){
+function standardizeRPCBlock(blk) {
     let blockIntegerFlds = ["baseFeePerGas", "difficulty", "gasLimit", "gasUsed", "number", "size", "timestamp", "totalDifficulty"]
-    let txnIntegerFlds =["blockNumber", "gas", "gasPrice", "nonce", "transactionIndex", "value", "type", "maxFeePerGas", "maxPriorityFeePerGas", "chainId"]
-    for (const blockFld of Object.keys(blk)){
-        if (blockIntegerFlds.includes(blockFld)){
+    let txnIntegerFlds = ["blockNumber", "gas", "gasPrice", "nonce", "transactionIndex", "value", "type", "maxFeePerGas", "maxPriorityFeePerGas", "chainId"]
+    for (const blockFld of Object.keys(blk)) {
+        if (blockIntegerFlds.includes(blockFld)) {
             if (blk[blockFld]) blk[blockFld] = paraTool.dechexToInt(blk[blockFld])
         }
     }
     for (let i = 0; i < blk.transactions.length; i++) {
         let txn = blk.transactions[i]
-        for (const txnFld of Object.keys(txn)){
-            if (txnIntegerFlds.includes(txnFld)){
+        for (const txnFld of Object.keys(txn)) {
+            if (txnIntegerFlds.includes(txnFld)) {
                 if (txn[txnFld]) txn[txnFld] = paraTool.dechexToInt(txn[txnFld])
             }
         }
@@ -2871,20 +2871,20 @@ function standardizeRPCBlock(blk){
     return blk
 }
 
-function standardizeRPCReceiptLogs(receipts){
+function standardizeRPCReceiptLogs(receipts) {
     let receiptIntegerFlds = ["blockNumber", "cumulativeGasUsed", "effectiveGasPrice", "gasUsed"]
-    let logIntegerFlds =["blockNumber", "transactionIndex", "logIndex"]
-    for (let i = 0; i < receipts.length; i++){
+    let logIntegerFlds = ["blockNumber", "transactionIndex", "logIndex"]
+    for (let i = 0; i < receipts.length; i++) {
         let receipt = receipts[i]
-        for (const receiptFld of Object.keys(receipt)){
-            if (receiptIntegerFlds.includes(receiptFld)){
+        for (const receiptFld of Object.keys(receipt)) {
+            if (receiptIntegerFlds.includes(receiptFld)) {
                 if (receipt[receiptFld]) receipt[receiptFld] = paraTool.dechexToInt(receipt[receiptFld])
             }
         }
         for (let i = 0; i < receipt.logs.length; i++) {
             let log = receipt.logs[i]
-            for (const logFld of Object.keys(log)){
-                if (logIntegerFlds.includes(logFld)){
+            for (const logFld of Object.keys(log)) {
+                if (logIntegerFlds.includes(logFld)) {
                     if (log[logFld]) log[logFld] = paraTool.dechexToInt(log[logFld])
                 }
             }
