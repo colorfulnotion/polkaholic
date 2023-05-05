@@ -1511,11 +1511,23 @@ from chain where chainID = '${chainID}' limit 1`);
         }
     }
 
+    sortArrayByField(array, field, order = 'asc') {
+      return array.sort((a, b) => {
+        if (order === 'asc') {
+          return a[field] - b[field];
+        } else if (order === 'desc') {
+          return b[field] - a[field];
+        } else {
+          throw new Error("Invalid sorting order. Use 'asc' or 'desc'.");
+        }
+      });
+    }
+
     // [blocks, contracts, logs, token_transfers, traces, transactions]
     build_evm_block_from_row(row){
         let rowData = row.data;
         let r = {
-            blocks: false,
+            block: false,
             blockHash: false,
             blockNumber: false,
             contracts: false,
@@ -1523,35 +1535,100 @@ from chain where chainID = '${chainID}' limit 1`);
             token_transfers: false,
             traces: false,
             transactions: false,
-            feed: false
         }
         let evmColF = Object.keys(rowData)
         console.log(`evmColF`, evmColF)
         r.blockNumber = parseInt(row.id.substr(2), 16);
+        console.log(`${row.id} rowData`, rowData)
         if (rowData["blocks"]) {
-            //should we write blockHash?
+            let columnFamily = rowData["blocks"];
+            let blkhashes = Object.keys(columnFamily)
+            console.log(`blkhashes`, blkhashes)
+            //TODO: remove the incorret finalizedhash here
+            if (blkhashes.length == 1) {
+                r.blockHash = blkhashes[0];
+            } else {
+                //use the correct finalized hash by checking and see if we can find the proper blockrow
+                console.log(`ERROR: multiple evm blkhashes found ${blkhashes} @ blockNumber:`, r.blockNumber, `cbt read chain prefix=${row.id}`)
+                this.logger.error({
+                    "op": "build_evm_block_from_row",
+                    "err": `multiple evm blkhashes found ${blkhashes}`
+                });
+                return false
+            }
             console.log(`rowData["blocks"]`, rowData["blocks"])
-            let cell = (rowData["blocks"]) ? rowData["blocks"][0] : false;
+            let cell = (rowData["blocks"][r.blockHash]) ? rowData["blocks"][r.blockHash][0] : false;
             if (cell) {
                 let blk = JSON.parse(cell.value)
                 r.block = blk;
-                if (blk && blk.hash != undefined){
-                    r.blockHash = blk.hash
-                }
             }
         }
         if (rowData["logs"]) {
-            let cell = (r.blockHash && rowData["logs"]) ? rowData["logs"][0] : false;
+            let cell = (r.blockHash && rowData["logs"][r.blockHash]) ? rowData["logs"][r.blockHash][0] : false;
             if (cell) {
                 r.logs = JSON.parse(cell.value);
             }
         }
         if (rowData["traces"]) {
-            let cell = (r.blockHash && rowData["traces"]) ? rowData["traces"][0] : false;
+            let cell = (r.blockHash && rowData["traces"][r.blockHash]) ? rowData["traces"][r.blockHash][0] : false;
             if (cell) {
                 r.traces = JSON.parse(cell.value);
             }
         }
+        if (rowData["transactions"]) {
+            let cell = (r.blockHash && rowData["transactions"][r.blockHash]) ? rowData["transactions"][r.blockHash][0] : false;
+            if (cell) {
+                r.transactions = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["token_transfers"]) {
+            let cell = (r.blockHash && rowData["token_transfers"][r.blockHash]) ? rowData["token_transfers"][r.blockHash][0] : false;
+            if (cell) {
+                r.token_transfers = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["contracts"]) {
+            let cell = (r.blockHash && rowData["contracts"][r.blockHash]) ? rowData["contracts"][r.blockHash][0] : false;
+            if (cell) {
+                r.contracts = JSON.parse(cell.value);
+            }
+        }
+        //TODO: want RPC style of blockWithTransaction, ReceiptsWithLogs and trace
+        let btBlkCols = ["timestamp", "number", "parent_hash", "nonce", "sha3_uncles", "logs_bloom", "transactions_root", "state_root", "miner", "difficulty", "total_difficulty"]
+        let rpcBlkCols = ["timestamp", "number", "parentHash", "nonce", "sha3Uncles", "logsBloom", "transactionsRoot", "stateRoot", "miner", "difficulty", "totalDifficulty"]
+        let rpcBlk = {}
+        // convert header
+        for (let i = 0; i < btBlkCols.length; i++) {
+            let btBlkCol = btBlkCols[i]
+            let rpcBlkCol = rpcBlkCols[i]
+            let btBlk = r.block
+            rpcBlk[rpcBlkCol] = btBlk[btBlkCol]
+        }
+        let btTxCols = ["block_hash", "block_number", "from_address", "gas", "gas_price", "max_fee_per_gas", "max_priority_fee_per_gas", "hash", "input", "nonce", "to_address", "transaction_index", "value", "transaction_type", "chain_id"]
+        let rpcTxCols = ["blockHash","blockNumber", "from", "gas","gasPrice","maxFeePerGas","maxPriorityFeePerGas","hash","input","nonce","to","transactionIndex","value","type","chainId"] //no accessList, v, r, s
+
+        // include transaction
+        let rpcTxns = []
+        for (let i = 0; i < r.transactions.length; i++) {
+            let btTxn = r.transactions[i]
+            let rpcTxn = {}
+            // convert transaction
+            for (let i = 0; i < btTxCols.length; i++) {
+                let btTxCol = btTxCols[i]
+                let rpcTxCol = rpcTxCols[i]
+                rpcTxn[rpcTxCol] = btTxn[btTxCol]
+            }
+            //btTxn is missing accessList, r, s, v
+            rpcTxns.push(rpcTxn)
+        }
+
+        //TODO: will have to sort for messy ordering
+        rpcBlk.transactions = this.sortArrayByField(rpcTxns, 'transactionIndex', 'asc');
+        console.log(`rpcBlk`, rpcBlk)
+
+        //let rpcBlkCols = ["baseFeePerGas","difficulty","extraData","gasLimit","gasUsed","hash","logsBloom","miner","mixHash","nonce","number","parentHash","receiptsRoot","sha3Uncles","size","stateRoot","timestamp","totalDifficulty","transactions","transactionsRoot","uncles"]
+
+        process.exit(0)
         return r
     }
 
