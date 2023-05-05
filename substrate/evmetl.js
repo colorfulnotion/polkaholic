@@ -1748,7 +1748,7 @@ mysql> desc projectcontractabi;
 
     }
 
-    // cbt createtable  evmchain1      "families=blocks:maxversions=1,contracts:maxversions=1,logs:maxversions=1,token_transfers:maxversions=1,traces:maxversions=1,transactions:maxversions=1"
+
     async backfill(dt, chainID, id = "eth") {
 	let projectID = "substrate-etl";
 	let dataset = null;
@@ -1761,51 +1761,142 @@ mysql> desc projectcontractabi;
 	    break;
 	}
 	let tbl = this.instance.table("evmchain" + chainID);
-	let families = ["blocks", "logs", "token_transfers", "traces", "transactions"]; 
 	console.log("HI");
-	for ( const f of families ) {
-	    // bq extract --location=US --destination_format JSON  project_id:dataset.table gs://bucket/filename.ext
-	    let partitionField = f == "blocks" ? "timestamp" : "block_timestamp";
-	    let n = f == "blocks" ? "number" : "block_number";
-	    let query = `select * from \`${projectID}.${dataset}.${f}\` where date(${partitionField}) = "${dt}" order by ${n}`
-	    console.log(f, query);
-            let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-	    let rows = [];
-	    for ( const r of recs ) {
-		let bn = null;
-		let blockTS = null;
-		if ( r.number ) {
-		    bn = r.number;
-		} else if ( r.block_number ) {
-		    bn = r.block_number;
-		}
-		if ( r[partitionField] ) {
-		    blockTS = r[partitionField]
-		}
-		if ( bn ) {
-		    let cres = {
-			key: paraTool.blockNumberToHex(bn),
-			data: {
+	let min_bn = null, max_bn = null;
+	let query = `select * from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
+        let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+	let rows = {};
+	for ( const r of recs ) {
+	    let bn = r.number;
+	    let blockTS = null;
+	    if ( min_bn == null ) min_bn = bn;
+	    max_bn = bn;
+	    rows[bn] = {
+		blockTS: r.timestamp,
+		blocks: r,
+		logs: [],
+		token_transfers: [],
+		traces: [],
+		transactions: []
+	    }
+	}
+	let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+	this.batchedSQL.push(sql);
+	await this.update_batchedSQL();
+	
+	for ( let n = min_bn; n <= max_bn; n += 50 ) {
+	    let nmax = ( n + 50 ) <= max_bn ? n + 50 : max_bn;
+	    let families = ["logs", "token_transfers", "traces", "transactions"];
+	    for ( const f of families ) {
+		let query = `select * from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
+		console.log(f, query);
+		let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+		for ( const r of recs ) {
+		    let bn = r.block_number;
+		    try {
+			if ( bn && rows[bn] ) {
+			    rows[bn][f].push(r);
+			} else {
+			    console.log("problem", bn, f, r);
 			}
-		    };
-		    cres['data'][f] = {}
-		    
-		    cres['data'][f]["data"] = {
-			value: JSON.stringify(r),
-			timestamp: blockTS * 1000000
-		    };
-                    rows.push(cres);
-                    if (rows.length > 100) {
-                        await this.insertBTRows(tbl, rows, "evmchain");
-                        rows = [];
-                    }
+		    } catch (err) {
+			console.log(err);
+		    }
 		}
 	    }
-            if ( rows.length > 0 ) {
-		await this.insertBTRows(tbl, rows, "evmchain");
+	    let out = [];
+	    for (let bn = n; bn <= nmax; bn++) {
+		let r = rows[bn];
+		let blockTS = this.getCurrentTS() * 1000000;
+		let cres = {
+		    key: paraTool.blockNumberToHex(bn),
+		    data: {
+			blocks: {
+			    data: {
+				value: JSON.stringify(rows[bn].blocks),
+				timestamp: blockTS
+			    }
+			},
+			logs: {
+			    data: {
+				value: JSON.stringify(rows[bn].logs),
+				timestamp: blockTS
+			    }
+
+			},
+			token_transfers: {
+			    data: {
+				value: JSON.stringify(rows[bn].token_transfers),
+				timestamp: blockTS
+			    }
+			},
+			traces: {
+			    data: {
+				value: JSON.stringify(rows[bn].traces),
+				timestamp: blockTS
+			    }
+			},
+			transactions: {
+			    data: {
+				value: JSON.stringify(rows[bn].transactions),
+				timestamp: blockTS
+			    }
+			}
+		    }
+		}
+		out.push(cres);
+	    }
+	    try {
+		await this.insertBTRows(tbl, out, "evmchain");
+	    } catch (e) {
+		console.log(e);
 	    }
 	}
     }
+
+    async index_evmchain(chainID, logDT) {
+	let jmp = 50;
+	let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
+	let recs = await this.poolREADONLY.query(sql);
+	let currPeriod = recs[0];
+        for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
+            let startBN = bn
+            let endBN = bn + jmp - 1;
+            if (endBN > currPeriod.endBN) endBN = currPeriod.endBN;
+            let start = paraTool.blockNumberToHex(startBN);
+            let end = paraTool.blockNumberToHex(endBN);
+            console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
+
+            let families = ["blocks", "logs", "traces", "transactions"]
+            let startTS = new Date().getTime();
+            let [rows] = await tableChain.getRows({
+                start,
+                end,
+                cellLimit: 1,
+                family: families
+            });
+            for (let i = 0; i < rows.length; i++) {
+                try {
+                    let row = rows[i];
+		    
+                    //let rRow = this.build_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                    //let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, true, traceParseTS);
+                } catch (err) {
+                    this.log_indexing_error(err, `index_blocks_period`);
+                }
+            }
+        }
+	let indexlogvals = ["numRecords", "lastUpdateDT" ];
+        await this.upsertSQL({
+            "table": "evmlog",
+            "keys": ["chainID", "tableID", "logDT"],
+            "vals": indexlogvals,
+            "data": evmlog,
+            "replace": indexlogvals
+        });
+
+    }
+
 
     async dryrun(query = "SELECT count(`extrinsic_id`) AS `COUNT_extrinsic_id__a7d70` FROM `contracts`.`contractscall` LIMIT 50000") {
         console.log(query);
