@@ -307,10 +307,10 @@ async function main() {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
                     for (const dt of logDTRange) {
-                        await evmetl.index_evmchain(dt, chainID);
+                        await evmetl.index_evmchain(chainID, dt);
                     }
                 } else {
-                    await evmetl.index_evmchain(logDT, chainID);
+                    await evmetl.index_evmchain(chainID, logDT);
                 }
             }
             process.exit(0);

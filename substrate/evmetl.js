@@ -1700,7 +1700,7 @@ mysql> desc projectcontractabi;
         return [logTS, logYYYYMMDD, currDT, prevDT]
     }
 
-    async blcp(dt, chainID, id = "eth") {
+    async blcp(dt, chainID, id = "ethereum") {
         let srcprojectID, srcdataset;
         switch (chainID) {
             case 1:
@@ -1754,6 +1754,7 @@ mysql> desc projectcontractabi;
             //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
             console.log(bqCmd);
             try {
+                console.log(`bqCmd`)
                 await exec(bqCmd, {
                     maxBuffer: 1024 * 50000
                 });
@@ -1766,7 +1767,7 @@ mysql> desc projectcontractabi;
     }
 
 
-    async backfill(dt, chainID, id = "eth") {
+    async backfill(dt, chainID, id = "ethereum") {
         let projectID = "substrate-etl";
         let dataset = null;
         switch (chainID) {
@@ -1782,6 +1783,7 @@ mysql> desc projectcontractabi;
         let min_bn = null,
             max_bn = null;
         let query = `select * from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
+        console.log(`${query}`)
         let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
         let rows = {};
         for (const r of recs) {
@@ -1798,7 +1800,8 @@ mysql> desc projectcontractabi;
                 transactions: []
             }
         }
-        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${dt}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        console.log(`${sql}`)
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
 
@@ -1875,6 +1878,7 @@ mysql> desc projectcontractabi;
     async index_evmchain(chainID, logDT) {
         let jmp = 50;
         let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
+        console.log(`index_evmchain sql`, sql)
         let recs = await this.poolREADONLY.query(sql);
         let currPeriod = recs[0];
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
@@ -1883,10 +1887,11 @@ mysql> desc projectcontractabi;
             if (endBN > currPeriod.endBN) endBN = currPeriod.endBN;
             let start = paraTool.blockNumberToHex(startBN);
             let end = paraTool.blockNumberToHex(endBN);
-            console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
-
+            console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end})`)
+            //console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
             let families = ["blocks", "logs", "traces", "transactions"]
             let startTS = new Date().getTime();
+            const tableChain = this.getTableChain(chainID);
             let [rows] = await tableChain.getRows({
                 start,
                 end,
@@ -1896,7 +1901,7 @@ mysql> desc projectcontractabi;
             for (let i = 0; i < rows.length; i++) {
                 try {
                     let row = rows[i];
-
+                    console.log(`row`, row)
                     //let rRow = this.build_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
                     //let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, true, traceParseTS);
                 } catch (err) {
