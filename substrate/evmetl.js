@@ -1716,31 +1716,39 @@ mysql> desc projectcontractabi;
         let tables = {
             "blocks": {
                 "ts": "timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${dt}"`,
+                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`
             },
             "contracts": {
                 "ts": "block_timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${dt}"`,
+                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
             },
             "logs": {
                 "ts": "block_timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${dt}"`,
+                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
             },
             "token_transfers": {
                 "ts": "block_timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${dt}"`,
+                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
             },
             "tokens": {
                 "ts": "block_timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${dt}"`,
+                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
             },
             "traces": {
                 "ts": "block_timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${dt}"`,
+                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+
             },
             "transactions": {
                 "ts": "block_timestamp",
-                "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${dt}"`
+                "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${dt}"`,
+                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`
             },
         };
         let projectID = `substrate-etl`
@@ -1780,9 +1788,43 @@ mysql> desc projectcontractabi;
         }
         let tbl = this.instance.table("evmchain" + chainID);
         console.log("HI");
+
+        let tableQuery = {
+            "blocks": {
+                "ts": "timestamp",
+                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`
+            },
+            "contracts": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "logs": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "token_transfers": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "tokens": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "traces": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, CAST(value as string) value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+
+            },
+            "transactions": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`
+            },
+        };
+
         let min_bn = null,
             max_bn = null;
-        let query = `select * from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
+        let blkFlds =  tableQuery["blocks"]["flds"]
+        let query = `select ${blkFlds} from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
         console.log(`${query}`)
         let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
         let rows = {};
@@ -1790,19 +1832,19 @@ mysql> desc projectcontractabi;
             let bn = r.number;
             let blockTS = null;
             if (min_bn == null) min_bn = bn;
-            console.log(`r ++`, r)
             max_bn = bn;
             rows[bn] = {
                 blockTS: r.timestamp,
+                blockHash: r.hash,
                 blocks: r,
                 logs: [],
                 token_transfers: [],
                 traces: [],
-                transactions: []
+                transactions: [],
+                contracts: [],
             }
         }
-        //exit
-        process.exit(0)
+
         let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${dt}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
         console.log(`${sql}`)
         this.batchedSQL.push(sql);
@@ -1810,14 +1852,16 @@ mysql> desc projectcontractabi;
 
         for (let n = min_bn; n <= max_bn; n += 50) {
             let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
-            let families = ["logs", "token_transfers", "traces", "transactions"];
+            //let families = ["transactions", "logs", "token_transfers", "traces"];
+            let families = ["token_transfers"];
             for (const f of families) {
-                let query = `select * from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
+                let tableFlds =  tableQuery[f]["flds"]
+                let query = `select ${tableFlds} from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
                 console.log(f, query);
                 let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
                 for (const r of recs) {
                     let bn = r.block_number;
-                    console.log(`[${f}] BN, r`, r)
+                    console.log(`[${f}] BN=${bn}, r`, r)
                     try {
                         if (bn && rows[bn]) {
                             rows[bn][f].push(r);
@@ -1829,6 +1873,9 @@ mysql> desc projectcontractabi;
                     }
                 }
             }
+
+            //exit
+            process.exit(0)
 
             let out = [];
             for (let bn = n; bn <= nmax; bn++) {
@@ -1865,6 +1912,7 @@ mysql> desc projectcontractabi;
                     value: JSON.stringify(rows[bn].transactions),
                     timestamp: blockTS * 1000000
                 };
+                console.log(`cres['data']`, cres['data'])
                 /*
                 let cres = {
                     key: paraTool.blockNumberToHex(bn),
