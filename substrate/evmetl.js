@@ -1790,6 +1790,7 @@ mysql> desc projectcontractabi;
             let bn = r.number;
             let blockTS = null;
             if (min_bn == null) min_bn = bn;
+            console.log(`r ++`, r)
             max_bn = bn;
             rows[bn] = {
                 blockTS: r.timestamp,
@@ -1800,6 +1801,8 @@ mysql> desc projectcontractabi;
                 transactions: []
             }
         }
+        //exit
+        process.exit(0)
         let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${dt}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
         console.log(`${sql}`)
         this.batchedSQL.push(sql);
@@ -1814,6 +1817,7 @@ mysql> desc projectcontractabi;
                 let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
                 for (const r of recs) {
                     let bn = r.block_number;
+                    console.log(`[${f}] BN, r`, r)
                     try {
                         if (bn && rows[bn]) {
                             rows[bn][f].push(r);
@@ -1825,25 +1829,59 @@ mysql> desc projectcontractabi;
                     }
                 }
             }
+
             let out = [];
             for (let bn = n; bn <= nmax; bn++) {
                 let r = rows[bn];
                 let blockTS = this.getCurrentTS() * 1000000;
                 let cres = {
+                    key: paraTool.blockNumberToHex(blockNumber),
+                    data: {
+                        blocks: {},
+                        logs: {},
+                        token_transfers: {},
+                        traces: {},
+                        transactions: {},
+                    }
+                };
+
+                cres['data']['blocks'][blockHash] = {
+                    value: JSON.stringify(rows[bn].blocks),
+                    timestamp: blockTS * 1000000
+                };
+                cres['data']['logs'][blockHash] = {
+                    value: JSON.stringify(rows[bn].logs),
+                    timestamp: blockTS * 1000000
+                };
+                cres['data']['token_transfers'][blockHash] = {
+                    value: JSON.stringify(rows[bn].token_transfers),
+                    timestamp: blockTS * 1000000
+                };
+                cres['data']['traces'][blockHash] = {
+                    value: JSON.stringify(rows[bn].traces),
+                    timestamp: blockTS * 1000000
+                };
+                cres['data']['transactions'][blockHash] = {
+                    value: JSON.stringify(rows[bn].transactions),
+                    timestamp: blockTS * 1000000
+                };
+                /*
+                let cres = {
                     key: paraTool.blockNumberToHex(bn),
                     data: {
                         blocks: {
-                            data: {
+                            {
                                 value: JSON.stringify(rows[bn].blocks),
                                 timestamp: blockTS
                             }
                         },
                         logs: {
-                            data: {
+
+
+                            {
                                 value: JSON.stringify(rows[bn].logs),
                                 timestamp: blockTS
                             }
-
                         },
                         token_transfers: {
                             data: {
@@ -1865,10 +1903,11 @@ mysql> desc projectcontractabi;
                         }
                     }
                 }
+                */
                 out.push(cres);
             }
             try {
-                await this.insertBTRows(tbl, out, "evmchain");
+                //await this.insertBTRows(tbl, out, "evmchain");
             } catch (e) {
                 console.log(e);
             }
@@ -1891,8 +1930,8 @@ mysql> desc projectcontractabi;
             //console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
             let families = ["blocks", "logs", "traces", "transactions"]
             let startTS = new Date().getTime();
-            const tableChain = this.getTableChain(chainID);
-            let [rows] = await tableChain.getRows({
+            const evmTableChain = this.getEvmTableChain(chainID);
+            let [rows] = await evmTableChain.getRows({
                 start,
                 end,
                 cellLimit: 1,
@@ -1901,11 +1940,13 @@ mysql> desc projectcontractabi;
             for (let i = 0; i < rows.length; i++) {
                 try {
                     let row = rows[i];
-                    console.log(`row`, row)
-                    //let rRow = this.build_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                    //console.log(`row`, row)
+                    let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                    console.log(`rRow`, rRow)
                     //let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, true, traceParseTS);
                 } catch (err) {
-                    this.log_indexing_error(err, `index_blocks_period`);
+                    console.log(err)
+                    //this.log_indexing_error(err, `index_blocks_period`);
                 }
             }
         }

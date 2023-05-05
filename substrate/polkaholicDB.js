@@ -487,6 +487,10 @@ module.exports = class PolkaholicDB {
         return this.instance.table("chain" + chainID);
     }
 
+    getEvmTableChain(chainID) {
+        return this.instance.table("evmchain" + chainID);
+    }
+
     currentTS() {
         return Math.floor(new Date().getTime() / 1000);
     }
@@ -1506,6 +1510,51 @@ from chain where chainID = '${chainID}' limit 1`);
             return (succ);
         }
     }
+
+    // [blocks, contracts, logs, token_transfers, traces, transactions]
+    build_evm_block_from_row(row){
+        let rowData = row.data;
+        let r = {
+            blocks: false,
+            blockHash: false,
+            blockNumber: false,
+            contracts: false,
+            logs: false,
+            token_transfers: false,
+            traces: false,
+            transactions: false,
+            feed: false
+        }
+        let evmColF = Object.keys(rowData)
+        console.log(`evmColF`, evmColF)
+        r.blockNumber = parseInt(row.id.substr(2), 16);
+        if (rowData["blocks"]) {
+            //should we write blockHash?
+            console.log(`rowData["blocks"]`, rowData["blocks"])
+            let cell = (rowData["blocks"]) ? rowData["blocks"][0] : false;
+            if (cell) {
+                let blk = JSON.parse(cell.value)
+                r.block = blk;
+                if (blk && blk.hash != undefined){
+                    r.blockHash = blk.hash
+                }
+            }
+        }
+        if (rowData["logs"]) {
+            let cell = (r.blockHash && rowData["logs"]) ? rowData["logs"][0] : false;
+            if (cell) {
+                r.logs = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["traces"]) {
+            let cell = (r.blockHash && rowData["traces"]) ? rowData["traces"][0] : false;
+            if (cell) {
+                r.traces = JSON.parse(cell.value);
+            }
+        }
+        return r
+    }
+
     build_block_from_row(row) {
         let rowData = row.data;
         let r = {
