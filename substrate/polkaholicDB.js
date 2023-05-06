@@ -1537,9 +1537,9 @@ from chain where chainID = '${chainID}' limit 1`);
             transactions: false,
         }
         let evmColF = Object.keys(rowData)
-        console.log(`evmColF`, evmColF)
+        //console.log(`evmColF`, evmColF)
         r.blockNumber = parseInt(row.id.substr(2), 16);
-        console.log(`${row.id} rowData`, rowData)
+        //console.log(`${row.id} rowData`, rowData)
         if (rowData["blocks"]) {
             let columnFamily = rowData["blocks"];
             let blkhashes = Object.keys(columnFamily)
@@ -1593,7 +1593,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 r.contracts = JSON.parse(cell.value);
             }
         }
-        //TODO: want RPC style of blockWithTransaction, ReceiptsWithLogs and trace
+        // want RPC style of blockWithTransaction, ReceiptsWithLogs and trace
         let btBlkCols = ["timestamp", "number", "parent_hash", "nonce", "sha3_uncles", "logs_bloom", "transactions_root", "state_root", "miner", "difficulty", "total_difficulty"]
         let rpcBlkCols = ["timestamp", "number", "parentHash", "nonce", "sha3Uncles", "logsBloom", "transactionsRoot", "stateRoot", "miner", "difficulty", "totalDifficulty"]
         let rpcBlk = {}
@@ -1609,9 +1609,45 @@ from chain where chainID = '${chainID}' limit 1`);
 
         // include transaction
         let rpcTxns = []
+        let rpcReceipts = [] //receipt is a combinations of txn result + logs.. need to extract from both obj
+
+        let btReceiptCols = ["block_hash","block_number","receipt_contract_address","receipt_cumulative_gas_used","receipt_effective_gas_price", "from_address","receipt_gas_used","logs", "logsBloom", "receipt_status","to_address","hash","transaction_index","transaction_type"] //no bloom
+        let rpcReceiptCols = ["blockHash","blockNumber","contractAddress","cumulativeGasUsed","effectiveGasPrice","from","gasUsed","logs", "logsBloom", "status","to","transactionHash","transactionIndex","type"]
+
+        let btLogCols = ["address","topics","data","block_number","transaction_hash","transaction_index","block_hash","log_index","removed"] //no removed
+        let rpcLogCols = ["address","topics","data","blockNumber","transactionHash","transactionIndex","blockHash","logIndex","removed"]
+
+        this.sortArrayByField(r.transactions, 'transaction_index', 'asc');
+        this.sortArrayByField(r.logs, 'log_index', 'asc');
+
+        let logMap = {} //hash -> []
+        for (let i = 0; i < r.logs.length; i++) {
+            let rpcLog = {}
+            let btLog = r.logs[i]
+            let transactionHash = btLog.transaction_hash
+            if (logMap[transactionHash] == undefined) logMap[transactionHash] = []
+            //console.log(`btLog`, btLog)
+            // convert receipt header
+            for (let i = 0; i < btLogCols.length; i++) {
+                let btLogCol = btLogCols[i]
+                let rpcLogCol = rpcLogCols[i]
+                if (rpcLogCol == "removed"){
+                    rpcLog["removed"] = false
+                    //It is true when the log was removed due to a chain reorganization, and false if it's a valid log. since we don't have this. will use false for all
+                }else{
+                    rpcLog[rpcLogCol] = btLog[btLogCol]
+                }
+            }
+            logMap[transactionHash].push(rpcLog)
+        }
+        //console.log(`logMap`, logMap)
+
         for (let i = 0; i < r.transactions.length; i++) {
             let btTxn = r.transactions[i]
+            let transactionHash = btTxn.hash
+            //console.log(`btTxn`, btTxn)
             let rpcTxn = {}
+            let rpcReceipt = {}
             // convert transaction
             for (let i = 0; i < btTxCols.length; i++) {
                 let btTxCol = btTxCols[i]
@@ -1620,16 +1656,39 @@ from chain where chainID = '${chainID}' limit 1`);
             }
             //btTxn is missing accessList, r, s, v
             rpcTxns.push(rpcTxn)
+
+            // convert receipt header
+            for (let i = 0; i < btReceiptCols.length; i++) {
+                let btReceiptCol = btReceiptCols[i]
+                let rpcReceiptCol = rpcReceiptCols[i]
+                if (rpcReceiptCol == "logsBloom"){
+                    rpcReceipt["logsBloom"] = null
+                }else if (rpcReceiptCol == "logs"){
+                    if (logMap[transactionHash] == undefined){
+                        rpcReceipt["logs"] = [] // TODO build logs using logs
+                    }else{
+                        //console.log(`${transactionHash} logs`, logMap[transactionHash])
+                        rpcReceipt["logs"] = logMap[transactionHash]
+                    }
+                }else{
+                    rpcReceipt[rpcReceiptCol] = btTxn[btReceiptCol]
+                }
+            }
+            // rpcReceipts is missing logsbloom + removed
+            rpcReceipts.push(rpcReceipt)
         }
-
-        //TODO: will have to sort for messy ordering
-        rpcBlk.transactions = this.sortArrayByField(rpcTxns, 'transactionIndex', 'asc');
-        console.log(`rpcBlk`, rpcBlk)
-
-        //let rpcBlkCols = ["baseFeePerGas","difficulty","extraData","gasLimit","gasUsed","hash","logsBloom","miner","mixHash","nonce","number","parentHash","receiptsRoot","sha3Uncles","size","stateRoot","timestamp","totalDifficulty","transactions","transactionsRoot","uncles"]
-
-        process.exit(0)
-        return r
+        //will have to sort for messy ordering
+        //rpcBlk.transactions = this.sortArrayByField(rpcTxns, 'transactionIndex', 'asc');
+        rpcBlk.transactions = rpcTxns
+        //console.log(`rpcBlk`, rpcBlk)
+        //console.log(`rpcReceipts`, rpcReceipts)
+        //TODO: traces...
+        let f = {
+            block: rpcBlk,
+            evmReceipts: rpcReceipts
+        }
+        //process.exit(0)
+        return f
     }
 
     build_block_from_row(row) {
