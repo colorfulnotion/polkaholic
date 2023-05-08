@@ -8295,6 +8295,53 @@ module.exports = class Indexer extends AssetManager {
         await this.chainParser.getSystemProperties(this, chain);
     }
 
+
+    // given a row r fetched with "build_evm_block_from_row", processes the block, events + trace
+    async index_evm_chain_block_row(r, write_bq_log = false) {
+        /* index_chain_block_row shall process trace(if available) + block + events in orders
+        xcm steps:
+        (1a) processTrace: parse outgoing xcmmessages from traces
+        (1b) processBlockEvents: parse xcm transfers + xcm-incoming executed signals(TODO), use result from 1a to link xcmtransfers to xcmmessages
+        > This implies that we MUST do 1a, 1b in seqence UNLESS to push all the flushes to step 2
+        */
+        //console.log('index_chain_block_row', JSON.stringify(r))
+
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+
+        let autoTraces = false
+        let blkNum = false
+        let blkHash = false
+        let blockAvailable = false
+        let traceAvailable = false
+        let receiptsAvailable = false
+        let blk = r.block
+        let chainID = r.chain_id
+        let evmReceipts = []
+        let evmTrace = false
+        if (r.block) {
+            blockAvailable = true
+            blkNum = blk.number;
+            blkHash = blk.hash;
+        }
+        if (r.trace) {
+            traceAvailable = true
+        }
+        if (r.evmReceipts) {
+            receiptsAvailable = true
+            evmReceipts = r.evmReceipts
+        }
+        console.log(`[${blkNum}] [${blkHash}] Trace?${traceAvailable}, Receiptss?${receiptsAvailable} , currTS=${this.getCurrentTS()}`)
+        var statusesPromise = Promise.all([
+            ethTool.processTranssctions(blk.transactions, contractABIs, contractABISignatures),
+            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+        ])
+        let [dTxns, dReceipts] = await statusesPromise
+        console.log(`dTxns`, dTxns)
+        //await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        return r;
+    }
+
     // given a row r fetched with "fetch_block_row", processes the block, events + trace
     async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false, isFinalized = true, traceParseTS = 1670544000) {
         /* index_chain_block_row shall process trace(if available) + block + events in orders

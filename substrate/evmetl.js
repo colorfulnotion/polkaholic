@@ -1956,7 +1956,7 @@ mysql> desc projectcontractabi;
                     //console.log(`row`, row)
                     let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
                     console.log(`rRow`, rRow)
-                    //let r = await this.index_chain_block_row(rRow, false, true, refreshAPI, false, true, traceParseTS);
+                    let r = await this.index_evm_chain_block_row(rRow, false);
                 } catch (err) {
                     console.log(err)
                     //this.log_indexing_error(err, `index_blocks_period`);

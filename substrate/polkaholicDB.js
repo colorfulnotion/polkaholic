@@ -1527,6 +1527,8 @@ from chain where chainID = '${chainID}' limit 1`);
     build_evm_block_from_row(row){
         let rowData = row.data;
         let r = {
+            prefix: false,
+            chain_id: false,
             block: false,
             blockHash: false,
             blockNumber: false,
@@ -1539,6 +1541,7 @@ from chain where chainID = '${chainID}' limit 1`);
         let evmColF = Object.keys(rowData)
         //console.log(`evmColF`, evmColF)
         r.blockNumber = parseInt(row.id.substr(2), 16);
+        r.prefix = row.id
         //console.log(`${row.id} rowData`, rowData)
         if (rowData["blocks"]) {
             let columnFamily = rowData["blocks"];
@@ -1561,6 +1564,7 @@ from chain where chainID = '${chainID}' limit 1`);
             if (cell) {
                 let blk = JSON.parse(cell.value)
                 r.block = blk;
+                r.chain_id = blk.chain_id
             }
         }
         if (rowData["logs"]) {
@@ -1604,6 +1608,7 @@ from chain where chainID = '${chainID}' limit 1`);
             let btBlk = r.block
             rpcBlk[rpcBlkCol] = btBlk[btBlkCol]
         }
+
         let btTxCols = ["block_hash", "block_number", "from_address", "gas", "gas_price", "max_fee_per_gas", "max_priority_fee_per_gas", "hash", "input", "nonce", "to_address", "transaction_index", "value", "transaction_type", "chain_id"]
         let rpcTxCols = ["blockHash","blockNumber", "from", "gas","gasPrice","maxFeePerGas","maxPriorityFeePerGas","hash","input","nonce","to","transactionIndex","value","type","chainId"] //no accessList, v, r, s
 
@@ -1684,8 +1689,13 @@ from chain where chainID = '${chainID}' limit 1`);
         //console.log(`rpcReceipts`, rpcReceipts)
         //TODO: traces...
         let f = {
+            prefix: r.prefix,
+            chain_id: r.chain_id,
+            blockHash: r.blockHash,
+            blockNumber: r.blockNumber,
             block: rpcBlk,
-            evmReceipts: rpcReceipts
+            evmReceipts: rpcReceipts,
+            traces: false
         }
         //process.exit(0)
         return f
