@@ -262,6 +262,14 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('coinslist')
+        .action(async () => {
+            var PriceManager = require("./priceManager");
+            let manager = new PriceManager();
+            await manager.updateCoinsList();
+            process.exit(0);
+        });
+
     program.command('pricefeed')
         .description(`Update Asset Prices from coingecko`)
         .option('-s, --startDT <startDT>', 'Start Date', null)
@@ -280,7 +288,7 @@ async function main() {
             }
             process.exit(0);
         });
-
+    
     program.command('backupchains')
         .description(`Backup chains`)
         .action(async (opt) => {

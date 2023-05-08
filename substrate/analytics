@@ -1,0 +1,332 @@
+#!/usr/bin/env node
+const axios = require("axios");
+const {
+    Command,
+    InvalidArgumentError
+} = require('commander');
+const mysql = require("mysql2");
+
+const PolkaholicDB = require("./polkaholicDB");
+const paraTool = require("./paraTool");
+
+const {AnalyticsHubServiceClient} = require('@google-cloud/bigquery-data-exchange').v1beta1;
+
+class Analytics extends PolkaholicDB {
+    dataexchangeClient = null;
+
+    constructor() {
+        super("manager")
+	this.dataexchangeClient = new AnalyticsHubServiceClient();
+    }
+
+    // create table exportcompare ( datasetId varchar(64), tableId varchar(64), source int, dest int, addDT datetime, primary key (datasetId, tableId) );
+    async exportcompare(datasetID = "polkadot") {
+	if ( false ) {
+	    let sql = `SELECT distinct table_name FROM substrate-etl.${datasetID}.INFORMATION_SCHEMA.TABLES  where table_schema = '${datasetID}' order by table_name;`;
+	    console.log(sql);
+            let recs = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+	    for (const r of recs) {
+		let sql0 = `insert into exportcompare ( datasetId, tableId ) values ('${datasetID}', '${r.table_name}')`
+		this.batchedSQL.push(sql0);
+		await this.update_batchedSQL();
+	    }
+	} else {
+	    let sql0 = `select tableId from exportcompare where datasetId = '${datasetID}' and ( source is Null or dest is Null ) `
+	    let tablerecs = await this.poolREADONLY.query(sql0)
+	    for ( const r of tablerecs ) {
+		let table_name = r.tableId
+		for ( let t = 0; t < 2; t++) {
+		    let src = ( t == 0 ) ? true : false;
+		    let sql = src ? `SELECT count(*) cnt from  \`substrate-etl.${datasetID}.${table_name}\`` : `SELECT count(*) cnt from  \`substrate-etl.crypto_${datasetID}.${table_name}\``;
+		    let column = src ? `source` : `dest`
+		    let location = src ? paraTool.BQUSCentral1 : paraTool.BQUSMulti;
+		    let recs = await this.execute_bqJob(sql, location);
+		    for (const r of recs) {
+			let cnt = r.cnt;
+			let sql0 = `update exportcompare set ${column} = ${cnt}, addDT = Now() where datasetID = '${datasetID}' and tableId = '${table_name}'`
+			console.log(table_name, sql0);
+			this.batchedSQL.push(sql0);
+			await this.update_batchedSQL();
+		    }
+		}
+	    }
+	}
+    }
+
+    async createDataExchange(parent, dataExchangeId, dataExchange) {
+	const request = {
+	    parent,
+	    dataExchangeId,
+	    dataExchange
+	};
+	console.log(request);
+	const response = await this.dataexchangeClient.createDataExchange(request);
+	console.log(response);
+    }
+
+    async createDataExchanges(parent) {
+	let sql = 'select displayName, description, primaryContact, documentation, iconURL, exchange  from exchange where exchange != "ai" limit 20';
+	let exchanges = await this.poolREADONLY.query(sql);
+	for (const e of exchanges) {
+	    let dataExchange = {
+		displayName: e.displayName,
+		description: e.description,
+		primaryContact: e.primaryContact,
+		documentation: e.documentation
+		//icon:
+	    }
+	    await this.createDataExchange(parent, e.exchange, dataExchange)
+	}
+    }
+    
+    async createListing(parent, listingId, listing) {
+	const request = {
+	    parent,
+	    listingId,
+	    listing
+	};
+	const response = await this.dataexchangeClient.createListing(request);
+	console.log(response);
+	return response;
+    }
+    
+    async chatgpt_prompt(prompt = 'summarize what seaport does in 5 sentences in a ethereum context.  Use markdown syntax to format your answer.') {
+	const apiKey = ""; //
+	const API_URL = 'https://api.openai.com/v1/chat/completions';
+	let headers = {
+	    'Content-Type': 'application/json',
+	    'Authorization': `Bearer ${apiKey}`
+	};
+
+	let res = await axios.post(API_URL, {
+	    messages: [{"role":"user", "content": prompt}],
+	    model: "gpt-3.5-turbo"
+
+	}, { headers });
+	let choices = res.data.choices;
+	if ( choices.length > 0 ) {
+	    let choice = choices[0];
+	    if ( choice.message && choice.message.content ) {
+		return choice.message.content;
+	    }
+	}
+	return null;
+    }
+
+
+
+    async createDataset(datasetId, projectId = 'substrate-etl') {
+	const options = {
+	    location: 'US',
+	    projectId
+	};
+
+	let bigquery = this.get_big_query();
+	try {
+	    const [dataset] = await bigquery.createDataset(datasetId, options);
+	} catch (err) {
+	}
+    }
+    
+    async generateListingsContent() {
+	do {
+	    let sql0 = 'select listing from listing where listing is not null and summary is null and listingid is null limit 1';
+	    let recs = await this.poolREADONLY.query(sql0);
+	    if ( recs.length > 0 ) {
+		let listing = recs[0].listing;
+		await this.generateListingContent(listing);
+	    }
+	} while ( 1 );
+	
+    }
+    
+    async generateListingContent(listing = "uniswap") {
+	// summary
+	let summary = await this.chatgpt_prompt(`summarize what ${listing} does in 5 sentences in an ethereum context.  Use markdown syntax to format your answer`);
+	if (summary) {
+	    let sql0 = `update listing set summary = ${mysql.escape(summary)} where listing = ${mysql.escape(listing)}`
+	    console.log("SUMMARY", summary, sql0);
+	    this.batchedSQL.push(sql0);
+	    await this.update_batchedSQL();
+	    await this.sleep(5000);
+	}
+	// calls
+	let calls = await this.chatgpt_prompt(`what are the top methods of the ${listing} smart contract.  Use markdown syntax to format your answer`);
+	if ( calls ) {
+	    let sql1 = `update listing set calls = ${mysql.escape(calls)} where listing = ${mysql.escape(listing)}`
+	    console.log("CALLS", calls);
+	    this.batchedSQL.push(sql1);
+	    await this.update_batchedSQL();
+	    await this.sleep(5000);
+	}
+	// events
+	let events = await this.chatgpt_prompt(`what are the top events generated by the ${listing} smart contract.  Use markdown syntax to format your answer`);
+	if ( events ) {
+	    let sql2 = `update listing set events = ${mysql.escape(events)} where listing = ${mysql.escape(listing)}`
+	    console.log("EVENTS", events, sql2);
+	    this.batchedSQL.push(sql2);
+	    await this.update_batchedSQL();
+	    await this.sleep(5000);
+	}
+    }
+    
+    async createListings() {
+	let sql = 'select listing, exchange, datasetId, projectId, summary, calls, events from listing where listing is not null and listingId is null and summary is not null and events is not null limit 50';
+	let listings = await this.poolREADONLY.query(sql);
+	for (const e of listings) {
+	    let parent = `projects/substrate-etl/locations/us/dataExchanges/${e.exchange}`
+	    let documentation = `
+# Calls
+
+${e.calls}
+
+# Events
+
+${e.events}
+`;
+	    await this.createDataset(e.datasetId);
+	    await this.sleep(1000);
+	    
+	    let listing = {
+		categories: [ 'CATEGORY_FINANCIAL' ],
+		displayName: e.listing,
+		description: e.summary, 
+		primaryContact: 'info@colorfulnotion.com',
+		documentation: documentation,
+		//icon: <Buffer >,
+		dataProvider: {
+		    name: 'Colorful Notion',
+		    primaryContact: 'info@colorfulnotion.com'
+		},
+		publisher: {
+		    name: 'Colorful Notion',
+		    primaryContact: 'info@colorfulnotion.com'
+		},
+		requestAccess: 'info@colorfulnotion.com',
+		bigqueryDataset: { dataset: `projects/substrate-etl/datasets/${e.datasetId}` },
+	    }
+	    try {
+		let result = await this.createListing(parent, e.listing, listing);
+		let r = result[0];
+		let listingId = r.name;
+		let sql = `update listing set listingId = ${mysql.escape(listingId)} where listing = '${e.listing}'`
+		this.batchedSQL.push(sql);
+		await this.update_batchedSQL();
+	    } catch (err) {
+		console.log(err);
+	    }
+	}
+    }
+    
+    
+    async getDataExchange(name) {
+	const request = {
+	    name,
+	};
+	const response = await this.dataexchangeClient.getDataExchange(request);
+	console.log(response);
+    }
+    
+    async getListings(parent) {
+	const request = {
+	    parent
+	};
+	
+	const iterable = await this.dataexchangeClient.listListingsAsync(request);
+	 for await (const response of iterable) {
+            console.log(response);
+        }
+    }
+
+    async listDataExchanges(parent) {
+	const request = {
+	    parent,
+	};
+	const iterable = await this.dataexchangeClient.listDataExchangesAsync(request);
+	for await (const response of iterable) {
+            console.log(response);
+	}
+    }
+}
+
+
+async function main() {
+    let cli_version = '1.0.0'
+    const program = new Command();
+
+    program
+        .name('analytics')
+        .description('Analytics Hub')
+        .version(`${cli_version}`);
+
+    program.command('exportcompare')
+        .description(`Data transfer Comparison`)
+        .action(async (opt) => {
+	    let analytics = new Analytics()
+	    var exchanges = await analytics.exportcompare();
+	    process.exit(0);
+        });
+
+    program.command('createexchanges')
+        .description(`List data exchanges`)
+        .action(async (opt) => {
+	    let parent = "projects/substrate-etl/locations/US";
+	    let analytics = new Analytics()
+	    var exchanges = await analytics.createDataExchanges(parent);
+	process.exit(0);
+        });
+    
+    program.command('createlistings')
+        .description(`List data exchanges`)
+        .action(async (opt) => {
+	    let analytics = new Analytics()
+	    var exchanges = await analytics.createListings();
+	process.exit(0);
+        });
+
+    program.command('exchanges')
+        .description(`List data exchanges`)
+        .action(async (opt) => {
+	    let parent = "projects/974572213039/locations/us";
+	    let analytics = new Analytics()
+	    var exchanges = await analytics.listDataExchanges(parent);
+	process.exit(0);
+        });
+
+    program.command('listings')
+        .description(`Get listings of exchange`)
+        .action(async () => {
+	    let name = 'projects/974572213039/locations/us/dataExchanges/bridged_transfers_187f204d0d3'
+	    let analytics = new Analytics()
+    	    var exchanges = await analytics.getListings(name);
+	process.exit(0);
+        });
+
+    program.command('exchange')
+	.usage('projects/974572213039/locations/us/dataExchanges/bridged_transfers_187f204d0d3')
+        .description(`Get exchange`)
+        .argument('<name>', 'Exchange Name')
+        .action(async (name) => {
+	    let analytics = new Analytics()
+    	    var exchanges = await analytics.getListing(name);
+	process.exit(0);
+        });
+    
+    program.command('prompt')
+        .action(async () => {
+	    let analytics = new Analytics()
+    	    var exchanges = await analytics.generateListingsContent();
+	    process.exit(0);
+        });
+    
+    await program.parseAsync(process.argv);
+}
+
+main()
+    .then(() => {
+        // do not process.exit(0) here
+    })
+    .catch((e) => {
+        console.error('ERROR', e);
+        process.exit(1);
+    });

@@ -102,7 +102,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let systemtbls = ["xcmtransfers", "chains"]
             let relayChains = ["polkadot", "kusama"]
             for (const relayChain of relayChains) {
-                let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
+                let bqDataset = (this.isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev` //MK write to relay_dev for dev
                 for (const tbl of systemtbls) {
                     let fld = (this.partitioned_table(tbl))
                     let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
@@ -346,7 +346,7 @@ module.exports = class SubstrateETL extends AssetManager {
         //let tbl = `exchanges`
         let tbl = `knownpubs`
         let projectID = `${this.project}`
-        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev` //MK write to relay_dev for dev
         //let sql = `select nickname, accountName, address from account where is_exchange = 1`
         let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
         let sqlRecs = await this.poolREADONLY.query(sql);
@@ -646,7 +646,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
             let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${relayChain}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
             console.log(sqlQuery);
-            let rows = await this.execute_bqJob(sqlQuery, paraTool.BQUSCentral1);
+            let rows = await this.execute_bqJob(sqlQuery, paraTool.BQUSMulti);
             let blocks = {};
             let prevHash = null;
             let prevBN = null
@@ -882,15 +882,15 @@ module.exports = class SubstrateETL extends AssetManager {
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
         let fn = this.get_bqlogfn(chainID, logDT, startTS)
-        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${relayChain}.balances${paraID}$${logDTp}' ${fn} schema/substrateetl/balances.json`
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_${relayChain}.balances${paraID}$${logDTp}' ${fn} schema/substrateetl/balances.json`
 
         console.log(cmd);
         try {
             await exec(cmd);
             // do a confirmatory query to compute numAddresses and mark that we're done by updating lastUpdateAddressBalancesEndDT
-            let sql = `select count(distinct address_pubkey) as numAddresses from substrate-etl.${relayChain}.balances${paraID} where date(ts) = '${logDT}'`;
+            let sql = `select count(distinct address_pubkey) as numAddresses from substrate-etl.crypto_${relayChain}.balances${paraID} where date(ts) = '${logDT}'`;
 
-            let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+            let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
             let row = rows.length > 0 ? rows[0] : null;
             let [min_numAddresses, max_numAddresses] = await this.getMinMaxNumAddresses(chainID, logDT);
             if (!(row && (row["numAddresses"] >= min_numAddresses) && (row["numAddresses"] <= max_numAddresses))) {
@@ -1724,7 +1724,7 @@ Example of contractInfoOf:
                     sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
   where section = 'contracts' and method = 'CodeStored')
   select events.*, signer_pub_key from events left join substrate-etl.${relayChain}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
-                    let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+                    let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
                     for (const r of rows) {
                         let data = JSON.parse(r.data);
                         let codeHash = data[0];
@@ -1745,7 +1745,7 @@ Example of contractInfoOf:
                     sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
   where section = 'contracts' and method = 'Instantiated')
   select events.*, signer_pub_key from events left join substrate-etl.${relayChain}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
-                    let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+                    let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
                     for (const r of rows) {
                         let data = JSON.parse(r.data);
                         let address_ss58 = data[0];
@@ -1769,7 +1769,7 @@ Example of contractInfoOf:
                 {
                     // NOTE that this is not complete becuase of utility batch , etc. so we should use contracts.called events, but for some reason this was not systematic, grr.
                     sql = `select extrinsic_id, \`hash\` as extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, params, signer_pub_key from substrate-etl.contracts.contractsextrinsics${id} where section = 'contracts' and method = 'call'`
-                    let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+                    let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
                     let out = []
                     for (const r of rows) {
                         let extrinsic_id = r.extrinsic_id;
@@ -2312,7 +2312,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                     }
                     console.log(bsql, `Expecting range ${bn0} through ${bn1} with ${nrecs}`)
                     let found = {}
-                    let rows = await this.execute_bqJob(bsql, paraTool.BQUSCentral1);
+                    let rows = await this.execute_bqJob(bsql, paraTool.BQUSMulti);
                     for (let bn = bn0; bn <= bn1; bn++) {
                         found[bn] = false;
                     }
@@ -2465,7 +2465,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             for (const tbl of system_tables) {
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
-                let fulltbl = `${projectID}:${relayChain}.${tbl}`;
+                let fulltbl = `${projectID}:crypto_${relayChain}.${tbl}`;
                 let projectID = `${projectID}`
                 if (tbl == "chains") {
                     let sql = `select id, chainName as chain_name, paraID para_id, ss58Format as ss58_prefix, symbol, isEVM as is_evm, isWASM as is_wasm from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' order by para_id`;
@@ -2501,7 +2501,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             let r = {}
             for (const k of Object.keys(sqla)) {
                 let sql = sqla[k];
-                let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+                let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
                 let keys = [];
                 let vals = [];
                 let data = [];
@@ -3089,7 +3089,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let vals = [];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
-            let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+            let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
             let row = rows.length > 0 ? rows[0] : null;
             if (row) {
                 for (const a of Object.keys(row)) {
@@ -3820,7 +3820,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let dir = "/tmp";
         let fn = path.join(dir, `${tbl}-${relayChain}-${logDT}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
-        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev` //MK write to relay_dev for dev
         let logDTp = logDT.replaceAll("-", "")
         let xcmtransfers = [];
         let NL = "\r\n";
@@ -3959,7 +3959,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             try {
-                let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+                let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
                 console.log(sql, rows.length, " rows");
 
                 for (const row of rows) {
@@ -4070,7 +4070,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             console.log("openSync", fn[tbl]);
             f[tbl] = fs.openSync(fn[tbl], 'w', 0o666);
         }
-        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev` //MK write to relay_dev for dev
 
         // 3. setup specversions
         const tableChain = this.getTableChain(chainID);
@@ -4693,7 +4693,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         let tbl = "traces";
         let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
-        let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to relay_dev for dev
+        let bqDataset = (this.isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev` 
 
         // 3. setup specversions
         const tableChain = this.getTableChain(chainID);
@@ -4812,7 +4812,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         let vals = [];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
-            let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+            let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
             let row = rows.length > 0 ? rows[0] : null;
             if (row) {
                 for (const a of Object.keys(row)) {
@@ -4872,7 +4872,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             try {
-                let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+                let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
                 console.log(sql, rows.length, " rows");
 
                 for (const row of rows) {
@@ -4945,7 +4945,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
       "Vesting", "XcmpQueue",      "Session",      "SessionManager",      "DmpQueue",      "Aura",      "AuraExt", "relayerXcm",      "Authorship", "Evm")
       and storage not in ("Locks", "LowestUnbaked", "LastAccumulationSecs", "HasDispatched", "PreviousRelayBlockNumber"))
  GROUP BY section, storage`
-        let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+        let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
         let keys = ["palletName", "storageName"];
         let vals = ["numKeys7d", "numChains", "chainID", "lastCountUpdateDT"]
         let data = [];
@@ -4985,7 +4985,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         let bqCmds = []
         let fullTableIDs = []
         for (const rc of relayChains) {
-            let bqCmd = `bq ls --max_results 1000 --project_id=${projectID} --dataset_id="${rc}" --format=json`
+            let bqCmd = `bq ls --max_results 1000 --project_id=${projectID} --dataset_id="crypto_${rc}" --format=json`
             let res = await exec(bqCmd)
             try {
                 if (res.stdout && res.stderr == '') {
@@ -5377,7 +5377,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
         const datasetId = `substrate_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};
         let substrateSchemaQuery = `SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%' or table_name like 'evt_%' or table_name like 'storage_%'`
-        let tablesRecs = await this.execute_bqJob(substrateSchemaQuery, paraTool.BQUSCentral1);
+        let tablesRecs = await this.execute_bqJob(substrateSchemaQuery, paraTool.BQUSMulti);
         let ntables = 0;
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
@@ -5415,8 +5415,8 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     }
 
     async enrich_swaps() {
-        let sql = `select * from substrate-etl.polkadot_enterprise.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
-        let rows = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+        let sql = `select * from substrate-etl.substrate_internal.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
+        let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
         for (const r of rows) {
             let call_args = r.call_args;
             let call_args_def = r.call_args_def;
