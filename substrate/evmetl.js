@@ -1936,7 +1936,9 @@ mysql> desc projectcontractabi;
         let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
         paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
         paraTool.chainIDArbitrum, paraTool.chainIDAvalanche]
-        if (!evmChainIDList.includes(blockchainID)) {
+        if (evmChainIDList.includes(blockchainID)) {
+            await crawler.setupEvm(blockchainID)
+        }else{
             console.log(`Invalid chainID`)
             process.exit(1)
         }

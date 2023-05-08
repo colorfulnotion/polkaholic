@@ -9539,6 +9539,56 @@ module.exports = class Indexer extends AssetManager {
         return false;
     }
 
+    async setupEvm(chainID){
+        let chain = await this.getChain(chainID);
+        const bigquery = this.get_big_query();
+        await this.initEvmSchemaMap()
+        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
+            return (false);
+        }
+
+        // TODO: extract this
+        const Web3 = require('web3')
+        let provider = null
+        const startConnection = () => {
+            provider = new Web3.providers.WebsocketProvider(
+                chain.WSEndpoint, {
+                    clientConfig: {
+                        keepalive: true,
+                        keepaliveInterval: -1
+                    },
+                    reconnect: {
+                        auto: true,
+                        delay: 5000,
+                        maxAttempts: 5,
+                        onTimeout: false
+                    }
+                }
+            );
+            provider.connection.addEventListener('close', () => {
+                startConnection()
+            })
+        }
+        startConnection();
+        const web3 = new Web3(provider);
+        this.web3Api = web3;
+        if (chain.evmRPCBlockReceipts != undefined) {
+            this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
+        }
+        if (chain.evmRPCInternal != undefined) {
+            this.evmRPCInternal = chain.evmRPCInternal
+        }
+        if (chain.evmRPC != undefined) {
+            this.evmRPC = chain.evmRPC
+        }
+        this.contractABIs = await this.getContractABI();
+
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        await this.assetManagerInit()
+
+    }
+
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
