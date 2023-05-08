@@ -8,6 +8,7 @@ const exec = util.promisify(require('child_process').exec);
 const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const path = require('path');
+const Crawler = require("./crawler");
 
 const fs = require('fs');
 const readline = require('readline');
@@ -1927,6 +1928,18 @@ mysql> desc projectcontractabi;
     }
 
     async index_evmchain(chainID, logDT) {
+        let crawler = new Crawler();
+        crawler.setDebugLevel(paraTool.debugTracing)
+        let chain = await crawler.getChain(chainID);
+        let blockchainID = chain.chainID
+        //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
+        let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
+        paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+        paraTool.chainIDArbitrum, paraTool.chainIDAvalanche]
+        if (!evmChainIDList.includes(blockchainID)) {
+            console.log(`Invalid chainID`)
+            process.exit(1)
+        }
         let jmp = 50;
         let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
         console.log(`index_evmchain sql`, sql)
@@ -1956,7 +1969,7 @@ mysql> desc projectcontractabi;
                     //console.log(`row`, row)
                     let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
                     console.log(`rRow`, rRow)
-                    let r = await this.index_evm_chain_block_row(rRow, false);
+                    let r = await crawler.index_evm_chain_block_row(rRow, false);
                 } catch (err) {
                     console.log(err)
                     //this.log_indexing_error(err, `index_blocks_period`);
