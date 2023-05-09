@@ -1706,14 +1706,14 @@ mysql> desc projectcontractabi;
         //20201201 -> [TS, '20221201', '2022-12-01', '2022-11-30']
         let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
         let logYYYYMMDD = logDT.replaceAll('-', '')
-        let logYYYY_MM_DD = logDT.replaceAll('-', '/')
         let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let logYYYY_MM_DD = currDT.replaceAll('-', '/')
         let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
         return [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD]
     }
     async blcp(dt, chainID, id = "ethereum") {
         let srcprojectID, srcdataset;
-        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getTimeFormat(dt)
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
 
         switch (chainID) {
             case 1:
@@ -1731,42 +1731,73 @@ mysql> desc projectcontractabi;
                 "ts": "timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${currDT}" order by number, timestamp`,
                 "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`,
-                "gs": `'EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/blocks_*", format="JSON", overwrite=true) AS
-SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty FROM \`substrate-etl.crypto_ethereum.blocks\` WHERE DATE(timestamp) = "${currDT}" order by number, timestamp'`
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/blocks_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty
+                FROM \`substrate-etl.crypto_ethereum.blocks\` WHERE DATE(timestamp) = "${currDT}"
+                ORDER BY number, timestamp`
             },
             "contracts": {
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${currDT}" order by block_number, block_timestamp`,
-                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/contracts_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
+                FROM \`substrate-etl.crypto_ethereum.contracts\` WHERE DATE(block_timestamp) = "${currDT}"
+                ORDER BY block_number, block_timestamp`
             },
             "logs": {
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${currDT}" order by block_number, log_index, transaction_index, block_timestamp`,
-                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/logs_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
+                FROM \`substrate-etl.crypto_ethereum.logs\` WHERE DATE(block_timestamp) = "${currDT}"
+                ORDER BY block_number, log_index, transaction_index, block_timestamp`
             },
             "token_transfers": {
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${currDT}" order by block_number, log_index, block_timestamp`,
-                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/token_transfers_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
+                FROM \`substrate-etl.crypto_ethereum.token_transfers\` WHERE DATE(block_timestamp) = "${currDT}"
+                ORDER BY block_number, log_index, block_timestamp`
             },
             "tokens": {
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${currDT}" order by block_number, block_timestamp`,
-                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/tokens_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
+                FROM \`substrate-etl.crypto_ethereum.tokens\` WHERE DATE(block_timestamp) = "${currDT}"
+                ORDER BY block_number, block_timestamp
+
+                `
             },
             "traces": {
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${currDT}" order by block_number, transaction_index, trace_address, subtraces`,
-                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/traces_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
+                FROM \`substrate-etl.crypto_ethereum.traces\`where date(block_timestamp) = "${currDT}"
+                ORDER BY block_number, transaction_index, trace_address, subtraces
+                `
 
             },
             "transactions": {
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${currDT}" order by block_number, transaction_index`,
-                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`
+                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`,
+                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/transactions_*", format="JSON", overwrite=true) AS
+                SELECT chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price
+                FROM \`substrate-etl.crypto_ethereum.transactions\`where date(block_timestamp) = "${currDT}"
+                ORDER BY block_number, transaction_index
+                `
             },
         };
         let projectID = `substrate-etl`
+        let cmds = []
         for (const tbl of Object.keys(tables)) {
             let t = tables[tbl];
             //let [logTS, logYYYYMMDD, currDT, prevDT] = this.getAllTimeFormat(dt)
@@ -1775,22 +1806,23 @@ SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent
             let targetSQL = t.sql;
             let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
             //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
-            console.log('\n', bqCmd);
-            let gsCmd = `bq query --use_legacy_sql=false ${t["gs"]}`
-            console.log(gsCmd, '\n')
-            /*
+            let gsCmd = `bq query --use_legacy_sql=false '${paraTool.removeNewLine(t["gs"])}'`
+            //console.log(gsCmd, '\n')
+            cmds.push(bqCmd)
+            cmds.push(gsCmd)
+        }
+        for (const cmd of cmds){
             try {
-                console.log(`bqCmd`)
-                await exec(bqCmd, {
+                console.log(cmd, `\n`)
+                await exec(cmd, {
                     maxBuffer: 1024 * 50000
                 });
+
             } catch (e) {
                 console.log(e);
                 // TODO optimization: do not create twice
             }
-            */
         }
-
     }
 
 
@@ -1874,6 +1906,7 @@ SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent
             let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
             let families = ["transactions", "logs", "token_transfers", "traces", "contracts"];
             //let families = ["transactions"];
+            /*
             for (const f of families) {
                 let tableFlds =  tableQuery[f]["flds"]
                 let query = `select ${tableFlds} from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
@@ -1893,6 +1926,7 @@ SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent
                     }
                 }
             }
+            */
             let out = [];
             for (let bn = n; bn <= nmax; bn++) {
                 let r = rows[bn];
