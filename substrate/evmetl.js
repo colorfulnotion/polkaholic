@@ -1718,7 +1718,9 @@ mysql> desc projectcontractabi;
             "blocks": {
                 "ts": "timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${dt}" order by number, timestamp`,
-                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`
+                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`,
+                "gs": `'EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${dt}/blocks_*", format="JSON", overwrite=true) AS
+SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty FROM \`substrate-etl.crypto_ethereum.blocks\` WHERE DATE(timestamp) = "${dt}" order by number, timestamp'`
             },
             "contracts": {
                 "ts": "block_timestamp",
@@ -1762,6 +1764,9 @@ mysql> desc projectcontractabi;
             let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
             //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
             console.log(bqCmd);
+            let gsCmd = `bq query  --use_legacy_sql=false ${t["gs"]}`
+            console.log(`gsCmd`, gsCmd)
+            /*
             try {
                 console.log(`bqCmd`)
                 await exec(bqCmd, {
@@ -1771,6 +1776,7 @@ mysql> desc projectcontractabi;
                 console.log(e);
                 // TODO optimization: do not create twice
             }
+            */
         }
 
     }
