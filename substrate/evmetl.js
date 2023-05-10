@@ -12,6 +12,7 @@ const Crawler = require("./crawler");
 
 const fs = require('fs');
 const readline = require('readline');
+const glob = require('glob');
 
 // Function: mint(address poolToken,uint256 amount,address to,uint256 deadline)
 // MethodID: 0x3c173a4f
@@ -1825,7 +1826,19 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async countLinesInFile(fn='/tmp/blocks_000000000000') {
+    async countLinesInFiles(pattern) {
+      const filepaths = glob.sync(pattern).sort();
+      let totalLineCount = 0;
+      for (const filepath of filepaths) {
+        const lineCount = await this.countLinesInFile(filepath);
+        console.log(`${filepath} recCnt=${lineCount}`)
+        totalLineCount += lineCount;
+      }
+      return totalLineCount;
+    }
+
+
+    async countLinesInFile(fn='/disk1/evm/blocks_000000000000') {
       return new Promise((resolve, reject) => {
         const readStream = fs.createReadStream(fn, { encoding: 'utf8' });
         let lineCount = 0;
@@ -1852,7 +1865,7 @@ mysql> desc projectcontractabi;
       });
     }
 
-    async parseJSONL(fn='/tmp/blocks_000000000000', offsetStart=0, maxN=null) {
+    async parseJSONL(fn='/disk1/evm/blocks_000000000000', offsetStart=0, maxN=null) {
       const fileStream = fs.createReadStream(fn, { encoding: 'utf8' });
       const rl = readline.createInterface({
         input: fileStream,
@@ -1881,6 +1894,50 @@ mysql> desc projectcontractabi;
       return jsonData;
     }
 
+    async parseJSONLPath(pattern='/disk1/evm/blocks_', offsetStart, maxN = null) {
+      const filepaths = glob.sync(pattern).sort();
+      let remainingOffset = offsetStart;
+      let linesToRead = maxN;
+      const jsonData = [];
+      for (const filepath of filepaths) {
+        const fileStream = fs.createReadStream(filepath, { encoding: 'utf8' });
+        const rl = readline.createInterface({
+          input: fileStream,
+          crlfDelay: Infinity,
+        });
+        console.log(`parseJSONLPath stream ${filepath}`)
+        let lineCount = 0;
+        let linesRead = 0;
+
+        for await (const line of rl) {
+          if (lineCount >= remainingOffset || linesToRead == null) {
+            try {
+              const jsonObject = JSON.parse(line);
+              jsonData.push(jsonObject);
+              console.log(`jsonDataLen ${jsonData.length}`)
+              linesRead++;
+            } catch (error) {
+              console.error('Error parsing line:', line, error);
+            }
+          }
+
+          if (linesToRead !== null && linesRead >= linesToRead) {
+            break;
+          }
+          lineCount++;
+        }
+
+        remainingOffset = Math.max(0, remainingOffset - lineCount);
+        if (linesToRead !== null) {
+          linesToRead = Math.max(0, linesToRead - linesRead);
+          if (linesToRead === 0) {
+            break;
+          }
+        }
+      }
+      return jsonData;
+    }
+
     async backfill(dt, chainID, id = "ethereum") {
         let projectID = "substrate-etl";
         let dataset = null;
@@ -1894,10 +1951,11 @@ mysql> desc projectcontractabi;
         }
         let tbl = this.instance.table("evmchain" + chainID);
         console.log("HI");
-        let fn = '/tmp/blocks_000000000000'
-        let recCnt = await this.countLinesInFile(fn)
-        console.log(`${fn} recCnt=${recCnt}`)
-        let res = await this.parseJSONL(fn)
+        //let fn = '/disk1/evm/blocks_000000000000'
+        let path = '/disk1/evm/transactions_*'
+        let recCnt = await this.countLinesInFiles(path)
+        console.log(`${path} recCnt=${recCnt}`)
+        let res = await this.parseJSONLPath(path)
         console.log(`res`, res)
         process.exit(1)
         let tableQuery = {
