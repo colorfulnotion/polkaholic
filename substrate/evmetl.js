@@ -1825,8 +1825,221 @@ mysql> desc projectcontractabi;
         }
     }
 
+    async countLinesInFile(fn='/tmp/blocks_000000000000') {
+      return new Promise((resolve, reject) => {
+        const readStream = fs.createReadStream(fn, { encoding: 'utf8' });
+        let lineCount = 0;
+        let buffer = '';
+
+        readStream.on('data', (chunk) => {
+          buffer += chunk;
+          let lines = buffer.split('\n');
+          buffer = lines.pop();
+          lineCount += lines.length;
+        });
+
+        readStream.on('end', () => {
+          // Account for the last line
+          if (buffer.length > 0) {
+            lineCount++;
+          }
+          resolve(lineCount);
+        });
+
+        readStream.on('error', (error) => {
+          reject(error);
+        });
+      });
+    }
+
+    async parseJSONL(fn='/tmp/blocks_000000000000', offsetStart=0, maxN=null) {
+      const fileStream = fs.createReadStream(fn, { encoding: 'utf8' });
+      const rl = readline.createInterface({
+        input: fileStream,
+        crlfDelay: Infinity,
+      });
+      //console.log(`rl`, rl)
+      const jsonData = [];
+      let lineCount = 0;
+      let linesRead = 0;
+
+      for await (const line of rl) {
+        if (lineCount >= offsetStart) {
+          try {
+            const jsonObject = JSON.parse(line);
+            jsonData.push(jsonObject);
+            linesRead++;
+          } catch (error) {
+            console.error('Error parsing line:', line, error);
+          }
+        }
+        if (maxN !== null && linesRead >= maxN) {
+          break;
+        }
+        lineCount++;
+      }
+      return jsonData;
+    }
 
     async backfill(dt, chainID, id = "ethereum") {
+        let projectID = "substrate-etl";
+        let dataset = null;
+        switch (chainID) {
+            case 1:
+                dataset = "crypto_ethereum";
+                break;
+            case 137:
+                dataset = "crypto_polygon";
+                break;
+        }
+        let tbl = this.instance.table("evmchain" + chainID);
+        console.log("HI");
+        let fn = '/tmp/blocks_000000000000'
+        let recCnt = await this.countLinesInFile(fn)
+        console.log(`${fn} recCnt=${recCnt}`)
+        let res = await this.parseJSONL(fn)
+        console.log(`res`, res)
+        process.exit(1)
+        let tableQuery = {
+            "blocks": {
+                "ts": "timestamp",
+                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`
+            },
+            "contracts": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "logs": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "token_transfers": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "tokens": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+            },
+            "traces": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, CAST(value as string) value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
+
+            },
+            "transactions": {
+                "ts": "block_timestamp",
+                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`
+            },
+        };
+
+        let min_bn = null,
+            max_bn = null;
+        let blkFlds =  tableQuery["blocks"]["flds"]
+        let query = `select ${blkFlds} from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
+        console.log(`${query}`)
+        let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+        let rows = {};
+        for (const r of recs) {
+            let bn = r.number;
+            let blockTS = r.timestamp;
+            if (min_bn == null) min_bn = bn;
+            max_bn = bn;
+            rows[bn] = {
+                blockTS: `${blockTS}`,
+                blockHash: r.hash,
+                blockNumber: r.number,
+                blocks: r,
+                logs: [],
+                token_transfers: [],
+                traces: [],
+                transactions: [],
+                contracts: [],
+            }
+        }
+
+        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${dt}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        console.log(`${sql}`)
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+
+        for (let n = min_bn; n <= max_bn; n += 50) {
+            let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
+            let families = ["transactions", "logs", "token_transfers", "traces", "contracts"];
+            //let families = ["transactions"];
+            /*
+            for (const f of families) {
+                let tableFlds =  tableQuery[f]["flds"]
+                let query = `select ${tableFlds} from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
+                console.log(f, query);
+                let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+                for (const r of recs) {
+                    let bn = r.block_number;
+                    //console.log(`[${f}] BN=${bn}, r`, r)
+                    try {
+                        if (bn && rows[bn]) {
+                            rows[bn][f].push(r);
+                        } else {
+                            console.log("problem", bn, f, r);
+                        }
+                    } catch (err) {
+                        console.log(err);
+                    }
+                }
+            }
+            */
+            let out = [];
+            for (let bn = n; bn <= nmax; bn++) {
+                let r = rows[bn];
+                let blockTS = r.blockTS * 1000000
+                let blockHash = r.blockHash
+                let cres = {
+                    key: paraTool.blockNumberToHex(r.blockNumber),
+                    data: {
+                        blocks: {},
+                        logs: {},
+                        token_transfers: {},
+                        traces: {},
+                        transactions: {},
+                        contracts: {},
+                    }
+                };
+
+                cres['data']['blocks'][blockHash] = {
+                    value: JSON.stringify(rows[bn].blocks),
+                    timestamp: blockTS
+                };
+                cres['data']['logs'][blockHash] = {
+                    value: JSON.stringify(rows[bn].logs),
+                    timestamp: blockTS
+                };
+                cres['data']['token_transfers'][blockHash] = {
+                    value: JSON.stringify(rows[bn].token_transfers),
+                    timestamp: blockTS
+                };
+                cres['data']['traces'][blockHash] = {
+                    value: JSON.stringify(rows[bn].traces),
+                    timestamp: blockTS
+                };
+                cres['data']['transactions'][blockHash] = {
+                    value: JSON.stringify(rows[bn].transactions),
+                    timestamp: blockTS
+                };
+                cres['data']['contracts'][blockHash] = {
+                    value: JSON.stringify(rows[bn].contracts),
+                    timestamp: blockTS
+                };
+                console.log(`cres['data']`, cres['data'])
+                out.push(cres);
+            }
+            try {
+                await this.insertBTRows(tbl, out, "evmchain");
+            } catch (e) {
+                console.log(e);
+            }
+        }
+    }
+
+    async backfillOld(dt, chainID, id = "ethereum") {
         let projectID = "substrate-etl";
         let dataset = null;
         switch (chainID) {
