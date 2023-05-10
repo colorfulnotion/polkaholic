@@ -1843,6 +1843,8 @@ mysql> desc projectcontractabi;
         const readStream = fs.createReadStream(fn, { encoding: 'utf8' });
         let lineCount = 0;
         let buffer = '';
+        let blockHashFld = (fn.includes("blocks"))? "hash" : "block_hash"
+        let blockNumberFld = (fn.includes("blocks"))? "number" : "block_number"
 
         readStream.on('data', (chunk) => {
           buffer += chunk;
@@ -1865,78 +1867,212 @@ mysql> desc projectcontractabi;
       });
     }
 
-    async parseJSONL(fn='/disk1/evm/blocks_000000000000', offsetStart=0, maxN=null) {
+    async parseJSONL(fn='/disk1/evm/blocks_000000000000', prevIncompleteBlkRecordsMaps = false, offsetStart=0, maxN=null) {
       const fileStream = fs.createReadStream(fn, { encoding: 'utf8' });
       const rl = readline.createInterface({
         input: fileStream,
         crlfDelay: Infinity,
       });
       //console.log(`rl`, rl)
-      const jsonData = [];
+      let blkRecordsMaps = {}
+      let blkRecords = [];
+      //let lastBlkRecords = [];
       let lineCount = 0;
       let linesRead = 0;
+      let blockHashFld = (fn.includes("blocks"))? "hash" : "block_hash"
+      let blockNumberFld = (fn.includes("blocks"))? "number" : "block_number"
+      let prevKey = false; //previusly completed key
+      let currKey = false;
+      let prevIncompleteKey = false
+
+      //load prevIncompleteBlkRecordsMaps
+      if (prevIncompleteBlkRecordsMaps){
+          // if exist, creat key
+          let key = Object.keys(prevIncompleteBlkRecordsMaps)[0]
+          blkRecordsMaps[key] = prevIncompleteBlkRecordsMaps[key]
+          currKey = key
+          prevIncompleteKey = key
+      }
 
       for await (const line of rl) {
         if (lineCount >= offsetStart) {
           try {
             const jsonObject = JSON.parse(line);
-            jsonData.push(jsonObject);
+            let bn = jsonObject[blockNumberFld]
+            let blkHash = jsonObject[blockHashFld]
+            let key = `${bn}_${blkHash}`
+            if (blkRecordsMaps[key] == undefined){
+                //if key not found, it's a start of a new block, last block is available to push
+                // mark last key as complete
+                prevKey = currKey
+                blkRecordsMaps[key] = []
+                blkRecordsMaps[key].push(jsonObject)
+                currKey = key
+            }else{
+                //currKey in process
+                blkRecordsMaps[key].push(jsonObject)
+                currKey = key
+            }
             linesRead++;
           } catch (error) {
             console.error('Error parsing line:', line, error);
           }
         }
         if (maxN !== null && linesRead >= maxN) {
-          break;
+            break;
         }
         lineCount++;
       }
-      return jsonData;
-    }
 
-    async parseJSONLPath(pattern='/disk1/evm/blocks_', offsetStart, maxN = null) {
-      const filepaths = glob.sync(pattern).sort();
-      let remainingOffset = offsetStart;
-      let linesToRead = maxN;
-      const jsonData = [];
-      for (const filepath of filepaths) {
-        const fileStream = fs.createReadStream(filepath, { encoding: 'utf8' });
-        const rl = readline.createInterface({
-          input: fileStream,
-          crlfDelay: Infinity,
-        });
-        console.log(`parseJSONLPath stream ${filepath}`)
-        let lineCount = 0;
-        let linesRead = 0;
-
-        for await (const line of rl) {
-          if (lineCount >= remainingOffset || linesToRead == null) {
-            try {
-              const jsonObject = JSON.parse(line);
-              jsonData.push(jsonObject);
-              console.log(`jsonDataLen ${jsonData.length}`)
-              linesRead++;
-            } catch (error) {
-              console.error('Error parsing line:', line, error);
-            }
-          }
-
-          if (linesToRead !== null && linesRead >= linesToRead) {
-            break;
-          }
-          lineCount++;
-        }
-
-        remainingOffset = Math.max(0, remainingOffset - lineCount);
-        if (linesToRead !== null) {
-          linesToRead = Math.max(0, linesToRead - linesRead);
-          if (linesToRead === 0) {
-            break;
-          }
-        }
+      let incompleteBlkRecordsMaps = {}
+      incompleteBlkRecordsMaps[currKey] = blkRecordsMaps[currKey]
+      delete blkRecordsMaps[currKey]
+      let coveredBlocks = Object.keys(blkRecordsMaps).sort()
+      let resp = {
+          fn: fn,
+          linesReads: linesRead,
+          prevIncompleteKey: prevIncompleteKey,
+          completeStarKey: coveredBlocks[0],
+          completeEndKey: prevKey,
+          remainingKey: currKey,
+          blkRecordsMaps: blkRecordsMaps,
+          incompleteBlkRecordsMaps: incompleteBlkRecordsMaps,
       }
-      return jsonData;
+      return resp;
     }
+
+    createWorkingDir(targetPath='/disk1/evm/2023/04/01/1/') {
+      // Create the target directory if it does not exist
+      if (!fs.existsSync(targetPath)) {
+        fs.mkdirSync(targetPath, { recursive: true });
+        console.log(`Making Directory "${targetPath}"`);
+      } else {
+        console.log(`Directory "${targetPath}" already exists.`);
+      }
+    }
+
+    async processTable(blocksMap, dirPath, tbl, fnType = "blocks") {
+        let path = `${dirPath}${fnType}_*`
+        let filepaths = glob.sync(path).sort();
+        console.log(`processTable filepaths`, filepaths)
+        let prevIncompleteBlkRecordsMaps = false
+        let currIncompleteBlkRecordsMaps = false
+        for (const fn of filepaths){
+            prevIncompleteBlkRecordsMaps = currIncompleteBlkRecordsMaps
+            /*
+            if (tblRec && tblRec.incompleteBlkRecordsMaps != undefined){
+                prevIncompleteBlkRecordsMaps = tblRec.incompleteBlkRecordsMaps
+            }
+            */
+            let tblRecs = await this.parseJSONL(fn, prevIncompleteBlkRecordsMaps)
+            currIncompleteBlkRecordsMaps = tblRecs.incompleteBlkRecordsMaps
+            console.log(`tblRec`, tblRecs)
+            await this.loadTableRecs(blocksMap, tblRecs.blkRecordsMaps, tbl, fnType, fn)
+        }
+        if (currIncompleteBlkRecordsMaps){
+            await this.loadTableRecs(blocksMap, currIncompleteBlkRecordsMaps, tbl, fnType, "Remaining")
+        }
+    }
+
+    async loadTableRecs(blocksMap, blkRecordsMaps, tbl, fnType = "blocks", content = ""){
+        let out = [];
+        let batchSize = 100
+        let batchN = 0;
+        let fnTypeList = ["blocks", "logs", "token_transfers", "traces", "transactions", "contracts"]
+        if (!fnTypeList.includes(fnType)){
+            console.log(`Invalid fnType=${fnType}`)
+            return
+        }
+        for (const blkKey of Object.keys(blkRecordsMaps)){
+            if (blocksMap[blkKey] == undefined){
+                //should not get here
+                console.log(`${blkKey} missing from blocksMap`)
+                continue
+            }
+            let blockNumber = paraTool.dechexToInt(blkKey.split(`_`)[0])
+            let blockHash = blkKey.split(`_`)[1]
+            let rec = blkRecordsMaps[blkKey]
+            let blockTS = blocksMap[blkKey] * 1000000
+            if (fnType == "blocks"){
+                rec = rec[0] //use array for blocks?
+            }
+            let cres = {
+                key: paraTool.blockNumberToHex(blockNumber),
+                data: {
+                    /*
+                    blocks: {},
+                    logs: {},
+                    token_transfers: {},
+                    traces: {},
+                    transactions: {},
+                    contracts: {},
+                    */
+                }
+            }
+            // only init specific fnType
+            cres.data[fnType] = {}
+            cres['data'][fnType][blockHash] = {
+                value: JSON.stringify(rec),
+                timestamp: blockTS
+            };
+            //console.log(`cres['data'][${fnType}][${blockHash}]`, cres['data'][fnType][blockHash])
+            out.push(cres);
+            if (out.length >= batchSize){
+                try {
+                    await this.insertBTRows(tbl, out, "evmchain");
+                    console.log(`${content}\n${fnType} batch#${batchN} insertBTRows ${out.length}`, out)
+                    batchN++
+                    out = []
+                } catch (e) {
+                    console.log(e);
+                }
+            }
+        }
+
+        if (out.length >= batchSize){
+            try {
+                await this.insertBTRows(tbl, out, "evmchain");
+                console.log(`${content}\n ${fnType} last batch#${batchN} insertBTRows ${out.length}`, out)
+            } catch (e) {
+                console.log(e);
+            }
+        }
+    }
+
+    async loadBlocksInfo(dirPath){
+        let path = `${dirPath}blocks_*`
+        let filepaths = glob.sync(path).sort();
+        let blocksMap = {}
+        let res = false
+        let prevIncompleteBlkRecordsMaps = false
+        for (const fn of filepaths){
+            if (res && res.incompleteBlkRecordsMaps != undefined){
+                prevIncompleteBlkRecordsMaps = res.incompleteBlkRecordsMaps
+            }
+            res = await this.parseJSONL(fn, prevIncompleteBlkRecordsMaps)
+            for (const k of Object.keys(res.blkRecordsMaps)){
+                let r = res["blkRecordsMaps"][k][0]
+                blocksMap[k] = r.timestamp
+            }
+            for (const k of Object.keys(res.incompleteBlkRecordsMaps)){
+                let r = res["incompleteBlkRecordsMaps"][k][0]
+                blocksMap[k] = r.timestamp
+            }
+        }
+        console.log(blocksMap)
+        let blockKeys = Object.keys(blocksMap).sort()
+        let minBlkKey = blockKeys.shift()
+        let maxBlkKey = blockKeys.pop()
+        let minBN = minBlkKey.split("_")[0]
+        let maxBN = maxBlkKey.split("_")[0]
+        let blocksInfo = {
+            blocks: blocksMap,
+            minBN: paraTool.dechexToInt(minBN),
+            maxBN: paraTool.dechexToInt(maxBN)
+        }
+        return blocksInfo
+    }
+
 
     async backfill(dt, chainID, id = "ethereum") {
         let projectID = "substrate-etl";
@@ -1949,304 +2085,33 @@ mysql> desc projectcontractabi;
                 dataset = "crypto_polygon";
                 break;
         }
-        let tbl = this.instance.table("evmchain" + chainID);
-        console.log("HI");
-        //let fn = '/disk1/evm/blocks_000000000000'
-        let path = '/disk1/evm/transactions_*'
-        let recCnt = await this.countLinesInFiles(path)
-        console.log(`${path} recCnt=${recCnt}`)
-        let res = await this.parseJSONLPath(path)
-        console.log(`res`, res)
-        process.exit(1)
-        let tableQuery = {
-            "blocks": {
-                "ts": "timestamp",
-                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`
-            },
-            "contracts": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "logs": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "token_transfers": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "tokens": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "traces": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, CAST(value as string) value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
 
-            },
-            "transactions": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`
-            },
-        };
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let dirPath = `/disk1/evm/${logYYYY_MM_DD}/${chainID}/`
+        this.createWorkingDir(dirPath)
 
-        let min_bn = null,
-            max_bn = null;
-        let blkFlds =  tableQuery["blocks"]["flds"]
-        let query = `select ${blkFlds} from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
-        console.log(`${query}`)
-        let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-        let rows = {};
-        for (const r of recs) {
-            let bn = r.number;
-            let blockTS = r.timestamp;
-            if (min_bn == null) min_bn = bn;
-            max_bn = bn;
-            rows[bn] = {
-                blockTS: `${blockTS}`,
-                blockHash: r.hash,
-                blockNumber: r.number,
-                blocks: r,
-                logs: [],
-                token_transfers: [],
-                traces: [],
-                transactions: [],
-                contracts: [],
-            }
-        }
-
-        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${dt}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
-        console.log(`${sql}`)
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-
-        for (let n = min_bn; n <= max_bn; n += 50) {
-            let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
-            let families = ["transactions", "logs", "token_transfers", "traces", "contracts"];
-            //let families = ["transactions"];
-            /*
-            for (const f of families) {
-                let tableFlds =  tableQuery[f]["flds"]
-                let query = `select ${tableFlds} from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
-                console.log(f, query);
-                let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-                for (const r of recs) {
-                    let bn = r.block_number;
-                    //console.log(`[${f}] BN=${bn}, r`, r)
-                    try {
-                        if (bn && rows[bn]) {
-                            rows[bn][f].push(r);
-                        } else {
-                            console.log("problem", bn, f, r);
-                        }
-                    } catch (err) {
-                        console.log(err);
-                    }
-                }
-            }
-            */
-            let out = [];
-            for (let bn = n; bn <= nmax; bn++) {
-                let r = rows[bn];
-                let blockTS = r.blockTS * 1000000
-                let blockHash = r.blockHash
-                let cres = {
-                    key: paraTool.blockNumberToHex(r.blockNumber),
-                    data: {
-                        blocks: {},
-                        logs: {},
-                        token_transfers: {},
-                        traces: {},
-                        transactions: {},
-                        contracts: {},
-                    }
-                };
-
-                cres['data']['blocks'][blockHash] = {
-                    value: JSON.stringify(rows[bn].blocks),
-                    timestamp: blockTS
-                };
-                cres['data']['logs'][blockHash] = {
-                    value: JSON.stringify(rows[bn].logs),
-                    timestamp: blockTS
-                };
-                cres['data']['token_transfers'][blockHash] = {
-                    value: JSON.stringify(rows[bn].token_transfers),
-                    timestamp: blockTS
-                };
-                cres['data']['traces'][blockHash] = {
-                    value: JSON.stringify(rows[bn].traces),
-                    timestamp: blockTS
-                };
-                cres['data']['transactions'][blockHash] = {
-                    value: JSON.stringify(rows[bn].transactions),
-                    timestamp: blockTS
-                };
-                cres['data']['contracts'][blockHash] = {
-                    value: JSON.stringify(rows[bn].contracts),
-                    timestamp: blockTS
-                };
-                console.log(`cres['data']`, cres['data'])
-                out.push(cres);
-            }
-            try {
-                await this.insertBTRows(tbl, out, "evmchain");
-            } catch (e) {
-                console.log(e);
-            }
-        }
-    }
-
-    async backfillOld(dt, chainID, id = "ethereum") {
-        let projectID = "substrate-etl";
-        let dataset = null;
-        switch (chainID) {
-            case 1:
-                dataset = "crypto_ethereum";
-                break;
-            case 137:
-                dataset = "crypto_polygon";
-                break;
+        try {
+            let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
+            //let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
+            console.log(`${gsCmd}`, res)
+        } catch (e) {
+            console.log(`${e.toString()}`)
         }
         let tbl = this.instance.table("evmchain" + chainID);
         console.log("HI");
 
-        let tableQuery = {
-            "blocks": {
-                "ts": "timestamp",
-                "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`
-            },
-            "contracts": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "logs": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "token_transfers": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "tokens": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-            },
-            "traces": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, CAST(value as string) value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`
-
-            },
-            "transactions": {
-                "ts": "block_timestamp",
-                "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`
-            },
-        };
-
-        let min_bn = null,
-            max_bn = null;
-        let blkFlds =  tableQuery["blocks"]["flds"]
-        let query = `select ${blkFlds} from \`${projectID}.${dataset}.blocks\` where date(timestamp) = "${dt}" order by number`
-        console.log(`${query}`)
-        let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-        let rows = {};
-        for (const r of recs) {
-            let bn = r.number;
-            let blockTS = r.timestamp;
-            if (min_bn == null) min_bn = bn;
-            max_bn = bn;
-            rows[bn] = {
-                blockTS: `${blockTS}`,
-                blockHash: r.hash,
-                blockNumber: r.number,
-                blocks: r,
-                logs: [],
-                token_transfers: [],
-                traces: [],
-                transactions: [],
-                contracts: [],
-            }
-        }
-
-        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${dt}', '${min_bn}', '${max_bn}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        let blocksInfo = await this.loadBlocksInfo(dirPath, "blocks")
+        console.log(`blocksInfo`, blocksInfo)
+        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${currDT}', '${blocksInfo.minBN}', '${blocksInfo.maxBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
         console.log(`${sql}`)
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
+        process.exit(0)
 
-        for (let n = min_bn; n <= max_bn; n += 50) {
-            let nmax = (n + 50) <= max_bn ? n + 50 : max_bn;
-            let families = ["transactions", "logs", "token_transfers", "traces", "contracts"];
-            //let families = ["transactions"];
-            /*
-            for (const f of families) {
-                let tableFlds =  tableQuery[f]["flds"]
-                let query = `select ${tableFlds} from \`${projectID}.${dataset}.${f}\` where date(block_timestamp) = "${dt}" and block_number >= ${n} and block_number <= ${nmax} order by block_number`
-                console.log(f, query);
-                let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
-                for (const r of recs) {
-                    let bn = r.block_number;
-                    //console.log(`[${f}] BN=${bn}, r`, r)
-                    try {
-                        if (bn && rows[bn]) {
-                            rows[bn][f].push(r);
-                        } else {
-                            console.log("problem", bn, f, r);
-                        }
-                    } catch (err) {
-                        console.log(err);
-                    }
-                }
-            }
-            */
-            let out = [];
-            for (let bn = n; bn <= nmax; bn++) {
-                let r = rows[bn];
-                let blockTS = r.blockTS * 1000000
-                let blockHash = r.blockHash
-                let cres = {
-                    key: paraTool.blockNumberToHex(r.blockNumber),
-                    data: {
-                        blocks: {},
-                        logs: {},
-                        token_transfers: {},
-                        traces: {},
-                        transactions: {},
-                        contracts: {},
-                    }
-                };
-
-                cres['data']['blocks'][blockHash] = {
-                    value: JSON.stringify(rows[bn].blocks),
-                    timestamp: blockTS
-                };
-                cres['data']['logs'][blockHash] = {
-                    value: JSON.stringify(rows[bn].logs),
-                    timestamp: blockTS
-                };
-                cres['data']['token_transfers'][blockHash] = {
-                    value: JSON.stringify(rows[bn].token_transfers),
-                    timestamp: blockTS
-                };
-                cres['data']['traces'][blockHash] = {
-                    value: JSON.stringify(rows[bn].traces),
-                    timestamp: blockTS
-                };
-                cres['data']['transactions'][blockHash] = {
-                    value: JSON.stringify(rows[bn].transactions),
-                    timestamp: blockTS
-                };
-                cres['data']['contracts'][blockHash] = {
-                    value: JSON.stringify(rows[bn].contracts),
-                    timestamp: blockTS
-                };
-                console.log(`cres['data']`, cres['data'])
-                out.push(cres);
-            }
-            try {
-                await this.insertBTRows(tbl, out, "evmchain");
-            } catch (e) {
-                console.log(e);
-            }
+        let fnTypes = ["blocks", "logs", "traces", "transactions", "contracts", "token_transfers"]
+        //let fnTypes = ["blocks"]
+        for (const fnType of fnTypes){
+            await this.processTable(blocksInfo.blocks, dirPath, tbl, fnType)
         }
     }
 
@@ -2268,6 +2133,7 @@ mysql> desc projectcontractabi;
         let jmp = 50;
         let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
         console.log(`index_evmchain sql`, sql)
+        //TODO: how to make this hourly?
         let recs = await this.poolREADONLY.query(sql);
         let currPeriod = recs[0];
         let evmindexLogs = []

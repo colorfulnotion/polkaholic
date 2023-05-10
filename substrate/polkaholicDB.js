@@ -1532,6 +1532,7 @@ from chain where chainID = '${chainID}' limit 1`);
             block: false,
             blockHash: false,
             blockNumber: false,
+            blockTS: false,
             contracts: false,
             logs: false,
             token_transfers: false,
@@ -1564,6 +1565,7 @@ from chain where chainID = '${chainID}' limit 1`);
             if (cell) {
                 let blk = JSON.parse(cell.value)
                 r.block = blk;
+                r.blockTS = blk.timestamp
                 r.chain_id = blk.chain_id
             }
         }
@@ -1693,6 +1695,7 @@ from chain where chainID = '${chainID}' limit 1`);
             chain_id: r.chain_id,
             blockHash: r.blockHash,
             blockNumber: r.blockNumber,
+            blockTS: paraTool.dechexToInt(r.blockTS),
             block: rpcBlk,
             evmReceipts: rpcReceipts,
             traces: false
