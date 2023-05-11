@@ -1642,7 +1642,7 @@ from chain where chainID = '${chainID}' limit 1`);
                     rpcLog["removed"] = false
                     //It is true when the log was removed due to a chain reorganization, and false if it's a valid log. since we don't have this. will use false for all
                 }else{
-                    rpcLog[rpcLogCol] = btLog[btLogCol]
+                    rpcLog[rpcLogCol] = (btLog[btLogCol] != undefined)? btLog[btLogCol]: null
                 }
             }
             logMap[transactionHash].push(rpcLog)
@@ -1659,7 +1659,7 @@ from chain where chainID = '${chainID}' limit 1`);
             for (let i = 0; i < btTxCols.length; i++) {
                 let btTxCol = btTxCols[i]
                 let rpcTxCol = rpcTxCols[i]
-                rpcTxn[rpcTxCol] = btTxn[btTxCol]
+                rpcTxn[rpcTxCol] = (btTxn[btTxCol] != undefined)?  btTxn[btTxCol] : null
             }
             //btTxn is missing accessList, r, s, v
             rpcTxns.push(rpcTxn)
@@ -1678,7 +1678,7 @@ from chain where chainID = '${chainID}' limit 1`);
                         rpcReceipt["logs"] = logMap[transactionHash]
                     }
                 }else{
-                    rpcReceipt[rpcReceiptCol] = btTxn[btReceiptCol]
+                    rpcReceipt[rpcReceiptCol] = (btTxn[btReceiptCol] != undefined)? btTxn[btReceiptCol] : null
                 }
             }
             // rpcReceipts is missing logsbloom + removed

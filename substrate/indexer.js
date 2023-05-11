@@ -8334,8 +8334,386 @@ module.exports = class Indexer extends AssetManager {
         ])
         let [dTxns, dReceipts] = await statusesPromise
         console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
-        //await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
         return r;
+    }
+
+    async store_stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        let chain = await this.getChain(chainID);
+        let rows_blocks = [];
+        let rows_transactions = [];
+        let rows_logs = [];
+        let auto_evm_rows_map = {} // tableID => rows
+        let auto_evm_schema_map = {} // tableID => rows
+
+        let block = JSON.parse(JSON.stringify(evmlBlock))
+        let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
+        //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
+        let evm_chain_id = chainID
+        let evm_blk_num = block.number
+        let blockTS = block.timestamp
+        let bqEvmBlock = {
+            insertId: `${block.hash}`,
+            json: {
+                chain_id: chainID,
+                id: chain.id,
+                timestamp: block.timestamp,
+                number: block.number,
+                hash: block.hash,
+                parent_hash: block.parentHash,
+                nonce: block.nonce,
+                sha3_uncles: block.sha3Uncles,
+                logs_bloom: block.logsBloom,
+                transactions_root: block.transactionsRoot,
+                state_root: block.stateRoot,
+                receipts_root: block.receiptsRoot,
+                miner: block.miner,
+                difficulty: paraTool.dechexToInt(block.difficulty),
+                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
+                size: block.size,
+                extra_data: block.extraData,
+                gas_limit: block.gasLimit,
+                gas_used: block.gasUsed,
+                transaction_count: block.transactions.length
+            }
+        }
+        //console.log(`bqEvmBlock`, bqEvmBlock)
+        rows_blocks.push(bqEvmBlock);
+
+        for (let i = 0; i < evmFullBlock.transactions.length; i++) {
+            let rawTx = block.transactions[i];
+            let tx = evmFullBlock.transactions[i];
+            //console.log(`rawTx`, rawTx)
+            //console.log(`tx`, tx)
+            let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
+            let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
+            let txhash = tx.transactionHash
+            tx.raw = tx.input; // ???
+            tx.decodedLogs = logs; // fuse here
+            let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+            //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
+            let methodID = null
+            if (tx.to && tx.input.length >= 10) {
+                methodID = tx.input.substr(0, 10)
+            }
+            let evmTx = {
+                chain_id: chainID,
+                id: chain.id,
+                hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
+                nonce: tx.nonce,
+                transaction_index: tx.transactionIndex,
+                from_address: tx.from.toLowerCase(),
+                to_address: (tx.to != undefined) ? tx.to.toLowerCase() : null,
+                value: rawTx.value,
+                gas: rawTx.gas,
+                gas_price: rawTx.gasPrice,
+                input: tx.input,
+                receipt_cumulative_gas_used: receipt && receipt.cumulativeGasUsed ? receipt.cumulativeGasUsed : null,
+                receipt_gas_used: receipt && receipt.gasUsed ? receipt.gasUsed : null,
+                receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
+                receipt_root: null, // irrelevant
+                receipt_status: receipt && receipt.status ? 1 : 0,
+                block_timestamp: block.timestamp,
+                block_number: tx.blockNumber,
+                block_hash: tx.blockHash,
+                decoded: false,
+                method_id: methodID,
+                signature: null,
+                params: null
+            }
+            //arbitrum 0x0 values??
+            if (evmTx.value == "0x0") evmTx.value = 0
+            if (evmTx.gas == "0x0") evmTx.gas = 0
+            if (evmTx.gas_price == "0x0") evmTx.gas_price = 0
+            if (evmTx.receipt_cumulative_gas_used == "0x0") evmTx.receipt_cumulative_gas_used = 0
+            if (evmTx.receipt_gas_used == "0x0") evmTx.receipt_gas_used = 0
+
+            if (decodedInput) {
+                evmTx.decoded = (decodedInput.decodeStatus == 'success');
+                evmTx.method_id = methodID;
+                if (evmTx.decoded) {
+                    evmTx.signature = decodedInput.signature;
+                    evmTx.params = JSON.stringify(decodedInput.params);
+                    // write specific call_ table
+                    // try to find tableID
+                    if (methodID != null) { //skip nativeTransfer
+                        let acctAddr = tx.from.toLowerCase() // signer of the tx
+
+                        let [tableID, projectTableInfo] = this.getTableIDFromFingerprintID(methodID, tx.to);
+                        if (tableID) {
+                            let [bqCall, bqCall2] = this.generateCallBqRec(tableID, projectTableInfo, methodID, evmTx, acctAddr)
+                            if (bqCall) {
+                                //console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push(bqCall)
+                            }
+                            // if there is no projectTableInfo set up yet, set it up with the same schema
+                            if (projectTableInfo) {
+                                let subtableID = projectTableInfo.subtableId;
+                                if (projectTableInfo.status == "Unknown") {
+                                    let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures);
+                                    if (schemaInfo) {
+                                        auto_evm_schema_map[subtableID] = schemaInfo
+                                        console.log("*******1 CREATING SUBTABLEID", subtableID, schemaInfo);
+                                    }
+                                } else if (bqCall2) {
+                                    if (auto_evm_rows_map[subtableID] == undefined) {
+                                        auto_evm_rows_map[subtableID] = []
+                                    }
+                                    auto_evm_rows_map[subtableID].push(bqCall2)
+                                    console.log("*******2 ADDING ROW SUBTABLEID", subtableID, bqCall2);
+                                }
+                            }
+                        } else {
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
+                            if (schemaInfo) {
+                                tableID = schemaInfo.schema.tableId
+                                let [bqCall, bqCall2] = this.generateCallBqRec(tableID, projectTableInfo, methodID, evmTx, acctAddr)
+                                // TODO: bqCall's label
+                                if (schemaInfo && tableID) {
+                                    console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
+                                    auto_evm_schema_map[tableID] = schemaInfo
+                                }
+                            } else {
+                                //shouldn't get here?
+                                console.log(`Unknown methodID ${methodID}\n`)
+                            }
+                        }
+
+                    }
+                }
+            }
+            let bqEvmTransaction = {
+                insertId: `${tx.transactionHash}`,
+                json: evmTx
+            }
+            //console.log(`bq+`, bqEvmTransaction)
+            rows_transactions.push(bqEvmTransaction);
+            if (logs) {
+                for (let j = 0; j < logs.length; j++) {
+                    let l = logs[j]
+                    let eSig = l.signature ? l.signature : null
+                    let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
+                    let evmLog = {
+                        chain_id: chainID,
+                        id: chain.id,
+                        log_index: l.logIndex,
+                        transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
+                        transaction_index: i,
+                        address: l.address.toLowerCase(),
+                        data: l.data,
+                        topics: l.topics,
+                        block_timestamp: block.timestamp,
+                        block_number: block.number,
+                        block_hash: block.hash,
+                        signature: eSig,
+                        events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
+                    }
+                    let bqEvmLog = {
+                        insertId: `${tx.transactionHash}_${l.logIndex}`,
+                        json: evmLog
+                    }
+                    //console.log(`bqEvmLog`, bqEvmLog)
+                    rows_logs.push(bqEvmLog);
+
+                    // write specific evt_ table
+                    if (eSig) {
+                        // try to find tableID
+                        let acctAddr = tx.from.toLowerCase() // signer of the tx
+                        let [tableID, projectTableInfo] = this.getTableIDFromFingerprintID(eFingerprintID, l.address)
+
+                        if (tableID) { // existing table
+                            let [bqEvent, bqEvent2] = this.generateEventBqRec(tableID, projectTableInfo, eFingerprintID, evmLog, acctAddr)
+                            if (bqEvent && tableID) {
+                                //console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push(bqEvent)
+                            }
+                            if (projectTableInfo) {
+                                let subtableID = projectTableInfo.subtableId;
+                                if (projectTableInfo.status == "Unknown") {
+                                    console.log("*******3 CREATE PROJECT EVENTS TABLE", subtableID)
+                                    let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                                    if (schemaInfo) {
+                                        auto_evm_schema_map[subtableID] = schemaInfo
+                                    }
+                                } else if (bqEvent2) {
+                                    console.log(`*******4 PROJECTS EVENTS ROW ${subtableID}\n`, bqEvent2)
+                                    if (auto_evm_rows_map[subtableID] == undefined) {
+                                        auto_evm_rows_map[subtableID] = []
+                                    }
+                                    auto_evm_rows_map[subtableID].push(bqEvent2)
+                                }
+                            }
+                        } else { // do the abi lookup
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                            if (schemaInfo) {
+                                tableID = schemaInfo.schema.tableId
+                                let [bqEvent, bqEvent2] = this.generateEventBqRec(tableID, projectTableInfo, eFingerprintID, evmLog, acctAddr)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push()
+                                if (schemaInfo && tableID) {
+                                    console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
+                                    auto_evm_schema_map[tableID] = schemaInfo
+                                }
+                            } else { //shouldn't get here?
+                                console.log(`Unknown eFingerprintID ${eFingerprintID}\n`, eSig)
+                            }
+                        }
+
+
+                    }
+                }
+            }
+            // NOTE: we do not write out hashes yet (development)
+            this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
+        }
+
+        /*
+        if (blockTS) {
+            // crawl any token addresses, write to btRealtime
+            await this.crawl_erc_tokens(evm_blk_num, blockTS, chainID);
+            await this.process_evm_flush(blockTS)
+        }
+        */
+
+        // stream into blocks, transactions
+        /*
+        try {
+            let dataset = "evm";
+            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
+            for (const tbl of tables) {
+                let rows = null
+                switch (tbl) {
+                    case "blocks":
+                        rows = rows_blocks;
+                        break;
+                    case "transactions":
+                        rows = rows_transactions;
+                        //console.log(`transactions`, rows_transactions)
+                        break;
+                    case "logs":
+                        rows = rows_logs;
+                        //console.log(`log`, rows_logs)
+                        break;
+                }
+                if (rows && rows.length > 0) {
+                    await bigquery
+                        .dataset(dataset)
+                        .table(tbl)
+                        .insert(rows, {
+                            raw: true
+                        });
+                    console.log(`WRITE ${dataset}:${tbl} len=${rows.length}`)
+                }
+            }
+        } catch (err) {
+            console.log("err", JSON.stringify(err)); // TODO: logger
+        }
+        */
+
+        // evm _call _evt datasetId
+        let evmDatasetID = this.evmDatasetID;
+
+        // update schems
+        console.log(`new schemas`, Object.keys(auto_evm_schema_map))
+
+        for (const schemaTableId of Object.keys(auto_evm_schema_map)) {
+            let schemaInfo = auto_evm_schema_map[schemaTableId]
+            let schema = schemaInfo.schema
+            let sch = schema.schema
+            let timePartitioning = schema.timePartitioning
+            console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            try {
+                const [table] = await bigquery
+                    .dataset(evmDatasetID)
+                    .createTable(schemaTableId, {
+                        schema: sch,
+                        location: this.evmBQLocation,
+                        timePartitioning: timePartitioning,
+                    });
+            } catch (err) {
+                let errorStr = err.toString()
+                if (!errorStr.includes('Already Exists')) {
+                    console.log(`${evmDatasetID}:${schemaTableId} Error`, errorStr, `\nSchema:`, sch)
+                    this.logger.error({
+                        op: "auto_evm_schema_create",
+                        tableId: `${schemaTableId}`,
+                        error: errorStr,
+                        schema: sch
+                    })
+                    await this.log_streaming_error(schemaTableId, "auto_evm_schema_create", sch, errorStr, evm_chain_id, evm_blk_num);
+                }
+            }
+        }
+
+        // stream into call_ ,  evt_ table
+        console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
+
+        let tableIds = Object.keys(auto_evm_rows_map)
+        let autoEvmRowPromise = []
+        let autoEvmRowPromiseTableId = []
+        for (const tableId of Object.keys(auto_evm_rows_map)) {
+            let rows = auto_evm_rows_map[tableId]
+            console.log(`${evmDatasetID}:${tableId} row`, rows)
+            /*
+            if (rows && rows.length > 0) {
+                autoEvmRowPromiseTableId.push(tableId)
+                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {
+                    raw: true
+                }))
+            }
+            */
+        }
+
+        return
+
+        let autoEvmRowStates;
+        try {
+            autoEvmRowStates = await Promise.allSettled(autoEvmRowPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
+            this.log_manager_error(e, "batchCrawlerInit", "Promise.allSettled");
+        }
+        for (let i = 0; i < autoEvmRowStates.length; i += 1) {
+            let autoEvmRowState = autoEvmRowStates[i]
+            let tableId = autoEvmRowPromiseTableId[i]
+            let rows = auto_evm_rows_map[tableId]
+            if (autoEvmRowState.status != undefined && autoEvmRowState.status == "fulfilled") {
+                //console.log(`autoEvmRowState[${i}] fulfilled`, autoEvmRowState)
+                console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
+            } else {
+                let rejectedReason = JSON.parse(JSON.stringify(autoEvmRowState['reason']))
+                let errorStr = rejectedReason.message
+                if (errorStr) {
+                    if (!errorStr.includes('Already Exists')) {
+                        console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
+                        await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
+                        this.logger.error({
+                            op: "auto_evm_row_insert",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            rows: rows
+                        })
+                    }
+                }
+            }
+        }
     }
 
     // given a row r fetched with "fetch_block_row", processes the block, events + trace

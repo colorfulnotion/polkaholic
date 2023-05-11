@@ -2140,6 +2140,7 @@ mysql> desc projectcontractabi;
         let recs = await this.poolREADONLY.query(sql);
         let currPeriod = recs[0];
         let evmindexLogs = []
+        let batches = []
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             let startBN = bn
             let endBN = bn + jmp - 1;
@@ -2147,13 +2148,28 @@ mysql> desc projectcontractabi;
             let start = paraTool.blockNumberToHex(startBN);
             let end = paraTool.blockNumberToHex(endBN);
             console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end})`)
-            //console.log(`\nindex_blocks_period chainID=${chainID}, ${startBN}(${start}), ${endBN}(${end}), indexTS=${indexTS} [${logDT} ${hr}] [${batchN}/${totalBatch}]`)
+            let b = {
+                start: start,
+                end: end,
+                startBN: startBN,
+                endBN: endBN,
+            }
+            batches.push(b)
+        }
+
+        for (let i = 0; i < batches.length; i++) {
+            // debug only
+            if (i > 0){
+                return
+            }
+            let b = batches[i]
+            console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1}`)
             let families = ["blocks", "logs", "traces", "transactions"]
             let startTS = new Date().getTime();
             const evmTableChain = this.getEvmTableChain(chainID);
             let [rows] = await evmTableChain.getRows({
-                start,
-                end,
+                start: b.start,
+                end:  b.end,
                 cellLimit: 1,
                 family: families
             });
@@ -2170,6 +2186,8 @@ mysql> desc projectcontractabi;
                 }
             }
         }
+
+        // need somekind of flush here
 
         /*
         TODO: write via memory map
