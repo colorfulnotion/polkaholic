@@ -1268,7 +1268,18 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
         for (const t of txn_input_stub) {
             let fld = t.name
             let val = res[fld]
-            val = JSON.parse(JSON.stringify(val))
+            if (val instanceof Function) {
+                /* do something */
+                console.log(`TODO*** res[${fld}] is function`, val)
+                val = []
+            }else if (val != undefined){
+                try {
+                    val = JSON.parse(JSON.stringify(val))
+                } catch (e1){
+                    console.log(`e1 res[${fld}] val!!`, res[fld])
+                    console.log(`e1+++`, e1)
+                }
+            }
             if (val != undefined) {
                 //console.log(`val!!`, val)
                 t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
@@ -1278,7 +1289,9 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
         //console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
         return [combinedTxnInputs, true]
     } catch (e) {
-        console.log(`decode_txn_input_etherjs err`, e)
+        console.log(`[${txn.hash}] txn_input_stub`, txn_input_stub)
+        console.log(`[${txn.hash}] res`, res)
+        console.log(`[${txn.hash}] decode_txn_input_etherjs err`, e)
         return [false, false]
     }
 }
