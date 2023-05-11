@@ -6843,7 +6843,7 @@ module.exports = class Indexer extends AssetManager {
                     break;
             }
             if (rows && rows.length > 0) {
-                let dataset = "substrate_internal"
+                let dataset = "polkadot_enterprise"
                 try {
                     await bigquery
                         .dataset(dataset)
@@ -8168,7 +8168,7 @@ module.exports = class Indexer extends AssetManager {
                 if (rows && rows.length > 0) {
                     try {
                         await bigquery
-                            .dataset("substrate_internal")
+                            .dataset("polkadot_enterprise")
                             .table(t)
                             .insert(rows, {
                                 raw: true

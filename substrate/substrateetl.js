@@ -5415,7 +5415,7 @@ select token_address, account_address, sum(value) as value, sum(valuein) as rece
     }
 
     async enrich_swaps() {
-        let sql = `select * from substrate-etl.substrate_internal.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
+        let sql = `select * from substrate-etl.polkadot_enterprise.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
         let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
         for (const r of rows) {
             let call_args = r.call_args;
