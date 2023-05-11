@@ -898,6 +898,41 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
         }
     }
 
+    async updateCoinsList() {
+        const axios = require("axios");
+        var url = `https://api.coingecko.com/api/v3/coins/list?include_platform=true`;
+        try {
+            var headers = {
+                "accept": "application/json"
+            };
+            const resp = await axios.get(url, {
+                headers: headers
+            });
+	    let vals = ["tokenAddress", "symbol", "name", "addDT"];
+            const coins = resp.data;
+	    let out = [];
+	    for (const c of coins) {
+		for ( const platform of Object.keys(c.platforms) ) {
+		    let tokenAddress = c.platforms[platform];
+		    if (tokenAddress && tokenAddress.length < 128 ) {
+		    } else {
+			tokenAddress = "";
+		    }
+		    out.push(`(${mysql.escape(c.id)}, ${mysql.escape(platform)}, ${mysql.escape(tokenAddress)}, ${mysql.escape(c.symbol)}, ${mysql.escape(c.name)}, Now())`);
+		}
+	    }
+            await this.upsertSQL({
+                "table": "coingeckoplatform",
+                "keys": ["id", "platform"],
+                "vals": vals,
+                "data": out,
+                "replace": vals,
+            })
+	} catch (e) {
+	    console.log(e);
+	}
+    }
+    
     async update_coingecko_backfill(startDate = '2022-01-01', endDate = '2022-04-01') {
         let coingeckoRecs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null`);
         let coingeckoids = {};
@@ -1038,7 +1073,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     }
 
     async getCoinPricesRange(startTS, endTS, symbol = null) {
-        let w = symbol ? ` and symbol = '${symbol}'` : "and ( coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) or  coingeckoLastUpdateDTcoingeckoID is null )";
+        let w = symbol ? ` and symbol = '${symbol}'` : "and ( coingeckoLastUpdateDT < date_sub(Now(), interval 5 minute) or  coingeckoLastUpdateDT is null )";
         let sql = `select coingeckoID, symbol, relayChain from xcmasset where length(coingeckoID) > 0  ${w} order by coingeckoLastUpdateDT limit 1000`
         console.log(sql);
         var coingeckoIDs = await this.poolREADONLY.query(sql);
