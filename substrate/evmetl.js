@@ -1899,8 +1899,9 @@ mysql> desc projectcontractabi;
           try {
             const jsonObject = JSON.parse(line);
             let bn = jsonObject[blockNumberFld]
+            let bnHex = paraTool.blockNumberToHex(paraTool.dechexToInt(bn))
             let blkHash = jsonObject[blockHashFld]
-            let key = `${bn}_${blkHash}`
+            let key = `${bn}_${blkHash}_${bnHex}`
             if (blkRecordsMaps[key] == undefined){
                 //if key not found, it's a start of a new block, last block is available to push
                 // mark last key as complete
@@ -2024,17 +2025,19 @@ mysql> desc projectcontractabi;
                     batchN++
                     out = []
                 } catch (e) {
-                    console.log(e);
+                    console.log(`load err`, e);
                 }
             }
         }
 
-        if (out.length >= batchSize){
+        if (out.length >= 0){
             try {
                 await this.insertBTRows(tbl, out, "evmchain");
                 console.log(`${content}\n ${fnType} last batch#${batchN} insertBTRows ${out.length}`, out)
+                batchN++
+                out = []
             } catch (e) {
-                console.log(e);
+                console.log(`load err`, e);
             }
         }
     }
@@ -2106,7 +2109,7 @@ mysql> desc projectcontractabi;
         console.log(`${sql}`)
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-        process.exit(0)
+        //process.exit(0)
 
         let fnTypes = ["blocks", "logs", "traces", "transactions", "contracts", "token_transfers"]
         //let fnTypes = ["blocks"]
