@@ -2133,7 +2133,7 @@ mysql> desc projectcontractabi;
             console.log(`Invalid chainID`)
             process.exit(1)
         }
-        let jmp = 50;
+        let jmp = 3;
         let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
         console.log(`index_evmchain sql`, sql)
         //TODO: how to make this hourly?

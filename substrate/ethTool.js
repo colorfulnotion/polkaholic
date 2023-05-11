@@ -2770,7 +2770,7 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
                 tableId: tableId,
                 schema: sch,
                 timePartitioning: {
-                    type: 'HOUR',
+                    type: 'DAY',
                     field: timePartitionField
                 },
             }
