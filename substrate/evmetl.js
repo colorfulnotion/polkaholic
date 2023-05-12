@@ -356,6 +356,79 @@ module.exports = class EVMETL extends PolkaholicDB {
         return flds
     }
 
+    async fetchSchema(tableId, evmDataset='evm_dev'){
+        let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
+        let cmd = `bq show --project_id=substrate-etl --format=prettyjson ${evmDataset}.${tableId} | jq -c '[.schema.fields[] | {mode, name, type}]'`
+        let {
+            stdout,
+            stderr
+        } = await exec(cmd)
+        let r = {
+            tableId: tableId,
+            modifiedFingerprintID: modifiedFingerprintID,
+            tinySchema: stdout
+        }
+        return r
+    }
+
+    async updateEvmschema() {
+        let localSQL = `select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, lastUpdateDT from evmschema where tableSchema is not null`;
+        let knownSchemas = await this.poolREADONLY.query(localSQL);
+        let knowSchemaMap = {}
+        for (const knownSchema of knownSchemas){
+            knowSchemaMap[knownSchema.modifiedFingerprintID] = knownSchema
+        }
+        let evmDataset = `evm_dev`
+        let query = `select table_id as tableId, modified_fingerprint_id as modifiedFingerprintID, abi_type as abiType, table_schema as tableSchema FROM substrate-etl.${evmDataset}.evmschema order by tableId`
+        let tablesRecs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+        let tinySchemaMap = {}
+        let newTableIds = []
+        let newTableSchemas = []
+        for (const r of tablesRecs) {
+            if (knowSchemaMap[r.tableId] == undefined){
+                newTableIds.push(r.tableId)
+                newTableSchemas.push(r)
+            }
+        }
+        let i = 0;
+        let n = 0
+        let batchSize = 10; // safety check
+        while (i < newTableSchemas.length) {
+            let currBatchTableSchemas = newTableSchemas.slice(i, i + batchSize);
+            console.log(`currBatchTableSchemas#${n}`, currBatchTableSchemas)
+            if (currBatchTableSchemas.length > 0) {
+                let output = []
+                for (let j = 0; j < currBatchTableSchemas.length; j += 1) {
+                    let v = currBatchTableSchemas[j]
+
+                    let tableSchema = null
+                    if (v.tableSchema){
+                        tableSchema = JSON.parse(v.tableSchema)
+                        tableSchema = JSON.stringify(tableSchema)
+                    }
+                    console.log(`${v.tableId}`, tableSchema)
+                    let tinySchema = `${mysql.escape(tableSchema)}`
+                    let row = `('${v.tableId}', '${v.modifiedFingerprintID}', ${tinySchema}, NOW())`
+                    output.push(row)
+                }
+                if (output.length > 0 ){
+                    console.log(`output len=${output.length}`, output)
+                    await this.upsertSQL({
+                        "table": "evmschema",
+                        "keys": ["tableId"],
+                        "vals": ["modifiedFingerprintID","tableSchema","lastUpdateDT"],
+                        "data": output,
+                        "replaceIfNull": ["tableId","tableSchema","lastUpdateDT"] // once written, it should NOT get updated
+                    }, true);
+                }
+                i += batchSize;
+                n++
+            }
+        }
+        console.log(tinySchemaMap, tinySchemaMap)
+        process.exit(0)
+    }
+
     async initEvmSchemaMap() {
         let projectcontractabiRecs = await this.poolREADONLY.query(`select address, fingerprintID, name, projectName, abiType from projectcontractabi`);
         let projectcontractabi = {};

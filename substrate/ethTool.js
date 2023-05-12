@@ -2832,6 +2832,20 @@ async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
 
+function getSchemaWithoutDesc(schema){
+    let tinySchema = []
+    for (let i = 0; i < schema.length; i++) {
+        let s = schema[i]
+        let t = {
+            mode: s.mode,
+            name: s.name,
+            type: s.type,
+        }
+        tinySchema.push(t)
+    }
+    return tinySchema
+}
+
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     for (let i = 0; i < evmTrace.length; i++) {
         let t = evmTrace[i];
@@ -3092,5 +3106,6 @@ module.exports = {
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
     computeTableIDFromFingerprintIDAndName: computeTableIDFromFingerprintIDAndName,
     computeModifiedFingerprintID: computeModifiedFingerprintID,
-    getEVMFlds: getEVMFlds
+    getEVMFlds: getEVMFlds,
+    getSchemaWithoutDesc: getSchemaWithoutDesc,
 };

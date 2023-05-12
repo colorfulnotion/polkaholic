@@ -317,6 +317,13 @@ async function main() {
         });
 
 
+
+    program.command('updateevmschema')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.updateEvmschema();
+        });
+
     await program.parseAsync(process.argv);
 }
 

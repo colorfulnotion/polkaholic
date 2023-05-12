@@ -8635,8 +8635,11 @@ module.exports = class Indexer extends AssetManager {
             let schemaInfo = auto_evm_schema_map[schemaTableId]
             let schema = schemaInfo.schema
             let sch = schema.schema
+            let tinySchema = ethTool.getSchemaWithoutDesc(sch)
             let timePartitioning = schema.timePartitioning
             console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            console.log(`${evmDatasetID}:${schemaTableId} tinySchema`, JSON.stringify(tinySchema))
+            /*
             try {
                 const [table] = await bigquery
                     .dataset(evmDatasetID)
@@ -8658,6 +8661,7 @@ module.exports = class Indexer extends AssetManager {
                     await this.log_streaming_error(schemaTableId, "auto_evm_schema_create", sch, errorStr, evm_chain_id, evm_blk_num);
                 }
             }
+            */
         }
 
         // stream into call_ ,  evt_ table
@@ -9592,8 +9596,10 @@ module.exports = class Indexer extends AssetManager {
             let schemaInfo = auto_evm_schema_map[schemaTableId]
             let schema = schemaInfo.schema
             let sch = schema.schema
+            let tinySchema = ethTool.getSchemaWithoutDesc(sch)
             let timePartitioning = schema.timePartitioning
             console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            console.log(`${evmDatasetID}:${schemaTableId} tinySchema`, tinySchema)
             try {
                 const [table] = await bigquery
                     .dataset(evmDatasetID)
@@ -9602,6 +9608,7 @@ module.exports = class Indexer extends AssetManager {
                         location: this.evmBQLocation,
                         timePartitioning: timePartitioning,
                     });
+
             } catch (err) {
                 let errorStr = err.toString()
                 if (!errorStr.includes('Already Exists')) {
