@@ -402,7 +402,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                     }
                     console.log(`${v.tableId}`, tableSchema)
                     let tinySchema = `${mysql.escape(tableSchema)}`
-                    let abiType = (v.abiType == "call")? "function" : "event"
+                    let abiType = (v.abiType == "function" || v.abiType == "call")? "function" : "event"
                     let row = `('${v.tableId}', '${v.modifiedFingerprintID}', ${tinySchema}, '${abiType}', '1', NOW())`
                     output.push(row)
                 }
@@ -413,8 +413,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                         "keys": ["tableId"],
                         "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
                         "data": output,
-                        "replaceIfNull": ["tableId","tableSchema","lastUpdateDT", "abiType"], // once written, it should NOT get updated
-                        "replace": ["created"]
+                        "replaceIfNull": ["tableId","tableSchema","lastUpdateDT"], // once written, it should NOT get updated
+                        "replace": ["created", "abiType"]
                     }, true);
                 }
                 i += batchSize;
@@ -1038,6 +1038,106 @@ mysql> desc projectcontractabi;
             s = s[0];
         }
         return s;
+    }
+
+    async preloadEvmSchema() {
+        let knownSchema = {}
+        let localSQL = `select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, lastUpdateDT from evmschema where tableSchema is not null`;
+        let storedEvmSchemas = await this.poolREADONLY.query(localSQL);
+        for (const storedEvmSchema of storedEvmSchemas){
+            knownSchema[knownSchema.modifiedFingerprintID] = 1
+        }
+        let targetSQL = null
+        let sql = (targetSQL != undefined) ? targetSQL : `select modifiedFingerprintID, CONVERT(abi using utf8) as abi, abiType from contractabi order by modifiedFingerprintID, firstSeenDT`
+        var res = await this.poolREADONLY.query(sql);
+        let modifiedFingerprintIDMaps = {}
+        let tables = {}
+        let output = []
+        let batchSize = 100
+        for (let i = 0; i < res.length; i++) {
+            let r = res[i]
+            let modifiedFingerprintID = r.modifiedFingerprintID
+            if (knownSchema[modifiedFingerprintID] != undefined){
+                //skip
+                continue
+            }
+            if (modifiedFingerprintIDMaps[modifiedFingerprintID] != undefined){
+                //skip
+                continue
+            }
+            let fingerprintID = modifiedFingerprintID.replaceAll("-", "_")
+            modifiedFingerprintIDMaps[modifiedFingerprintID] = 1
+            let abiStruct = JSON.parse(r.abi);
+            let a = abiStruct[0]
+            if ((a.type == "function") && (a.stateMutability == "view" || a.stateMutability == "pure")) continue;
+            //let fingerprintID = (a.type == "function") ? r.fingerprintID.substring(0, 10) : r.fingerprintID.substring(0, r.fingerprintID.length - 11).replaceAll("-", "_")
+            let tableId = ethTool.computeTableId(abiStruct, fingerprintID)
+            if (tables[tableId] != undefined) {
+                console.log(`known tableId ${i} ${tableId}`)
+                continue
+            }
+            let schema = ethTool.createEvmSchema(abiStruct, fingerprintID, tableId)
+            let sch = schema.schema
+            let tinySchema = ethTool.getSchemaWithoutDesc(sch)
+            let tableSchema = `${mysql.escape(JSON.stringify(tinySchema))}`
+            let abiType = r.abiType
+            let row = `('${tableId}', '${modifiedFingerprintID}', ${tableSchema}, '${abiType}', '0', NOW())`
+            output.push(row)
+
+            if (output.length > batchSize){
+                console.log(`output len=${output.length}`, output)
+                await this.upsertSQL({
+                    "table": "evmschema",
+                    "keys": ["tableId"],
+                    "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
+                    "data": output,
+                    "replaceIfNull": ["tableId","tableSchema","lastUpdateDT", "abiType", "created"], // once written, it should NOT get updated. do not mark created from 1 to 0
+                }, true);
+                output = []
+            }
+            /*
+            let timePartitioning = schema.timePartitioning
+            tables[tableId] = sch;
+            if (isCeateTable) {
+                console.log(`\n\nNew Schema #${i} for ${tableId}`)
+                try {
+                    const [table] = await bigquery
+                        .dataset(datasetId)
+                        .createTable(tableId, {
+                            schema: sch,
+                            location: this.evmBQLocation,
+                            timePartitioning: timePartitioning,
+                        });
+                } catch (err) {
+                    let errorStr = err.toString()
+                    if (!errorStr.includes('Already Exists')) {
+                        console.log(`${datasetId}:${tableId} Error`, errorStr)
+                        this.logger.error({
+                            op: "setupCallEvents:auto_evm_schema_create",
+                            tableId: `${tableId}`,
+                            error: errorStr,
+                            schema: sch
+                        })
+                    }
+                }
+            } else {
+                console.log(`*****\nNew Schema #${i} ${tableId}\n`, sch, `\n`)
+            }
+            */
+        }
+        if (output.length > batchSize){
+            console.log(`output len=${output.length}`, output)
+            await this.upsertSQL({
+                "table": "evmschema",
+                "keys": ["tableId"],
+                "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
+                "data": output,
+                "replaceIfNull": ["tableId","tableSchema","lastUpdateDT", "abiType", "created"], // once written, it should NOT get updated. do not mark created from 1 to 0
+            }, true);
+            output = []
+        }
+        process.exit(1)
+
     }
 
     async reloadABI(targetSQL = null) {
@@ -2164,8 +2264,9 @@ mysql> desc projectcontractabi;
 
         try {
             let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
-            //let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
-            console.log(`${gsCmd}`, res)
+            console.log(gsCmd)
+            let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
+            console.log(`res`, res)
         } catch (e) {
             console.log(`${e.toString()}`)
         }

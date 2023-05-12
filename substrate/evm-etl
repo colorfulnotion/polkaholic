@@ -316,7 +316,11 @@ async function main() {
             process.exit(0);
         });
 
-
+    program.command('preloadevmschema')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.preloadEvmSchema();
+        });
 
     program.command('updateevmschema')
         .action(async (opt) => {
