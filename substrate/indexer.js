@@ -6,6 +6,8 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const btTool = require("./btTool");
 const mysql = require("mysql2");
+const stream = require('stream');
+
 const {
     WebSocket
 } = require('ws');
@@ -8338,6 +8340,52 @@ module.exports = class Indexer extends AssetManager {
         return r;
     }
 
+    async streamWrite(fn, JSONNLArray, isReplace = false) {
+      // Ensure the directory exists
+      let dir = path.dirname(fn)
+      if (!fs.existsSync(dir)) {
+        fs.mkdirSync(dir, { recursive: true });
+        console.log(`Making Directory "${dir}"`);
+      } else {
+        console.log(`Directory "${dir}" already exists.`);
+      }
+      // Delete the existing file if isReplace is true
+      if (isReplace && fs.existsSync(fn)) {
+        fs.unlinkSync(fn);
+      }
+      console.log(`${fn} replaced=${isReplace}`, JSONNLArray)
+      // Create a readable stream from the JSONNLArray
+      let readableStream = new stream.Readable({
+        read() {
+          JSONNLArray.forEach((jsonObject) => {
+            let str = JSON.stringify(jsonObject) + '\n'
+            //console.log(`*** str`, str)
+            this.push(str);
+          });
+          this.push(null); // Signal the end of the stream
+        },
+      });
+      //console.log(`readableStream`, readableStream)
+
+      // Create a write stream to the local file in append mode
+      const writeStream = fs.createWriteStream(fn, { flags: 'a' });
+
+      // Pipe the readable stream to the write stream and return a Promise
+      return new Promise((resolve, reject) => {
+        console.log('Starting to consume the readableStream');
+        readableStream
+          .pipe(writeStream)
+          .on('error', (error) => {
+            console.error('Error during streaming:', error);
+            reject(error);
+          })
+          .on('finish', () => {
+            console.log('Data streamed successfully to the local file:', fn);
+            resolve();
+          });
+      });
+    }
+
     async store_stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
         const {
             BigQuery
@@ -8359,6 +8407,8 @@ module.exports = class Indexer extends AssetManager {
         let evm_chain_id = chainID
         let evm_blk_num = block.number
         let blockTS = block.timestamp
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(blockTS)
+        let logYYYY_MM_DD = currDT.replaceAll('-', '/')
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8639,6 +8689,7 @@ module.exports = class Indexer extends AssetManager {
             let timePartitioning = schema.timePartitioning
             console.log(`${evmDatasetID}:${schemaTableId} `, sch)
             console.log(`${evmDatasetID}:${schemaTableId} tinySchema`, JSON.stringify(tinySchema))
+            //TODO: need a way to clear older record ONCE
             /*
             try {
                 const [table] = await bigquery
@@ -8668,53 +8719,50 @@ module.exports = class Indexer extends AssetManager {
         console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
 
         let tableIds = Object.keys(auto_evm_rows_map)
-        let autoEvmRowPromise = []
-        let autoEvmRowPromiseTableId = []
+        let autoEvmStorePromise = []
+        let autoEvmStorePromiseFn = []
+        let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
+        if (!fs.existsSync(evmLogBasePath)) {
+          fs.mkdirSync(evmLogBasePath, { recursive: true });
+          console.log(`Making Directory "${evmLogBasePath}"`);
+        }
         for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
-            console.log(`${evmDatasetID}:${tableId} row`, rows)
-            /*
+            //call_buyWithETHWert_0x5173ffaa/1.json
+            let fn = `${evmLogBasePath}${tableId}/${chainID}.json`
             if (rows && rows.length > 0) {
-                autoEvmRowPromiseTableId.push(tableId)
-                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {
-                    raw: true
-                }))
+                let recs = []
+                for (const row of rows){
+                    recs.push(row.json)
+                }
+                let replace = false
+                console.log(`${evmDatasetID}:${tableId} -> ${fn}`, recs)
+                //await this.streamWrite(fn, recs, replace);
+                autoEvmStorePromiseFn.push({fn: fn, tableId: tableId, rowCnt: rows.length})
+                autoEvmStorePromise.push(this.streamWrite(fn, recs, replace))
             }
-            */
         }
 
-        return
-
-        let autoEvmRowStates;
+        let autoEvmStoreStates;
         try {
-            autoEvmRowStates = await Promise.allSettled(autoEvmRowPromise);
+            autoEvmStoreStates = await Promise.allSettled(autoEvmStorePromise);
             //{ status: 'fulfilled', value: ... },
             //{ status: 'rejected', reason: Error: '.....'}
         } catch (e) {
             //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
-            this.log_manager_error(e, "batchCrawlerInit", "Promise.allSettled");
+            this.log_manager_error(e, "batchStreamWrite", "Promise.allSettled");
         }
-        for (let i = 0; i < autoEvmRowStates.length; i += 1) {
-            let autoEvmRowState = autoEvmRowStates[i]
-            let tableId = autoEvmRowPromiseTableId[i]
-            let rows = auto_evm_rows_map[tableId]
-            if (autoEvmRowState.status != undefined && autoEvmRowState.status == "fulfilled") {
-                //console.log(`autoEvmRowState[${i}] fulfilled`, autoEvmRowState)
-                console.log(`WRITE ${evmDatasetID}:${tableId} len=${rows.length}`)
+        for (let i = 0; i < autoEvmStoreStates.length; i += 1) {
+            let autoEvmStoreState = autoEvmStoreStates[i]
+            let fnInfo = autoEvmStorePromiseFn[i]
+            if (autoEvmStoreState.status != undefined && autoEvmStoreState.status == "fulfilled") {
+                //console.log(`autoEvmStoreState[${i}] fulfilled`, autoEvmStoreState)
+                console.log(`Stored\tlen=${fnInfo.rowCnt}\t${fnInfo.fn} `)
             } else {
-                let rejectedReason = JSON.parse(JSON.stringify(autoEvmRowState['reason']))
+                let rejectedReason = JSON.parse(JSON.stringify(autoEvmStoreState['reason']))
                 let errorStr = rejectedReason.message
                 if (errorStr) {
-                    if (!errorStr.includes('Already Exists')) {
-                        console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
-                        await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
-                        this.logger.error({
-                            op: "auto_evm_row_insert",
-                            tableId: `${tableId}`,
-                            error: errorStr,
-                            rows: rows
-                        })
-                    }
+                    console.log(`errorMsg`, errorStr)
                 }
             }
         }
