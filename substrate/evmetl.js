@@ -373,11 +373,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 
     async updateEvmschema() {
         let localSQL = `select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, lastUpdateDT from evmschema where tableSchema is not null`;
-        let knownSchemas = await this.poolREADONLY.query(localSQL);
-        let knowSchemaMap = {}
-        for (const knownSchema of knownSchemas){
-            knowSchemaMap[knownSchema.modifiedFingerprintID] = knownSchema
-        }
+        //let knownSchemas = await this.poolREADONLY.query(localSQL);
         let evmDataset = `evm_dev`
         let query = `select table_id as tableId, modified_fingerprint_id as modifiedFingerprintID, abi_type as abiType, table_schema as tableSchema FROM substrate-etl.${evmDataset}.evmschema order by tableId`
         let tablesRecs = await this.execute_bqJob(query, paraTool.BQUSMulti);
@@ -385,10 +381,8 @@ module.exports = class EVMETL extends PolkaholicDB {
         let newTableIds = []
         let newTableSchemas = []
         for (const r of tablesRecs) {
-            if (knowSchemaMap[r.tableId] == undefined){
-                newTableIds.push(r.tableId)
-                newTableSchemas.push(r)
-            }
+            newTableIds.push(r.tableId)
+            newTableSchemas.push(r)
         }
         let i = 0;
         let n = 0
@@ -408,7 +402,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                     }
                     console.log(`${v.tableId}`, tableSchema)
                     let tinySchema = `${mysql.escape(tableSchema)}`
-                    let row = `('${v.tableId}', '${v.modifiedFingerprintID}', ${tinySchema}, NOW())`
+                    let abiType = (v.abiType == "call")? "function" : "event"
+                    let row = `('${v.tableId}', '${v.modifiedFingerprintID}', ${tinySchema}, '${abiType}', '1', NOW())`
                     output.push(row)
                 }
                 if (output.length > 0 ){
@@ -416,9 +411,10 @@ module.exports = class EVMETL extends PolkaholicDB {
                     await this.upsertSQL({
                         "table": "evmschema",
                         "keys": ["tableId"],
-                        "vals": ["modifiedFingerprintID","tableSchema","lastUpdateDT"],
+                        "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
                         "data": output,
-                        "replaceIfNull": ["tableId","tableSchema","lastUpdateDT"] // once written, it should NOT get updated
+                        "replaceIfNull": ["tableId","tableSchema","lastUpdateDT", "abiType"], // once written, it should NOT get updated
+                        "replace": ["created"]
                     }, true);
                 }
                 i += batchSize;
@@ -1158,7 +1154,7 @@ mysql> desc projectcontractabi;
             let data = sigs[fingerprintID];
             let numContracts = numContractsTally[fingerprintID];
             //fingerprintID, signatureID, signatureRaw, signature, name, abi ,abiType, numContracts, topicLength
-            let row = `('${data.fingerprintID}', '${data.secondaryID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${data.topicLength}', '1', '0', NOW())`
+            let row = `('${data.fingerprintID}', '${data.modifiedFingerprintID}', '${data.secondaryID}', '${data.signatureID}', '${data.signatureRaw}', '${data.signature}', '${data.name}', '${data.abi}', '${data.abiType}', '${data.topicLength}', '1', '0', NOW())`
             abiRows.push(row);
             console.log(`[${data.name}] ${row}`)
         }
@@ -1166,9 +1162,9 @@ mysql> desc projectcontractabi;
         await this.upsertSQL({
             "table": "contractabi",
             "keys": ["fingerprintID"],
-            "vals": ["secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", "firstSeenDT"],
+            "vals": ["modifiedFingerprintID", "secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", "firstSeenDT"],
             "data": abiRows,
-            "replace": ["secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", ],
+            "replace": ["modifiedFingerprintID", "secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated",],
             "replaceIfNull": ["firstSeenDT"]
         }, sqlDebug);
 

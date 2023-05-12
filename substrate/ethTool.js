@@ -1533,18 +1533,20 @@ function parseAbiSignature(abiStrArr) {
             */
             let secondaryID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) // this is NOT Unique
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
+            let modifiedFingerprintID = (abiType == 'function') ? signatureID : `${signatureID}-${topicLen}`
             let abiStr = JSON.stringify([e])
             output.push({
                 stateMutability: (stateMutability) ? stateMutability : null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
+                modifiedFingerprintID: modifiedFingerprintID,
                 secondaryID: secondaryID,
                 signatureID: signatureID,
                 signatureRaw: signatureRaw,
                 signature: signature,
                 name: firstCharUpperCase(e.name),
                 abi: abiStr,
-                abiType,
+                abiType: abiType,
                 topicLength: topicLen,
                 flds: flds
             })
