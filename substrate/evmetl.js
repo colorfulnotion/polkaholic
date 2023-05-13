@@ -2303,7 +2303,7 @@ mysql> desc projectcontractabi;
             console.log(`Invalid chainID`)
             process.exit(1)
         }
-        let jmp = 3;
+        let jmp = 50;
         let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
         console.log(`index_evmchain sql`, sql)
         //TODO: how to make this hourly?
@@ -2311,6 +2311,11 @@ mysql> desc projectcontractabi;
         let currPeriod = recs[0];
         let evmindexLogs = []
         let batches = []
+        //delete previously generated files for chainID
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+        let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
+        await crawler.deleteFilesWithChainID(evmLogBasePath, chainID)
+
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             let startBN = bn
             let endBN = bn + jmp - 1;
@@ -2330,7 +2335,7 @@ mysql> desc projectcontractabi;
         for (let i = 0; i < batches.length; i++) {
             // debug only
             if (i > 0){
-                return
+                //return
             }
             let b = batches[i]
             console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1}`)

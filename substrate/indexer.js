@@ -8340,6 +8340,34 @@ module.exports = class Indexer extends AssetManager {
         return r;
     }
 
+    async deleteFilesWithChainID(basePath, chainID) {
+      // Helper function to delete a file
+      console.log(`basePath: ${basePath}`)
+      const deleteFile = (filePath) => {
+        try {
+          fs.unlinkSync(filePath);
+          console.log(`Deleted file: ${filePath}`);
+        } catch (error) {
+          console.error(`Error deleting file: ${filePath}`, error);
+        }
+      };
+
+      // Helper function to recursively search and delete files
+      const searchAndDelete = (dirPath) => {
+        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+        for (const entry of entries) {
+          const entryPath = path.join(dirPath, entry.name);
+          if (entry.isFile() && entry.name.endsWith(`${chainID}.json`)) {
+            deleteFile(entryPath);
+          } else if (entry.isDirectory()) {
+            searchAndDelete(entryPath);
+          }
+        }
+      };
+      // Start the search and delete process
+      searchAndDelete(basePath);
+    }
+
     async streamWrite(fn, JSONNLArray, isReplace = false) {
       // Ensure the directory exists
       let dir = path.dirname(fn)
@@ -8380,7 +8408,7 @@ module.exports = class Indexer extends AssetManager {
             reject(error);
           })
           .on('finish', () => {
-            console.log('Data streamed successfully to the local file:', fn);
+            //console.log('Data streamed successfully to the local file:', fn);
             resolve();
           });
       });
@@ -8409,6 +8437,7 @@ module.exports = class Indexer extends AssetManager {
         let blockTS = block.timestamp
         let [currDT, _c] = paraTool.ts_to_logDT_hr(blockTS)
         let logYYYY_MM_DD = currDT.replaceAll('-', '/')
+        let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8721,7 +8750,6 @@ module.exports = class Indexer extends AssetManager {
         let tableIds = Object.keys(auto_evm_rows_map)
         let autoEvmStorePromise = []
         let autoEvmStorePromiseFn = []
-        let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
         if (!fs.existsSync(evmLogBasePath)) {
           fs.mkdirSync(evmLogBasePath, { recursive: true });
           console.log(`Making Directory "${evmLogBasePath}"`);
@@ -8757,7 +8785,7 @@ module.exports = class Indexer extends AssetManager {
             let fnInfo = autoEvmStorePromiseFn[i]
             if (autoEvmStoreState.status != undefined && autoEvmStoreState.status == "fulfilled") {
                 //console.log(`autoEvmStoreState[${i}] fulfilled`, autoEvmStoreState)
-                console.log(`Stored\tlen=${fnInfo.rowCnt}\t${fnInfo.fn} `)
+                //console.log(`Stored\tlen=${fnInfo.rowCnt}\t${fnInfo.fn} `)
             } else {
                 let rejectedReason = JSON.parse(JSON.stringify(autoEvmStoreState['reason']))
                 let errorStr = rejectedReason.message
