@@ -2117,7 +2117,7 @@ module.exports = class Crawler extends Indexer {
                 let log_retry_ms = 2000
                 let log_timeout_ms = 5000
 
-                let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+                let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
                 let res = false
                 if (qnSupportedChainIDs.includes(chainID)) {
                     res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)

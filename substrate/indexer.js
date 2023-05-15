@@ -9875,7 +9875,7 @@ module.exports = class Indexer extends AssetManager {
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
         if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
-        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
             console.log(`crawlEvmBlockTracesWithRetry try#${i}\n${cmd}`)
