@@ -2363,6 +2363,40 @@ mysql> desc projectcontractabi;
         }
     }
 
+    async batchExec(batchCmds){
+        let cmdPromiseFn = []
+        let cmdPromise = []
+        for (const batchCmd of batchCmds) {
+            cmdPromiseFn.push(batchCmd)
+            cmdPromise.push(
+                exec(batchCmd, {
+                    maxBuffer: 1024 * 50000
+            }))
+        }
+
+        let cmdStates;
+        try {
+            cmdStates = await Promise.allSettled(cmdPromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`batchExec error`, e, crawlerInitStates)
+        }
+        for (let i = 0; i < cmdStates.length; i += 1) {
+            let cmdState = cmdStates[i]
+            let cmdFn = cmdPromiseFn[i]
+            if (cmdState.status != undefined && cmdState.status == "fulfilled") {
+                console.log(`cmdState[${i}] fulfilled`, cmdState)
+            } else {
+                let rejectedReason = JSON.parse(JSON.stringify(cmdState['reason']))
+                let errorStr = rejectedReason.message
+                if (errorStr) {
+                    console.log(`errorMsg`, errorStr)
+                }
+            }
+        }
+    }
+
     async load_gs_evmrec(dt){
         let project_id = 'substrate-etl'
         let evmDatasetID = this.evmDatasetID
@@ -2395,6 +2429,18 @@ mysql> desc projectcontractabi;
         }
         for (const loadCmd of loadCmds){
             console.log(loadCmd)
+        }
+        let i = 0;
+        let n = 0
+        let batchSize = 30; // safety check
+        while (i < loadCmds.length) {
+            let currBatchLoads = loadCmds.slice(i, i + batchSize);
+            console.log(`currBatchLoads#${n}`, currBatchLoads)
+            if (currBatchLoads.length > 0) {
+                await this.batchExec(currBatchLoads)
+                i += batchSize;
+                n++
+            }
         }
     }
 
