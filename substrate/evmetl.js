@@ -2294,13 +2294,20 @@ mysql> desc projectcontractabi;
         let cmd = `gsutil ls ${basePath} | jq -c -R -n '[inputs]'`
         console.log(`cmd`, cmd)
         let res = await exec(cmd, {maxBuffer: 1024 * 640000});
+        let fnPathMap = {}
         try {
             if (res.stderr != ''){
                 console.log(`${cmd} error`, res.stderr)
                 return false
             }
-            let fns = JSON.parse(res.stdout)
-            return fns
+            let fns = JSON.parse(res.stdout) // this may contain file from many different chains and potentially many hours when we split day into hours. need to use path instead
+            for (const fn of fns){
+                let fnPieces = fn.split('/')
+                let fnLast = fnPieces.pop() //{chainID_hr.json}
+                let fnWild = `${fnPieces.join('/')}/*.json`
+                fnPathMap[fnWild] = 1
+            }
+            return Object.keys(fnPathMap)
         } catch (e){
             console.log(`error`, e)
             return false
@@ -2314,9 +2321,46 @@ mysql> desc projectcontractabi;
         let evmLocalSchemaMap = {}
         for (const rec of recs){
             evmLocalSchemaMap[rec.tableId] = rec
+            //this.writeTableSchemaJSON(rec.tableId, rec.tableSchema)
         }
         this.evmLocalSchemaMap = evmLocalSchemaMap
+        console.log(`evmLocalSchemaMap`, Object.keys(evmLocalSchemaMap))
         console.log(`Found ${recs.length} tableId in local evmschema`)
+    }
+
+    async generateTableSchemaJSON(){
+        let sql = 'select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, abiType, created from evmschema order by tableId';
+        let recs = await this.poolREADONLY.query(sql);
+        for (const rec of recs){
+            await this.writeTableSchemaJSON(rec.tableId, rec.tableSchema)
+        }
+    }
+
+    // since bq load does not allow NULLABLE/REQUIRED with inline schema. write to disk1 instead
+    async writeTableSchemaJSON(tableId, tableSchema, replace = false) {
+        const filePath = path.join('/disk1', 'evmschema', `${tableId}.json`);
+        let data = tableSchema
+        //console.log(`filePath=${filePath} replace=${replace}, data=${data}`)
+        try {
+            await fs.stat(filePath, () => {});
+            // File exists
+            if (replace) {
+                // Replace the file
+                await fs.writeFile(filePath, data, () => {});
+                console.log(`Table schema replaced in ${filePath}`);
+            } else {
+                //console.log(`File ${filePath} already exists, skipping`);
+            }
+        } catch (err) {
+            if (err.code === 'ENOENT') {
+                // File does not exist, so write it
+                await fs.writeFile(filePath, data, () => {});
+                console.log(`Table schema written to ${filePath}`);
+            } else {
+                // Some other error occurred
+                console.error(`Error occurred: ${err}`);
+            }
+        }
     }
 
     async load_gs_evmrec(dt){
@@ -2324,6 +2368,7 @@ mysql> desc projectcontractabi;
         let evmDatasetID = this.evmDatasetID
 
         await this.initEvmLocalSchemaMap()
+        //await this.generateTableSchemaJSON()
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
         console.log(`fns`, fns)
@@ -2338,14 +2383,19 @@ mysql> desc projectcontractabi;
             let tableInfo = this.evmLocalSchemaMap[tableId]
             if (tableInfo != undefined){
                 //console.log(`tableId ${tableId} Schema:`, tableInfo.tableSchema)
-                let loadCmd = `bq load --project_id=${project_id} --replace --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} '${tableInfo.tableSchema}'`
+                await this.writeTableSchemaJSON(tableId, tableInfo.tableSchema)
+                let jsonFN = `/disk1/evmschema/${tableId}.json`
+                let timePartitioningFld = (tableId.substr(0,4) == 'call')? "call_block_time": "evt_block_time"
+                let loadCmd = `bq load --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
                 loadCmds.push(loadCmd)
                 //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
             }else{
                 console.log(`tableId ${tableId} missing schema`)
             }
         }
-        console.log(loadCmds)
+        for (const loadCmd of loadCmds){
+            console.log(loadCmd)
+        }
     }
 
     async index_evmchain(chainID, logDT) {
