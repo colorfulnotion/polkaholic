@@ -97,6 +97,7 @@ function dechex(number) {
 module.exports = class EVMETL extends PolkaholicDB {
     methodMap = {};
 
+    evmLocalSchemaMap = {};
     evmSchemaMap = {}; //by tableId
     evmFingerprintMap = {}; //by fingerprintID
     evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
@@ -2286,6 +2287,65 @@ mysql> desc projectcontractabi;
         for (const fnType of fnTypes){
             await this.processTable(blocksInfo.blocks, dirPath, tbl, fnType)
         }
+    }
+
+    async fetch_gs_file_list(logYYYY_MM_DD = "2023/05/11", bucketName = "gs://evmrec"){
+        let basePath = `${bucketName}/${logYYYY_MM_DD}/**`
+        let cmd = `gsutil ls ${basePath} | jq -c -R -n '[inputs]'`
+        console.log(`cmd`, cmd)
+        let res = await exec(cmd, {maxBuffer: 1024 * 640000});
+        try {
+            if (res.stderr != ''){
+                console.log(`${cmd} error`, res.stderr)
+                return false
+            }
+            let fns = JSON.parse(res.stdout)
+            return fns
+        } catch (e){
+            console.log(`error`, e)
+            return false
+        }
+        return false
+    }
+
+    async initEvmLocalSchemaMap(){
+        let sql = 'select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, abiType, created from evmschema order by tableId';
+        let recs = await this.poolREADONLY.query(sql);
+        let evmLocalSchemaMap = {}
+        for (const rec of recs){
+            evmLocalSchemaMap[rec.tableId] = rec
+        }
+        this.evmLocalSchemaMap = evmLocalSchemaMap
+        console.log(`Found ${recs.length} tableId in local evmschema`)
+    }
+
+    async load_gs_evmrec(dt){
+        let project_id = 'substrate-etl'
+        let evmDatasetID = this.evmDatasetID
+
+        await this.initEvmLocalSchemaMap()
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
+        console.log(`fns`, fns)
+        if (!fns){
+            console.log(`${logYYYY_MM_DD} evmrec not found`)
+            return
+        }
+        let loadCmds = []
+        for (const fn of fns){
+            //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
+            let tableId = fn.split('/')[6]
+            let tableInfo = this.evmLocalSchemaMap[tableId]
+            if (tableInfo != undefined){
+                //console.log(`tableId ${tableId} Schema:`, tableInfo.tableSchema)
+                let loadCmd = `bq load --project_id=${project_id} --replace --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} '${tableInfo.tableSchema}'`
+                loadCmds.push(loadCmd)
+                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
+            }else{
+                console.log(`tableId ${tableId} missing schema`)
+            }
+        }
+        console.log(loadCmds)
     }
 
     async index_evmchain(chainID, logDT) {
