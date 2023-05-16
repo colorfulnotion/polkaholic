@@ -2411,6 +2411,7 @@ mysql> desc projectcontractabi;
             return
         }
         let loadCmds = []
+        let loadJobs = []
         for (const fn of fns){
             //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
             let tableId = fn.split('/')[6]
@@ -2420,13 +2421,25 @@ mysql> desc projectcontractabi;
                 await this.writeTableSchemaJSON(tableId, tableInfo.tableSchema)
                 let jsonFN = `/disk1/evmschema/${tableId}.json`
                 let timePartitioningFld = (tableId.substr(0,4) == 'call')? "call_block_time": "evt_block_time"
+                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
                 let loadCmd = `bq load --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
                 loadCmds.push(loadCmd)
-                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
+                let job = {
+                    evmDataset: evmDataset,
+                    tableIdYYYYMMDD: `${tableId}$${logYYYYMMDD}`,
+                    tableSchema: tableInfo.tableSchema,
+                    timePartitioningFld: timePartitioningFld,
+                    loadPath: `${fn}`,
+                }
+                loadJobs.push(job)
             }else{
                 console.log(`tableId ${tableId} missing schema`)
             }
         }
+        for (const loadJob of loadJobs){
+            await.bqLoadJob(loadJob)
+        }
+        /*
         for (const loadCmd of loadCmds){
             console.log(loadCmd)
         }
@@ -2437,11 +2450,33 @@ mysql> desc projectcontractabi;
             let currBatchLoads = loadCmds.slice(i, i + batchSize);
             console.log(`currBatchLoads#${n}`, currBatchLoads)
             if (currBatchLoads.length > 0) {
-                await this.batchExec(currBatchLoads)
+                //await this.batchExec(currBatchLoads)
                 i += batchSize;
                 n++
             }
         }
+        */
+    }
+
+    async bqLoadJob(job) {
+        console.log(`loadBQ JOB`, job)
+        const metadata = {
+            sourceFormat: 'NEWLINE_DELIMITED_JSON',
+            schema: {
+                fields: JSON.parse(job.tableSchema)
+            },
+            timePartitioning: {
+                type: 'DAY',
+                field: job.timePartitioningFld,
+            },
+            writeDisposition: 'WRITE_TRUNCATE',
+      };
+
+      const [job] = await bigquery
+        .dataset(job.evmDataset)
+        .table(job.tableIdYYYYMMDD) // Appending $20230101 to load into the 2023-01-01 partition
+        .load(job.loadPath, metadata);
+        console.log(`Job ${job.tableIdYYYYMMDD} ${job.id} started.`);
     }
 
     async index_evmchain(chainID, logDT) {
