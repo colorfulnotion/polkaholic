@@ -1882,6 +1882,7 @@ mysql> desc projectcontractabi;
         let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
         return [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD]
     }
+
     async blcp(dt, chainID, id = "ethereum") {
         let srcprojectID, srcdataset;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
@@ -2424,60 +2425,63 @@ mysql> desc projectcontractabi;
                 //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
                 let loadCmd = `bq load --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
                 loadCmds.push(loadCmd)
-                let job = {
-                    evmDataset: evmDataset,
+                let jobInfo = {
+                    evmDatasetID: evmDatasetID,
                     tableIdYYYYMMDD: `${tableId}$${logYYYYMMDD}`,
                     tableSchema: tableInfo.tableSchema,
                     timePartitioningFld: timePartitioningFld,
                     loadPath: `${fn}`,
                 }
-                loadJobs.push(job)
+                loadJobs.push(jobInfo)
             }else{
                 console.log(`tableId ${tableId} missing schema`)
             }
         }
         for (const loadJob of loadJobs){
-            await.bqLoadJob(loadJob)
+            //await this.bqLoadJob(loadJob)
         }
-        /*
         for (const loadCmd of loadCmds){
             console.log(loadCmd)
         }
         let i = 0;
         let n = 0
-        let batchSize = 30; // safety check
+        let batchSize = 5; // safety check
         while (i < loadCmds.length) {
             let currBatchLoads = loadCmds.slice(i, i + batchSize);
             console.log(`currBatchLoads#${n}`, currBatchLoads)
             if (currBatchLoads.length > 0) {
-                //await this.batchExec(currBatchLoads)
+                await this.batchExec(currBatchLoads)
                 i += batchSize;
                 n++
             }
         }
-        */
     }
 
-    async bqLoadJob(job) {
-        console.log(`loadBQ JOB`, job)
+/*
+    async bqLoadJob(jobInfo) {
+        console.log(`loadBQ JOB`, jobInfo)
         const metadata = {
             sourceFormat: 'NEWLINE_DELIMITED_JSON',
             schema: {
-                fields: JSON.parse(job.tableSchema)
+                fields: JSON.parse(jobInfo.tableSchema)
             },
             timePartitioning: {
                 type: 'DAY',
-                field: job.timePartitioningFld,
+                field: jobInfo.timePartitioningFld,
             },
             writeDisposition: 'WRITE_TRUNCATE',
       };
+      const bigquery = this.get_big_query();
+      const storage = this.get_google_storage();
 
       const [job] = await bigquery
-        .dataset(job.evmDataset)
-        .table(job.tableIdYYYYMMDD) // Appending $20230101 to load into the 2023-01-01 partition
-        .load(job.loadPath, metadata);
-        console.log(`Job ${job.tableIdYYYYMMDD} ${job.id} started.`);
+        .dataset(jobInfo.evmDatasetID)
+        .table(jobInfo.tableIdYYYYMMDD) // Appending $20230101 to load into the 2023-01-01 partition
+        .load(storage.bucket(bucketName).file(filename), metadata);
+        //.load(jobInfo.loadPath, metadata);
+        console.log(`Job ${jobInfo.tableIdYYYYMMDD} ${job.id} started.`);
     }
+*/
 
     async index_evmchain(chainID, logDT) {
         let crawler = new Crawler();
@@ -2569,6 +2573,13 @@ mysql> desc projectcontractabi;
                 "replace": indexlogvals
             });
         }
+    }
+
+    //load evmlog to gs
+    async cp_evm_log_to_gs(dt, chainID = 1){
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let cmd = `gsutil -m cp -r evmlog/${logYYYY_MM_DD}/*/${chainID}.json gs://evmrec/${logYYYY_MM_DD}/`
+        console.log(cmd)
     }
 
 

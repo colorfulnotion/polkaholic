@@ -22,6 +22,9 @@ const {
 const {
     BigQuery
 } = require('@google-cloud/bigquery');
+const {
+    Storage
+} = require('@google-cloud/storage');
 const stream = require("stream");
 const paraTool = require("./paraTool.js");
 const mysql = require("mysql2");
@@ -80,6 +83,7 @@ module.exports = class PolkaholicDB {
 
     BQ_SUBSTRATEETL_KEY = null;
     bigQuery = null;
+    googleStorage = null;
     bqTablesCallsEvents = null;
 
     constructor(serviceName = "polkaholic") {
@@ -904,6 +908,15 @@ from chain where chainID = '${chainID}' limit 1`);
         this.isConneted = false
         this.isErrored = true
         this.disconnectedCnt += 1
+    }
+
+    get_google_storage(){
+        if (this.googleStorage) return this.googleStorage;
+        this.googleStorage = new Storage({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        return this.googleStorage;
     }
 
     get_big_query() {
