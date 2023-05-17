@@ -8335,7 +8335,7 @@ module.exports = class Indexer extends AssetManager {
             ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
         ])
         let [dTxns, dReceipts] = await statusesPromise
-        console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
+        //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
         await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
         return r;
     }
@@ -8364,6 +8364,13 @@ module.exports = class Indexer extends AssetManager {
           }
         }
       };
+
+      // Create base path if it doesn't exist
+      if (!fs.existsSync(basePath)) {
+          fs.mkdirSync(basePath, { recursive: true });
+          console.log(`Created base path: ${basePath}`);
+      }
+
       // Start the search and delete process
       searchAndDelete(basePath);
     }

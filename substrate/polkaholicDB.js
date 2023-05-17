@@ -1573,7 +1573,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 });
                 return false
             }
-            console.log(`rowData["blocks"]`, rowData["blocks"])
+            //console.log(`rowData["blocks"]`, rowData["blocks"])
             let cell = (rowData["blocks"][r.blockHash]) ? rowData["blocks"][r.blockHash][0] : false;
             if (cell) {
                 let blk = JSON.parse(cell.value)

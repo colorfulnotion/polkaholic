@@ -2445,7 +2445,7 @@ mysql> desc projectcontractabi;
         }
         let i = 0;
         let n = 0
-        let batchSize = 5; // safety check
+        let batchSize = 10; // safety check
         while (i < loadCmds.length) {
             let currBatchLoads = loadCmds.slice(i, i + batchSize);
             console.log(`currBatchLoads#${n}`, currBatchLoads)
@@ -2543,12 +2543,35 @@ mysql> desc projectcontractabi;
                 cellLimit: 1,
                 family: families
             });
+
+            let rowLen = rows.length
+            let expectedLen = b.endBN - b.startBN + 1
+            if (rowLen != expectedLen){
+                let expectedRangeBNs = [];
+                let observedBNs = []
+                for(let i = startBN; i <= endBN; i++) {
+                    expectedRangeBNs.push(i);
+                }
+                for (let j = 0; j < rows.length; j++) {
+                    let blockNum = paraTool.dechexToInt(rows[j].id)
+                    observedBNs.push(blockNum);
+                }
+                // await this.audit_chain(chain, startBN, endBN)
+                // can we do a more robost audit_chain here?
+                let missedBNs = expectedRangeBNs.filter(function(num) {
+                    return observedBNs.indexOf(num) === -1;
+                });
+            }
+
+            console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1} MISSING BNs`, missedBNs)
+            //TODO: if missing, we need to get the missing blocks
+
             for (let i = 0; i < rows.length; i++) {
                 try {
                     let row = rows[i];
                     //console.log(`row`, row)
                     let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
-                    console.log(`rRow`, rRow)
+                    //console.log(`rRow`, rRow)
                     let r = await crawler.index_evm_chain_block_row(rRow, false);
                 } catch (err) {
                     console.log(err)
@@ -2578,7 +2601,8 @@ mysql> desc projectcontractabi;
     //load evmlog to gs
     async cp_evm_log_to_gs(dt, chainID = 1){
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
-        let cmd = `gsutil -m cp -r evmlog/${logYYYY_MM_DD}/*/${chainID}.json gs://evmrec/${logYYYY_MM_DD}/`
+        //TODO: can't specify chainID and other filter here..
+        let cmd = `gsutil -m cp -r /disk1/evmlog/${logYYYY_MM_DD}/* gs://evmrec/${logYYYY_MM_DD}/`
         console.log(cmd)
     }
 
