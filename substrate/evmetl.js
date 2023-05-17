@@ -2446,12 +2446,16 @@ mysql> desc projectcontractabi;
         let i = 0;
         let n = 0
         let batchSize = 10; // safety check
+        let totalLen = loadCmds.length
+        let processedLen = 0
         while (i < loadCmds.length) {
             let currBatchLoads = loadCmds.slice(i, i + batchSize);
-            console.log(`currBatchLoads#${n}`, currBatchLoads)
+            processedLen += currBatchLoads.length
+            console.log(`currBatchLoads#${n} ${processedLen}/${totalLen}`, currBatchLoads)
             if (currBatchLoads.length > 0) {
                 await this.batchExec(currBatchLoads)
                 i += batchSize;
+
                 n++
             }
         }
