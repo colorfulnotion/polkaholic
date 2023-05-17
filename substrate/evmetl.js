@@ -1970,6 +1970,8 @@ mysql> desc projectcontractabi;
         };
         let projectID = `substrate-etl`
         let cmds = []
+        let bqCmds = []
+        let gsCmds = []
         for (const tbl of Object.keys(tables)) {
             let t = tables[tbl];
             //let [logTS, logYYYYMMDD, currDT, prevDT] = this.getAllTimeFormat(dt)
@@ -1980,21 +1982,26 @@ mysql> desc projectcontractabi;
             //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
             let gsCmd = `bq query --use_legacy_sql=false '${paraTool.removeNewLine(t["gs"])}'`
             //console.log(gsCmd, '\n')
+            bqCmds.push(bqCmd)
+            gsCmds.push(gsCmd)
             cmds.push(bqCmd)
             cmds.push(gsCmd)
         }
         for (const cmd of cmds){
             try {
                 console.log(cmd, `\n`)
+                /*
                 await exec(cmd, {
                     maxBuffer: 1024 * 50000
                 });
-
+                */
             } catch (e) {
                 console.log(e);
                 // TODO optimization: do not create twice
             }
         }
+        await this.batchExec(bqCmds)
+        await this.batchExec(gsCmds)
     }
 
     async countLinesInFiles(pattern) {
@@ -2403,7 +2410,7 @@ mysql> desc projectcontractabi;
         let evmDatasetID = this.evmDatasetID
 
         await this.initEvmLocalSchemaMap()
-        //await this.generateTableSchemaJSON()
+        await this.generateTableSchemaJSON()
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
         console.log(`fns`, fns)
@@ -2445,7 +2452,7 @@ mysql> desc projectcontractabi;
         }
         let i = 0;
         let n = 0
-        let batchSize = 10; // safety check
+        let batchSize = 20; // safety check
         let totalLen = loadCmds.length
         let processedLen = 0
         while (i < loadCmds.length) {
@@ -2455,7 +2462,6 @@ mysql> desc projectcontractabi;
             if (currBatchLoads.length > 0) {
                 await this.batchExec(currBatchLoads)
                 i += batchSize;
-
                 n++
             }
         }
