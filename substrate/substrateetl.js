@@ -161,7 +161,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const r of recs) {
                 let [logDT, hr] = paraTool.ts_to_logDT_hr(r.logTS);
                 let logYYYYMMDD = logDT.replaceAll('-', '')
-		let bqDataset = this.get_relayChain_dataset(relayChain);
+                let bqDataset = this.get_relayChain_dataset(relayChain);
                 let cmd = `bq query --destination_table '${bqDataset}.balances${paraID}$${logYYYYMMDD}' --project_id=${projectID} --time_partitioning_field ts --replace --use_legacy_sql=false 'select symbol,address_ss58,CONCAT(LEFT(address_pubkey, 2), RIGHT(address_pubkey, 40)) as address_pubkey,ts,id,chain_name,asset,para_id,free,free_usd,reserved,reserved_usd,misc_frozen,misc_frozen_usd,frozen,frozen_usd,price_usd from ${bqDataset}.balances${paraID} where DATE(ts) = "${logDT}"'`
                 try {
                     console.log(cmd);
@@ -315,9 +315,9 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     get_relayChain_dataset(relayChain, isProd = true) {
-	return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
+        return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
     }
-    
+
     async publishExchangeAddress() {
         //await this.ingestSystemAddress()
         //await this.ingestWalletAttribution()
@@ -326,7 +326,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbl = `knownpubs`
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd)
-        
+
         //let sql = `select nickname, accountName, address from account where is_exchange = 1`
         let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
         let sqlRecs = await this.poolREADONLY.query(sql);
@@ -550,57 +550,77 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async audit_fix(chainID = null, monthDT = null) {
-        let w = [];
-        if (chainID >= 0) {
-            w.push(`chainID = '${chainID}'`);
+
+    async detectChainIssues(chainID = null) {
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let paraID = paraTool.getParaIDfromChainID(chainID);
+        let sql = `with blocks as (SELECT
+ number, block_time, LAG(number) OVER (ORDER BY number) prev
+FROM
+  substrate-etl.crypto_${relayChain}.blocks${paraID}
+  order by number
+) select block_time,  number-1 as endblock, prev+1 as startblock, number - (prev+1) as diff from blocks where number != prev + 1 order by number desc, block_time limit 250`
+        let recs = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+        let sql0 = `delete from  chainissues where chainID = '${chainID}' and skip = 0`
+        this.batchedSQL.push(sql0);
+        await this.update_batchedSQL()
+
+        for (const gap of recs) {
+            let startBN = gap.startblock;
+            let endBN = gap.endblock;
+            let sql2 = `insert into chainissues (chainID, startBlock, endBlock, addDT, lastUpdateDT, currentBlock) values ('${chainID}', '${startBN}', '${endBN}', Now(), Now(), '${startBN}' ) on duplicate key update lastUpdateDT = values(lastUpdateDT)`;
+            this.batchedSQL.push(sql2);
+            await this.update_batchedSQL()
         }
-        if (monthDT) {
-            w.push(`monthDT = '${monthDT}'`);
-        }
-        let wstr = (w.length > 0) ? ` and ${w.join(" and ")}` : "";
-        // 1. find problematic periods with a small number of records (
-        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${wstr} order by chainID, monthDT`
-        console.log(sql);
+    }
+
+    async audit_fix(chainID = null) {
+        const Crawler = require("./crawler");
+        let crawler = new Crawler();
+        let chain = await this.getChain(chainID);
+        const tableChain = this.getTableChain(chainID);
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
+        let sql = `select startBlock, currentBlock, endBlock from chainissues where chainID = '${chainID}' and currentBlock <= endBlock order by endBlock asc limit 1`;
         let recs = await this.poolREADONLY.query(sql);
-        if (recs.length == 0) return (false);
-        for (const f of recs) {
-            let failures = JSON.parse(f.failures)
-            if (failures.gaps && failures.gaps.length > 0) {
-                for (const gap of failures.gaps) {
-                    let startBN = gap[0];
-                    let endBN = gap[1];
-                    // attempted > 100 == don't try again, its been audited (missing timestamps, has decoding errors etc.)
-                    let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 100;`
-                    if (endBN - startBN < 5000) { // 50 blocks * 6-12bps = 5-10mins
-                        console.log("EXECUTING: ", sql);
-                        this.batchedSQL.push(sql);
-                        await this.update_batchedSQL()
-                    } else {
-                        console.log("RECOMMENDING: ", sql);
-                    }
-                }
+        if (recs.length == 0) return;
+        let r = recs[0];
+        console.log(r);
+        for (let blockNumber = r.currentBlock; blockNumber <= r.endBlock; blockNumber++) {
+            let rowId = paraTool.blockNumberToHex(blockNumber);
+            await tableChain.row(rowId).delete();
+            let t2 = {
+                chainID,
+                blockNumber,
+                crawlBlockEVM: 1,
+                crawlReceiptsEVM: 1,
+                crawlTraceEVM: 1
             }
-
-            if (failures.errors && failures.errors.length > 0) {
-                const tableChain = this.getTableChain(chainID);
-                for (const bn of failures.errors) {
-                    let paraID = paraTool.getParaIDfromChainID(f.chainID);
-                    let relayChain = paraTool.getRelayChainByChainID(f.chainID);
-                    // redo in runs of 3
-                    for (let n = bn - 1; n <= bn + 1; n++) {
-                        let rowId = paraTool.blockNumberToHex(n);
-                        //tableChain.row(rowId).delete();
-                        let sql = `update block${f.chainID} set crawlBlock=1, attempted = 0 where blockNumber = '${n}' and attempted < 100;`;
-                        console.log("DELETED:", rowId, " recrawling", sql, `./polkaholic indexblock ${f.chainID} ${n}`);
-                        this.batchedSQL.push(sql);
-                        await this.update_batchedSQL()
-                    }
-                    console.log("");
-                }
-            }
+            let x = await crawler.crawl_block_trace(chain, t2);
+            let blockHash = x.blockHash;
+            await crawler.index_block(chain, blockNumber, blockHash);
+            sql = `update chainissues set currentBlock = '${blockNumber+1}' where chainID = '${chainID}' and startBlock = '${r.startBlock}' and endBlock = '${r.endBlock}'`
+            console.log(sql);
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL()
         }
 
+        await this.mark_chain_reload(chainID, r.startBlock)
+        await this.mark_chain_reload(chainID, r.startBlock + 1)
+        await this.mark_chain_reload(chainID, r.endBlock - 1)
+        await this.mark_chain_reload(chainID, r.endBlock)
+    }
+
+    async mark_chain_reload(chainID, blockNumber) {
+        let recs = await this.poolREADONLY.query(`select unix_timestamp(blockDT) indexTS from block${chainID} where blockNumber = '${blockNumber}'`);
+        if (recs.length == 1) {
+            let [logDT, _] = paraTool.ts_to_logDT_hr(recs[0].indexTS);
+            let sql0 = `update blocklog set loaded = 0, attempted = 0 where chainID = '${chainID}' and logDT = '${logDT}'`
+            console.log(sql0);
+            this.batchedSQL.push(sql0);
+            await this.update_batchedSQL()
+        }
     }
 
     async audit_blocks(chainID = null, monthDT = null, fix = true) {
@@ -624,7 +644,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
-	    let bqDataset = this.get_relayChain_dataset(relayChain);
+            let bqDataset = this.get_relayChain_dataset(relayChain);
             let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${bqDataset}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
             console.log(sqlQuery);
             let rows = await this.execute_bqJob(sqlQuery, paraTool.BQUSMulti);
@@ -1642,7 +1662,7 @@ Example of contractInfoOf:
         // 1. Build contractsevents{paraID} from startDT with a single bq load operation that generates an empirically small table
         if (loadSourceTables) {
             try {
-		let bqDataset = this.get_relayChain_dataset(relayChain);
+                let bqDataset = this.get_relayChain_dataset(relayChain);
                 let targetSQL = `SELECT * FROM \`substrate-etl.${bqDataset}.extrinsics${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
                 let destinationTbl = `contracts.contractsextrinsics${id}`
                 let partitionedFld = 'block_time'
@@ -2445,7 +2465,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         for (const relayChain of relayChains) {
             // 1. Generate system tables:
             let system_tables = ["chains", "xcmassets", "assets"];
-	    let bqDataset = this.get_relayChain_dataset(relayChain)
+            let bqDataset = this.get_relayChain_dataset(relayChain)
             for (const tbl of system_tables) {
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
@@ -3104,8 +3124,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let bqjobs = []
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let accountTbls = ["new", "reaped", "active", "all"]
-	let polkadot = this.get_relayChain_dataset("polkadot");
-	let kusama = this.get_relayChain_dataset("kusama");
+        let polkadot = this.get_relayChain_dataset("polkadot");
+        let kusama = this.get_relayChain_dataset("kusama");
         for (const tbl of accountTbls) {
             let tblName = `accounts${tbl}`
             let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
@@ -3254,7 +3274,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         //accountMetricsStatus, updateAddressBalanceStatus, crowdloanMetricsStatus, sourceMetricsStatus, poolsMetricsStatus, identityMetricsStatus, loaded
         switch (dumpType) {
             case "substrate-etl":
-            // how to check if dump substrate-etl is ready?
+                // how to check if dump substrate-etl is ready?
 
                 sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded >= 0 and logDT = '${logDT}' and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and chain.chainID = ${chainID} order by rand() limit 1`;
                 recs = await this.poolREADONLY.query(sql);
@@ -3866,7 +3886,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async update_xcm_summary(relayChain, logDT) {
         let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;
-	let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset = this.get_relayChain_dataset(relayChain);
         let sqla = {
             "xcmtransfers0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
@@ -4733,7 +4753,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
-	let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset = this.get_relayChain_dataset(relayChain);
         let sqla = {
             "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from ${project}.${bqDataset}.balances${paraID} where DATE(ts) >= "${startDT}" group by logDT order by logDT`,
             "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics, sum(fee) fees from ${project}.${bqDataset}.extrinsics${paraID} where DATE(block_time) >= "${startDT}" group by logDT having logDT < "${today}" order by logDT`,
@@ -5287,9 +5307,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         try {
             const resp = await axios.get(url);
             let assets = resp.data.assets;
-	    let out = {}
+            let out = {}
             for (const relayChain of Object.keys(assets)) {
-		out[relayChain] = {}
+                out[relayChain] = {}
                 let rcassets = assets[relayChain];
                 for (const c of rcassets) {
                     let paraID = c.paraID;
@@ -5300,14 +5320,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         if (currencyID == null && typeof a.asset == "object") {
                             currencyID = JSON.stringify(a.asset);
                         }
-			if ( out[relayChain][paraID] == undefined ) {
-			    out[relayChain][paraID] = {}
-			}
-			out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
+                        if (out[relayChain][paraID] == undefined) {
+                            out[relayChain][paraID] = {}
+                        }
+                        out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
                     }
                 }
-	    }
-	    let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
+            }
+            let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
 if ( m[relayChain] && m[relayChain][paraID] && m[relayChain][paraID][currencyID] ) {
  let x = m[relayChain][paraID][currencyID]; return { symbol: x[0], name: x[1], decimals: x[2] }
 }
@@ -5317,7 +5337,7 @@ function xcmgarsymbol(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayC
 function xcmgarname(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.name : null )};
 function xcmgardecimals(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.decimals: null )}`;
             let fn = "xcmgarlib3.js";
-	    let f = fs.openSync(fn, 'w', 0o666);
+            let f = fs.openSync(fn, 'w', 0o666);
             fs.writeSync(f, xcmgarlibrary);
         } catch (err) {
             console.log("ERROR", err);

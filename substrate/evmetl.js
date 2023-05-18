@@ -174,7 +174,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 
         let chain = await this.getChain(chainID);
         //console.log(`chain`, chain)
-        let evm_chain_name = (chain && chain.id && chain.isEVM)? chain.id : false
+        let evm_chain_name = (chain && chain.id && chain.isEVM) ? chain.id : false
         console.log(`evm_chain_name`, evm_chain_name)
 
         console.log(`generateProject chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName}`)
@@ -188,30 +188,30 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`generateProject sql`, sql)
         let sqlRecs = await this.poolREADONLY.query(sql);
         let projectInfo = false
-        if (sqlRecs.length == 1){
+        if (sqlRecs.length == 1) {
             projectInfo = sqlRecs[0]
-        }else{
+        } else {
             console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectInfo NOT FOUND`)
             return false
         }
         console.log(`chainID=${chainID}, address=${address}, project=${project}, contractName=${contractName} projectInfo`, projectInfo)
         let projectContractName = projectInfo.address.toLowerCase() //If projectName is unknown everywhere, use contractAddress
-        if (projectInfo.etherscanContractName){
+        if (projectInfo.etherscanContractName) {
             // Contract parser by default fetch the etherscanContractName as contractName
             projectContractName = projectInfo.etherscanContractName
         }
-        if (projectInfo.contractName){
+        if (projectInfo.contractName) {
             // Overwrite with our contractName if specified
             projectContractName = projectInfo.contractName
         }
-        if (projectInfo.customContractName){
+        if (projectInfo.customContractName) {
             // Overwrite with our customContractName if specified
             projectContractName = projectInfo.customContractName
             //TODO: need to link to other virtual table
         }
 
         var sigs = {};
-        let contractABIStr = (projectInfo.proxyAbiRaw)?  projectInfo.proxyAbiRaw : projectInfo.abiRaw
+        let contractABIStr = (projectInfo.proxyAbiRaw) ? projectInfo.proxyAbiRaw : projectInfo.abiRaw
         var output = ethTool.parseAbiSignature(contractABIStr)
         console.log(`output`, output)
 
@@ -228,11 +228,11 @@ module.exports = class EVMETL extends PolkaholicDB {
         */
         let eventMap = {}
         let callMap = {}
-        for (const e of output){
+        for (const e of output) {
             var fingerprintID = e.fingerprintID
             let modifiedFingerprintID = ethTool.computeModifiedFingerprintID(fingerprintID)
             sigs[fingerprintID] = e;
-            if (e.abiType == 'function' && e.stateMutability != 'view'){
+            if (e.abiType == 'function' && e.stateMutability != 'view') {
                 let k = `${projectContractName}_call_${e.name}`
                 let devTabelId = ethTool.computeTableId(JSON.parse(e.abi), modifiedFingerprintID)
                 //let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
@@ -250,14 +250,14 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devFlds = devFlds
                 e.etlFlds = e.flds
                 delete e.flds
-                if (callMap[k] == undefined){
+                if (callMap[k] == undefined) {
                     callMap[k] = e
-                }else{
+                } else {
                     console.log(`WARNING k not unique! modifiedFingerprintID`, modifiedFingerprintID)
                     callMap[k] = e
                 }
 
-            }else if (e.abiType == 'event'){
+            } else if (e.abiType == 'event') {
                 let k = `${projectContractName}_event_${e.name}`
                 let devTabelId = ethTool.computeTableId(JSON.parse(e.abi), modifiedFingerprintID)
                 //let devTabelId = ethTool.computeTableIDFromFingerprintIDAndName(fingerprintID, e.name)
@@ -275,9 +275,9 @@ module.exports = class EVMETL extends PolkaholicDB {
                 e.devFlds = devFlds
                 e.etlFlds = e.flds
                 delete e.flds
-                if (eventMap[k] == undefined){
+                if (eventMap[k] == undefined) {
                     eventMap[k] = e
-                }else{
+                } else {
                     console.log(`WARNING k not unique! modifiedFingerprintID`, modifiedFingerprintID)
                     eventMap[k] = e
                 }
@@ -289,42 +289,42 @@ module.exports = class EVMETL extends PolkaholicDB {
         console.log(`event table`, Object.keys(eventMap))
         console.log(`call tabel`, Object.keys(callMap))
 
-        let datasetID = (evm_chain_name)?  `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
+        let datasetID = (evm_chain_name) ? `${evm_chain_name}_${projectInfo.projectName}` : `${projectInfo.projectName}`
 
         //TODO: create datasetID when missing
         await this.create_dataset(datasetID)
-        let isAggregate = (projectInfo.isAggregate)? true : false
-        let targetContractAddress = (!isAggregate)? projectInfo.address: null
+        let isAggregate = (projectInfo.isAggregate) ? true : false
+        let targetContractAddress = (!isAggregate) ? projectInfo.address : null
 
         let viewCmds = []
-        for (const eventKey of Object.keys(eventMap)){
+        for (const eventKey of Object.keys(eventMap)) {
             let eventTableInfo = eventMap[eventKey]
-            if (projectInfo.projectName){
+            if (projectInfo.projectName) {
                 let viewCmd = await this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
-                if (viewCmd){
+                if (viewCmd) {
                     viewCmds.push(viewCmd)
                 }
             }
         }
 
-        for (const callKey of Object.keys(callMap)){
+        for (const callKey of Object.keys(callMap)) {
             let callTableInfo = callMap[callKey]
-            if (projectInfo.projectName){
+            if (projectInfo.projectName) {
                 let viewCmd = await this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
-                if (viewCmd){
+                if (viewCmd) {
                     viewCmds.push(viewCmd)
                 }
             }
         }
 
-        for (const cmd of viewCmds){
+        for (const cmd of viewCmds) {
             console.log(cmd);
             try {
                 let res = await exec(cmd, {
                     maxBuffer: 1024 * 64000
                 });
                 console.log(`res`, res)
-            } catch (e){
+            } catch (e) {
                 console.log(`${e.toString()}`)
             }
         }
@@ -333,7 +333,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
         let tableID = null;
         let subTableIDInfo = null;
-        let a = (to_address) ? to_address.toLowerCase(): '';
+        let a = (to_address) ? to_address.toLowerCase() : '';
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID].tableId
             if (this.evmFingerprintMap[fingerprintID].addresses) {
@@ -456,7 +456,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
     */
 
-    async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap'){
+    async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap') {
         const bigquery = this.get_big_query();
         let bqProjectID = `substrate-etl`
         let bqDataset = `${this.evmDatasetID}`
@@ -475,7 +475,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             flds.push(s)
         }
 
-        if (!tableInfo.devFlds){
+        if (!tableInfo.devFlds) {
             // we have not initiated the tableId yet use etl as schema definition
             tableInfo.devFlds = tableInfo.etlFlds
 
@@ -524,15 +524,15 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
 
         let fldStr = flds.join(', ')
-        let timePartitionField = (tableInfo.abiType == 'function')? "call_block_time" : "evt_block_time"
+        let timePartitionField = (tableInfo.abiType == 'function') ? "call_block_time" : "evt_block_time"
 
         let condFilter = ''
-        if (!isAggregate){
+        if (!isAggregate) {
             condFilter = `and Lower(contract_address) = "${contractAddress}"`
         }
         let subTbl = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
         //building view
-        let sql =  `${subTbl} select ${fldStr} from dev`
+        let sql = `${subTbl} select ${fldStr} from dev`
         sql = paraTool.removeNewLine(sql)
         let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
         console.log(sqlViewCmd)
@@ -662,7 +662,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             if (proxyAddress || proxyImplementation) {
                 console.log(`proxyAddress=${proxyAddress}, proxyImplementation=${proxyImplementation}`)
                 if (!proxyAddress) proxyAddress = proxyImplementation
-                if (proxyAddress != address){
+                if (proxyAddress != address) {
                     //0xc36442b4a4522e871399cd717abdd847ab11fe88 has implementation pointed to itself - thus creating nonstop loop..
                     let proxyABI = await this.crawlABI(proxyAddress, chainID, project, contractName);
                     if (proxyABI) {
@@ -842,7 +842,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             }
         } else if (abiType == "event") {
             let query = `SELECT * FROM \`substrate-etl.evm.logs\` as logs  where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`;
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             console.log(recs.length, abiType);
             for (const r of recs) {
                 if (r.address) {
@@ -1121,7 +1121,7 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async create_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`){
+    async create_dataset(detasetID = `evm_dev`, projectID = `substrate-etl`) {
         //check if exist
         let cmd = `bq ls --project_id=${projectID} --dataset_id=${detasetID}`
         let cmd2 = `bq --location=${this.evmBQLocation} mk --dataset ${projectID}:${detasetID}`
@@ -1135,7 +1135,7 @@ mysql> desc projectcontractabi;
                 console.log(`Create dataset=${projectID}:${detasetID}`)
                 console.log(cmd2)
                 await exec(cmd2);
-            } catch (e2){
+            } catch (e2) {
                 console.log(`e2`, e2.toString())
             }
         }
@@ -1182,7 +1182,7 @@ mysql> desc projectcontractabi;
         if (true) {
             let query = `SELECT signature, count(*) numTransactions FROM \`substrate-etl.evm.transactions\` as transactions where transactions.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)   group by signature order by numTransactions desc;`
             console.log(sql);
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
+            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             for (const r of recs) {
                 let sql0 = `update contractabi set numTransactions = '${r.numTransactions}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1191,7 +1191,7 @@ mysql> desc projectcontractabi;
             }
             return (true);
             query = `SELECT signature, count(*) numLogs FROM \`substrate-etl.evm.logs\` as logs  where logs.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)  group by signature order by count(*) desc;`;
-            recs = await this.execute_bqJob(query, paraTool.BQUSCentral1);  //todo: change evm data location
+            recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
             for (const r of recs) {
                 let sql0 = `update contractabi set numLogs = '${r.numLogs}' where signature = '${r.signature}'`
                 console.log(sql0);

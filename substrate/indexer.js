@@ -5807,10 +5807,8 @@ module.exports = class Indexer extends AssetManager {
         if (erc1155ContractInfo) {
             this.initERCAsset(contractAddress, chainID, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
             return `${paraTool.assetTypeERC1155}`
-        }
-
-        {
-            this.initERCAsset(contractAddress, chainID, contractInfo, tx, paraTool.assetTypeContract);
+        } else {
+            //this.initERCAsset(contractAddress, chainID, contractInfo, tx, paraTool.assetTypeContract);
             return `${paraTool.assetTypeContract}`
         }
         return (false);
@@ -5994,7 +5992,6 @@ module.exports = class Indexer extends AssetManager {
         //let assetChain = this.getErc721TokenIDAssetChain(cAddress, tokenID, chainID)
         let erc721TokenIDMeta = await this.process_token_address(cAddress, chainID, tokenID);
         if (erc721TokenIDMeta) {
-            console.log("process_erc721_token_transfer -- ", tokenInfo.symbol);
             let prevHolder = erc721TokenIDMeta.owner
             erc721TokenIDMeta.owner = recipient
             erc721TokenIDMeta.blockNumber = bn
@@ -8394,6 +8391,10 @@ module.exports = class Indexer extends AssetManager {
         if (chainID == 2058 && blockNumber < 78173) {
             return 1677087384 + 12 * blockNumber;
         }
+        if (chainID == 22110 && blockNumber == 2) {
+            return 1649774298;
+        }
+
         return (false);
     }
 
@@ -8563,7 +8564,7 @@ module.exports = class Indexer extends AssetManager {
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
         let tableID = null;
         let subTableIDInfo = null;
-        let a = (to_address) ? to_address.toLowerCase(): '';
+        let a = (to_address) ? to_address.toLowerCase() : '';
         if (this.evmFingerprintMap[fingerprintID] != undefined) {
             tableID = this.evmFingerprintMap[fingerprintID].tableId
             if (this.evmFingerprintMap[fingerprintID].addresses) {
@@ -8691,7 +8692,7 @@ module.exports = class Indexer extends AssetManager {
                 chain_id: evmTx.id, //string
                 evm_chain_id: evmTx.chain_id, //integer
                 contract_address: evmTx.to_address,
-                call_success: (evmTx.receipt_status == 1)? true: false, //TODO
+                call_success: (evmTx.receipt_status == 1) ? true : false, //TODO
                 call_tx_hash: evmTx.hash,
                 call_tx_index: evmTx.transaction_index,
                 call_block_time: evmTx.block_timestamp,
@@ -9200,7 +9201,9 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`${evmDatasetID}:${tableId} row`, rows)
             if (rows && rows.length > 0) {
                 autoEvmRowPromiseTableId.push(tableId)
-                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {raw: true}))
+                autoEvmRowPromise.push(bigquery.dataset(evmDatasetID).table(tableId).insert(rows, {
+                    raw: true
+                }))
             }
         }
         let autoEvmRowStates;
@@ -9222,7 +9225,7 @@ module.exports = class Indexer extends AssetManager {
             } else {
                 let rejectedReason = JSON.parse(JSON.stringify(autoEvmRowState['reason']))
                 let errorStr = rejectedReason.message
-                if (errorStr){
+                if (errorStr) {
                     if (!errorStr.includes('Already Exists')) {
                         console.log(`${evmDatasetID}:${tableId} Error`, errorStr, `\nRows:`, rows)
                         await this.log_streaming_error(tableId, "auto_evm_row_insert", rows, errorStr, evm_chain_id, evm_blk_num);
@@ -9271,7 +9274,7 @@ module.exports = class Indexer extends AssetManager {
                 console.log(blockNumber, receiptData.result.length, cmd);
                 return (receiptData.result);
             }
-            if (receiptData.error){
+            if (receiptData.error) {
                 console.log(`debug_traceBlockByNumber cmd`, cmd)
                 console.log(`debug_traceBlockByNumber error`, receiptData.error)
                 return false
@@ -9294,11 +9297,11 @@ module.exports = class Indexer extends AssetManager {
             const result = await operation();
             //console.log(`retryWithDelay retry#${i} result`, result)
             if (result) {
-                if (ctx.includes("crawlEvmBlockReceipts")){
+                if (ctx.includes("crawlEvmBlockReceipts")) {
                     console.log(`retryWithDelay`, result)
                     console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
                     return result;
-                }else{
+                } else {
                     console.log(`retryWithDelay success#${i} ctx=${ctx} returned`)
                     return result;
                 }
@@ -9336,7 +9339,7 @@ module.exports = class Indexer extends AssetManager {
                     console.log(blockNumber, receiptData.result.length, cmd);
                     return (receiptData.result);
                 }
-                if (receiptData.error){
+                if (receiptData.error) {
                     console.log(`crawlEvmBlockReceipts cmd`, cmd)
                     console.log(`crawlEvmBlockReceipts error`, receiptData.error)
                 }
@@ -9381,7 +9384,7 @@ module.exports = class Indexer extends AssetManager {
                 console.log(blockNumber, receiptData.result.length, cmd);
                 return (receiptData.result);
             }
-            if (receiptData.error){
+            if (receiptData.error) {
                 console.log(`crawlEvmBlockReceipts cmd`, cmd)
                 console.log(`crawlEvmBlockReceipts error`, receiptData.error)
                 return false
@@ -9476,9 +9479,9 @@ module.exports = class Indexer extends AssetManager {
                 let log_timeout_ms = 5000
                 let evmReceipts = false
 
-                if (evmRPCBlockReceiptsApi){
+                if (evmRPCBlockReceiptsApi) {
                     evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                } else{
+                } else {
                     let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
                     let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
                     evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
@@ -9494,7 +9497,7 @@ module.exports = class Indexer extends AssetManager {
                 let [dTxns, dReceipts] = await statusesPromise
 
                 let evmTrace = false
-                if (evmRPCInternalApi){
+                if (evmRPCInternalApi) {
                     let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
                     let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
                     evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
@@ -9537,8 +9540,10 @@ module.exports = class Indexer extends AssetManager {
             let fees = blockStats && blockStats.fees ? blockStats.fees : 0
             let feedTS = Math.floor(Date.now() / 1000)
             let indexTS = Math.floor(blockTS / 3600) * 3600;
-            if (typeof blockTS === "undefined") {
+            if (typeof blockTS === "undefined" || blockTS === false) {
                 blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
+            } else {
+                console.log("***!*$!*$*!*$*@#", blockTS);
             }
             if (!parentHash) {
                 console.log(`missing parentHash! bn=${blockNumber}`, r.block, r.block.header);

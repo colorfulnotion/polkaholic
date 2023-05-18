@@ -504,14 +504,17 @@ async function main() {
             process.exit(0);
         });
 
-    program.command('auditfix')
-        .description("Set up crawlBackfill workload for the results of an audit for a specific chain")
-        .usage("-c 2004")
-        .option('-c, --chainID <chainID>', 'ChainID', myParseInt, null)
-        .option('-m, --monthDT <monthDT>', 'MonthDT', null)
+    program.command('audit_fix')
+        .description("Detect chain issues")
+        .option('-c, --chainID <chainID>', 'ChainID', myParseInt)
+        .option('-m', 'model chain issues', false)
         .action(async (opt) => {
             var substrateetl = new SubstrateETL();
-            await substrateetl.audit_fix(opt.chainID, opt.monthDT);
+            if (opt.m) {
+                await substrateetl.detectChainIssues(opt.chainID);
+            } else {
+                await substrateetl.audit_fix(opt.chainID);
+            }
             process.exit(0);
         })
 

@@ -820,7 +820,7 @@ from chain where chainID = '${chainID}' limit 1`);
             console.log("API using backfill endpoint", chain.WSEndpoint);
         }
         let isSubstrate = chain.chainID != chain.evmChainID
-        if (isSubstrate){
+        if (isSubstrate) {
             //for substrate, initiat with polkadotjs
             if (!this.api) {
                 this.api = await this.get_api(chain);
@@ -916,7 +916,7 @@ from chain where chainID = '${chainID}' limit 1`);
         const bigqueryClient = this.get_big_query();
         const options = {
             query: sqlQuery,
-            location: (targetBQLocation)? targetBQLocation : this.defaultBQLocation,
+            location: (targetBQLocation) ? targetBQLocation : this.defaultBQLocation,
         };
 
         try {

@@ -1521,7 +1521,7 @@ function parseAbiSignature(abiStrArr) {
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
             let abiStr = JSON.stringify([e])
             output.push({
-                stateMutability: (stateMutability)? stateMutability: null,
+                stateMutability: (stateMutability) ? stateMutability : null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
                 secondaryID: secondaryID,
@@ -2788,10 +2788,10 @@ function computeTableIDFromFingerprintIDAndName(fingerprintID = '0x783cca1c0412d
     let tableId = false
     let typ = null
     let pieces = fingerprintID.split('-')
-    if (fingerprintID.length == '79'){
+    if (fingerprintID.length == '79') {
         typ = 'evt'
         tableId = `${typ}_${name}_${pieces[0]}_${pieces[1]}`
-    }else if (fingerprintID.length == '21'){
+    } else if (fingerprintID.length == '21') {
         typ = 'call'
         tableId = `${typ}_${name}_${pieces[0]}`
     }
@@ -2803,10 +2803,10 @@ function computeModifiedFingerprintID(fingerprintID = '0x783cca1c0412dd0d695e784
     let modifiedFingerprintID = false
     let typ = null
     let pieces = fingerprintID.split('-')
-    if (fingerprintID.length == '79'){
+    if (fingerprintID.length == '79') {
         typ = 'evt'
         modifiedFingerprintID = `${pieces[0]}_${pieces[1]}`
-    }else if (fingerprintID.length == '21'){
+    } else if (fingerprintID.length == '21') {
         typ = 'call'
         modifiedFingerprintID = `${pieces[0]}`
     }
