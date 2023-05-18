@@ -299,15 +299,18 @@ module.exports = class EVMETL extends PolkaholicDB {
         await this.create_dataset(datasetID)
         let isAggregate = (projectInfo.isAggregate) ? true : false
         let targetContractAddress = (!isAggregate) ? projectInfo.address : null
-
         let viewCmds = []
         let historyTblCmds = []
+        let externalViewCmds = []
         for (const eventKey of Object.keys(eventMap)) {
             let eventTableInfo = eventMap[eventKey]
             if (projectInfo.projectName) {
-                let [viewCmd, historyTblCmd] = await this.createProjectContractViewAndHistory(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+                let [viewCmd, externalViewCmd, historyTblCmd] = await this.createProjectContractViewAndHistory(eventTableInfo, targetContractAddress, isAggregate, datasetID)
                 if (viewCmd) {
                     viewCmds.push(viewCmd)
+                }
+                if (externalViewCmd) {
+                    externalViewCmds.push(externalViewCmd)
                 }
                 if (historyTblCmd){
                     historyTblCmds.push(historyTblCmd)
@@ -318,9 +321,12 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const callKey of Object.keys(callMap)) {
             let callTableInfo = callMap[callKey]
             if (projectInfo.projectName) {
-                let [viewCmd, historyTblCmd] = await this.createProjectContractViewAndHistory(callTableInfo, targetContractAddress, isAggregate, datasetID)
+                let [viewCmd, externalViewCmd, historyTblCmd] = await this.createProjectContractViewAndHistory(callTableInfo, targetContractAddress, isAggregate, datasetID)
                 if (viewCmd) {
                     viewCmds.push(viewCmd)
+                }
+                if (externalViewCmd) {
+                    externalViewCmds.push(externalViewCmd)
                 }
                 if (historyTblCmd){
                     historyTblCmds.push(historyTblCmd)
@@ -339,9 +345,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                 console.log(`${e.toString()}`)
             }
         }
-        for (const cmd of historyTblCmds) {
+        for (const cmd of externalViewCmds) {
             console.log(cmd);
-            /*
             try {
                 let res = await exec(cmd, {
                     maxBuffer: 1024 * 64000
@@ -350,7 +355,17 @@ module.exports = class EVMETL extends PolkaholicDB {
             } catch (e) {
                 console.log(`${e.toString()}`)
             }
-            */
+        }
+        for (const cmd of historyTblCmds) {
+            console.log(cmd);
+            try {
+                let res = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`res`, res)
+            } catch (e) {
+                console.log(`${e.toString()}`)
+            }
         }
     }
 
@@ -633,16 +648,24 @@ module.exports = class EVMETL extends PolkaholicDB {
         let subTblHistoryCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) < current_date() ${condFilter})`
         let subTblHistory = `${subTblHistoryCore} select ${fldStr} from dev`
         subTblHistory = paraTool.removeNewLine(subTblHistory)
-        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${this.evmProjectID} --time_partitioning_field ${universalTimePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
+        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${bqProjectID} --time_partitioning_field=${universalTimePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
         console.log(subTblHistoryCmd)
 
         //building view (currDay)
-        let subViewCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
-        let sqlView = `${subViewCore} select ${fldStr} from dev`
-        sqlView = paraTool.removeNewLine(sqlView)
-        let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sqlView}' ${datasetID}.${tableInfo.etlTableId} `
-        console.log(sqlViewCmd)
-        return [sqlViewCmd, subTblHistoryCmd]
+        let subCurrDayViewTbl = `${datasetID}.${tableInfo.etlTableId}`
+        let subCurrDayViewCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
+        let subCurrDayView = `${subCurrDayViewCore} select ${fldStr} from dev`
+        subCurrDayView = paraTool.removeNewLine(subCurrDayView)
+        let subCurrDayViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${subCurrDayView}' ${subCurrDayViewTbl} `
+        console.log(subCurrDayViewCmd)
+
+        //build external view history + currDay
+        let subExternalViewTbl = `${datasetID}.${tableInfo.etlTableId}_external`
+        let subExternalView = `SELECT * FROM \`${bqProjectID}.${destinationHistoryTbl}\` WHERE DATE(block_timestamp) < current_date() UNION ALL SELECT * FROM \`${bqProjectID}.${subCurrDayViewTbl}\` WHERE DATE(block_timestamp) >= current_date()`
+        let subExternalViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${subExternalView}' ${subExternalViewTbl} `
+        console.log(subExternalViewCmd)
+
+        return [subCurrDayViewCmd, subExternalViewCmd, subTblHistoryCmd]
     }
 
 
