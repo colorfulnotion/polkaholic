@@ -2430,7 +2430,7 @@ mysql> desc projectcontractabi;
                 let jsonFN = `/disk1/evmschema/${tableId}.json`
                 let timePartitioningFld = (tableId.substr(0,4) == 'call')? "call_block_time": "evt_block_time"
                 //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
-                let loadCmd = `bq load --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
+                let loadCmd = `bq load --nosynchronous_mode --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
                 loadCmds.push(loadCmd)
                 let jobInfo = {
                     evmDatasetID: evmDatasetID,
