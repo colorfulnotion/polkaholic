@@ -102,6 +102,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     evmFingerprintMap = {}; //by fingerprintID
     evmDatasetID = "evm_dev"; /*** FOR DEVELOPMENT: change to evm_test ***/
     evmBQLocation = "us";
+    evmProjectID = "substrate-etl"
 
     async getStorageAt(storageSlot, address, chainID = 1) {
         console.log("getStorageAt", storageSlot, address, chainID);
@@ -304,7 +305,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const eventKey of Object.keys(eventMap)) {
             let eventTableInfo = eventMap[eventKey]
             if (projectInfo.projectName) {
-                let [viewCmd, historyTblCmd] = await this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+                let [viewCmd, historyTblCmd] = await this.createProjectContractViewAndHistory(eventTableInfo, targetContractAddress, isAggregate, datasetID)
                 if (viewCmd) {
                     viewCmds.push(viewCmd)
                 }
@@ -317,7 +318,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const callKey of Object.keys(callMap)) {
             let callTableInfo = callMap[callKey]
             if (projectInfo.projectName) {
-                let [viewCmd, historyTblCmd] = await this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
+                let [viewCmd, historyTblCmd] = await this.createProjectContractViewAndHistory(callTableInfo, targetContractAddress, isAggregate, datasetID)
                 if (viewCmd) {
                     viewCmds.push(viewCmd)
                 }
@@ -548,7 +549,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
     */
 
-    async createProjectContractView(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap') {
+    async createProjectContractViewAndHistory(tableInfo, contractAddress = "0x1f98431c8ad98523631ae4a59f267346ea31f984", isAggregate = false, datasetID = 'ethereum_uniswap') {
         const bigquery = this.get_big_query();
         let bqProjectID = `substrate-etl`
         let bqDataset = `${this.evmDatasetID}`
@@ -622,19 +623,23 @@ module.exports = class EVMETL extends PolkaholicDB {
         if (!isAggregate) {
             condFilter = `and Lower(contract_address) = "${contractAddress}"`
         }
-        let subTbl = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
-        let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
 
         //let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
         //TODO: replace only a partitioned day instead of the entire table
-        let destinationHistoryTbl = `${datasetID}.${tableInfo.etlTableId}_history`
-        let subTblHistory = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) < current_date() ${condFilter})`
-        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${this.project} --time_partitioning_field ${timePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
 
-        //building view
-        let sql = `${subTbl} select ${fldStr} from dev`
-        sql = paraTool.removeNewLine(sql)
-        let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
+        //building view (past)
+        let destinationHistoryTbl = `${datasetID}.${tableInfo.etlTableId}_history`
+        let subTblHistoryCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) < current_date() ${condFilter})`
+        let subTblHistory = `${subTblHistoryCore} select ${fldStr} from dev`
+        subTblHistory = paraTool.removeNewLine(subTblHistory)
+        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${this.evmProjectID} --time_partitioning_field ${timePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
+        console.log(subTblHistoryCmd)
+
+        //building view (currDay)
+        let subViewCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
+        let sqlView = `${subViewCore} select ${fldStr} from dev`
+        sqlView = paraTool.removeNewLine(sqlView)
+        let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sqlView}' ${datasetID}.${tableInfo.etlTableId} `
         console.log(sqlViewCmd)
         return [sqlViewCmd, subTblHistoryCmd]
     }
