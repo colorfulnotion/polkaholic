@@ -345,7 +345,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                 console.log(`${e.toString()}`)
             }
         }
-        for (const cmd of externalViewCmds) {
+
+        for (const cmd of historyTblCmds) {
             console.log(cmd);
             try {
                 let res = await exec(cmd, {
@@ -356,7 +357,8 @@ module.exports = class EVMETL extends PolkaholicDB {
                 console.log(`${e.toString()}`)
             }
         }
-        for (const cmd of historyTblCmds) {
+
+        for (const cmd of externalViewCmds) {
             console.log(cmd);
             try {
                 let res = await exec(cmd, {
@@ -648,7 +650,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         let subTblHistoryCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) < current_date() ${condFilter})`
         let subTblHistory = `${subTblHistoryCore} select ${fldStr} from dev`
         subTblHistory = paraTool.removeNewLine(subTblHistory)
-        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${bqProjectID} --time_partitioning_field=${universalTimePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
+        let subTblHistoryCmd = `bq query --quiet --destination_table '${destinationHistoryTbl}' --project_id=${bqProjectID} --time_partitioning_field=${universalTimePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
         console.log(subTblHistoryCmd)
 
         //building view (currDay)
@@ -656,13 +658,13 @@ module.exports = class EVMETL extends PolkaholicDB {
         let subCurrDayViewCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
         let subCurrDayView = `${subCurrDayViewCore} select ${fldStr} from dev`
         subCurrDayView = paraTool.removeNewLine(subCurrDayView)
-        let subCurrDayViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${subCurrDayView}' ${subCurrDayViewTbl} `
+        let subCurrDayViewCmd = `bq mk --quiet --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${subCurrDayView}' ${subCurrDayViewTbl} `
         console.log(subCurrDayViewCmd)
 
         //build external view history + currDay
         let subExternalViewTbl = `${datasetID}.${tableInfo.etlTableId}_external`
         let subExternalView = `SELECT * FROM \`${bqProjectID}.${destinationHistoryTbl}\` WHERE DATE(block_timestamp) < current_date() UNION ALL SELECT * FROM \`${bqProjectID}.${subCurrDayViewTbl}\` WHERE DATE(block_timestamp) >= current_date()`
-        let subExternalViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${subExternalView}' ${subExternalViewTbl} `
+        let subExternalViewCmd = `bq mk --quiet --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${subExternalView}' ${subExternalViewTbl} `
         console.log(subExternalViewCmd)
 
         return [subCurrDayViewCmd, subExternalViewCmd, subTblHistoryCmd]
