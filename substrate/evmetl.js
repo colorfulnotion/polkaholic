@@ -628,11 +628,12 @@ module.exports = class EVMETL extends PolkaholicDB {
         //TODO: replace only a partitioned day instead of the entire table
 
         //building view (past)
+        let universalTimePartitionField = "block_timestamp" // project table use 'universalTimePartitionField', which is different than dune compatible style
         let destinationHistoryTbl = `${datasetID}.${tableInfo.etlTableId}_history`
         let subTblHistoryCore = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) < current_date() ${condFilter})`
         let subTblHistory = `${subTblHistoryCore} select ${fldStr} from dev`
         subTblHistory = paraTool.removeNewLine(subTblHistory)
-        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${this.evmProjectID} --time_partitioning_field ${timePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
+        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${this.evmProjectID} --time_partitioning_field ${universalTimePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
         console.log(subTblHistoryCmd)
 
         //building view (currDay)
