@@ -300,12 +300,16 @@ module.exports = class EVMETL extends PolkaholicDB {
         let targetContractAddress = (!isAggregate) ? projectInfo.address : null
 
         let viewCmds = []
+        let historyTblCmds = []
         for (const eventKey of Object.keys(eventMap)) {
             let eventTableInfo = eventMap[eventKey]
             if (projectInfo.projectName) {
-                let viewCmd = await this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
+                let [viewCmd, historyTblCmd] = await this.createProjectContractView(eventTableInfo, targetContractAddress, isAggregate, datasetID)
                 if (viewCmd) {
                     viewCmds.push(viewCmd)
+                }
+                if (historyTblCmd){
+                    historyTblCmds.push(historyTblCmd)
                 }
             }
         }
@@ -313,9 +317,12 @@ module.exports = class EVMETL extends PolkaholicDB {
         for (const callKey of Object.keys(callMap)) {
             let callTableInfo = callMap[callKey]
             if (projectInfo.projectName) {
-                let viewCmd = await this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
+                let [viewCmd, historyTblCmd] = await this.createProjectContractView(callTableInfo, targetContractAddress, isAggregate, datasetID)
                 if (viewCmd) {
                     viewCmds.push(viewCmd)
+                }
+                if (historyTblCmd){
+                    historyTblCmds.push(historyTblCmd)
                 }
             }
         }
@@ -330,6 +337,19 @@ module.exports = class EVMETL extends PolkaholicDB {
             } catch (e) {
                 console.log(`${e.toString()}`)
             }
+        }
+        for (const cmd of historyTblCmds) {
+            console.log(cmd);
+            /*
+            try {
+                let res = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`res`, res)
+            } catch (e) {
+                console.log(`${e.toString()}`)
+            }
+            */
         }
     }
 
@@ -603,12 +623,20 @@ module.exports = class EVMETL extends PolkaholicDB {
             condFilter = `and Lower(contract_address) = "${contractAddress}"`
         }
         let subTbl = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) = current_date() ${condFilter})`
+        let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
+
+        //let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
+        //TODO: replace only a partitioned day instead of the entire table
+        let destinationHistoryTbl = `${datasetID}.${tableInfo.etlTableId}_history`
+        let subTblHistory = `with dev as (SELECT * FROM \`${bqProjectID}.${bqDataset}.${tableInfo.devTabelId}\` WHERE DATE(${timePartitionField}) < current_date() ${condFilter})`
+        let subTblHistoryCmd = `bq query --destination_table '${destinationHistoryTbl}' --project_id=${this.project} --time_partitioning_field ${timePartitionField} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(subTblHistory)}'`;
+
         //building view
         let sql = `${subTbl} select ${fldStr} from dev`
         sql = paraTool.removeNewLine(sql)
         let sqlViewCmd = `bq mk --project_id=${bqProjectID} --use_legacy_sql=false --expiration 0  --description "${datasetID} ${tableInfo.name} -- ${tableInfo.signature}"  --view  '${sql}' ${datasetID}.${tableInfo.etlTableId} `
         console.log(sqlViewCmd)
-        return sqlViewCmd
+        return [sqlViewCmd, subTblHistoryCmd]
     }
 
 
