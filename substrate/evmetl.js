@@ -371,6 +371,36 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
+    async createDatasetSchema(datasetId = 'evm_dev', projectID = 'substrate-etl'){
+        let description = `Table Schema for Dataset ${projectID}.${datasetId}`;
+        let schemaTbl = `${datasetId}.datasetSchema`;
+        let sql = `WITH schemaInfo AS (
+            SELECT
+              table_name AS table_id,
+              "[" || STRING_AGG("{\\\"mode\\\": \\\"" || (CASE
+                    WHEN is_nullable = "YES" THEN "NULLABLE"
+                   ELSE
+                  "REQUIRED"
+                END
+                  ) || "\\\", \\\"name\\\": \\\"" || column_name || "\\\", \\\"type\\\": \\\"" || data_type || "\\\"}", ",") || "]" AS table_schema
+            FROM
+              \`${projectID}.${datasetId}\`.INFORMATION_SCHEMA.COLUMNS
+            WHERE table_name LIKE "%"
+            GROUP BY
+              table_id
+            ORDER BY
+              table_id)
+            SELECT * from schemaInfo`;
+        sql = paraTool.removeNewLine(sql)
+        let cmd = `bq mk --quiet --project_id=${projectID} --use_legacy_sql=false --expiration 0  --description "${description}"  --view  '${sql}' ${schemaTbl}`;
+        console.log(cmd);
+        let {
+            stdout,
+            stderr
+        } = await exec(cmd);
+        console.log(stdout, stderr);
+    }
+
     getTableIDFromFingerprintID(fingerprintID, to_address = null) {
         let tableID = null;
         let subTableIDInfo = null;
