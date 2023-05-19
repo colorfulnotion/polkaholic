@@ -317,7 +317,7 @@ module.exports = class SubstrateETL extends AssetManager {
     get_relayChain_dataset(relayChain, isProd = true) {
 	return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
     }
-    
+
     async publishExchangeAddress() {
         //await this.ingestSystemAddress()
         //await this.ingestWalletAttribution()
@@ -326,7 +326,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbl = `knownpubs`
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd)
-        
+
         //let sql = `select nickname, accountName, address from account where is_exchange = 1`
         let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
         let sqlRecs = await this.poolREADONLY.query(sql);
@@ -4062,6 +4062,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let transfers = [];
                 let evmtxs = [];
                 let evmtransfers = [];
+
+                //MK: evmtxs and evmtransfers generated here. consider to skip
                 if (r.evmFullBlock) {
                     let gWei = 10 ** 9
                     let ether = 10 ** 18

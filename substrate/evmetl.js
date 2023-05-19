@@ -372,11 +372,13 @@ module.exports = class EVMETL extends PolkaholicDB {
     }
 
     async createDatasetSchema(datasetId = 'evm_dev', projectID = 'substrate-etl'){
-        let description = `Table Schema for Dataset ${projectID}.${datasetId}`;
-        let schemaTbl = `${datasetId}.datasetSchema`;
+        let description = `Table Schema for the Dataset: ${datasetId}.\n\n'AAA' in 'aaa_tableschema' stands for 'All About Accessibility' - it is designed to appear as the first result in your search, ensuring easy access to crucial information such as {table_id, time_partitioning_field, table_cols, table_schema}. For a quick overview of the available tables/views within the ${datasetId} dataset, please query this view.`;
+        let schemaTbl = `${datasetId}.aaa_tableschema`;
         let sql = `WITH schemaInfo AS (
             SELECT
               table_name AS table_id,
+              MAX(IF(IS_PARTITIONING_COLUMN="YES", column_name, NULL)) AS time_partitioning_field,
+              ARRAY_AGG(column_name) AS table_cols,
               "[" || STRING_AGG("{\\\"mode\\\": \\\"" || (CASE
                     WHEN is_nullable = "YES" THEN "NULLABLE"
                    ELSE
