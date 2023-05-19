@@ -2069,9 +2069,9 @@ mysql> desc projectcontractabi;
             let destinationTbl = `crypto_ethereum.${tbl}$${logYYYYMMDD}`
             let partitionedFld = t.ts;
             let targetSQL = t.sql;
-            let bqCmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
+            let bqCmd = `bq query --quiet --format=sparse --max_rows=3 --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
             //bqCmd = `bq mk --project_id=substrate-etl  --time_partitioning_field ${partitionedFld} --schema schema/substrateetl/evm/${tbl}.json ${destinationTbl}`
-            let gsCmd = `bq query --use_legacy_sql=false '${paraTool.removeNewLine(t["gs"])}'`
+            let gsCmd = `bq query --quiet --format=sparse --max_rows=3 --use_legacy_sql=false '${paraTool.removeNewLine(t["gs"])}'`
             //console.log(gsCmd, '\n')
             bqCmds.push(bqCmd)
             gsCmds.push(gsCmd)
