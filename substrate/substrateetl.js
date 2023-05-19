@@ -117,7 +117,7 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers", "calls"] //MK - TODO: remove "evmtxs", "evmtransfers". Add "calls"
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
@@ -3957,7 +3957,12 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let chain = await this.getChain(chainID);
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
+        let id = this.getIDByChainID(chainID);
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back, TODO: add calls?
+        let processCalls = false
+        if (processCalls){
+            tbls.push("calls")
+        }
         console.log(`dump_substrateetl paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID}), tbls=${tbls}`)
         if (chain.isEVM) {
             tbls.push("evmtxs");
@@ -4184,6 +4189,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let events = [];
 
                 let extrinsics = [];
+                let calls = [];
                 for (const ext of b.extrinsics) {
                     for (const ev of ext.events) {
                         let [dEvent, isTransferType] = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
@@ -4264,7 +4270,60 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     }
                     //console.log(`bqExtrinsic`, bqExtrinsic)
                     extrinsics.push(bqExtrinsic);
+                    if (processCalls){
+                        let flattenedCalls = await this.paramToCalls(ext.extrinsicID, ext.section, ext.method, ext.callIndex, ext.params, ext.paramsDef, chainID, block.block_time, '0')
+                        for (const call of flattenedCalls) {
+                            let ext_fee = null
+                            let ext_fee_usd = null
+                            let ext_weight = null
+                            let call_root = (call.root != undefined) ? call.root : null
+                            let call_leaf = (call.leaf != undefined) ? call.leaf : null
+                            if (call_root) {
+                                //only store fee, fee_usd, weight at root
+                                ext_fee = ext.fee
+                                ext_fee_usd = feeUSD
+                                ext_weight = (ext.weight != undefined) ? ext.weight : null // TODO: ext.weight
+                            }
+                            let bqExtrinsicCall = {
+                                relay_chain: relayChain,
+                                para_id: paraID,
+                                id: id,
+                                block_hash: block.hash,
+                                block_number: block.number,
+                                block_time: block.block_time,
+                                extrinsic_hash: ext.extrinsicHash,
+                                extrinsic_id: ext.extrinsicID,
+                                lifetime: JSON.stringify(ext.lifetime),
+                                extrinsic_section: ext.section,
+                                extrinsic_method: ext.method,
+                                call_id: call.id,
+                                call_index: call.index,
+                                call_section: call.section,
+                                call_method: call.method,
+                                call_args: JSON.stringify(call.args),
+                                call_args_def: JSON.stringify(call.argsDef),
+                                root: call_root,
+                                leaf: call_leaf,
+                                fee: ext_fee,
+                                fee_usd: ext_fee_usd,
+                                //amounts: null
+                                //amount_usd: null,
+                                weight: ext_weight,
+                                signed: ext.signer ? true : false,
+                                signer_ss58: ext.signer ? ext.signer : null,
+                                signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
+                            }
+                            if (this.suppress_call(id, call.section, call.method)) {
+                                //console.log(`${bqExtrinsicCall.extrinsic_hash} ${bqExtrinsicCall.call_id} [${call.section}:${call.method}] SUPPRESSED`)
+                            } else {
+                                //let t = this.generate_call_rows(bqExtrinsicCall);
+                                //console.log(`${bqExtrinsicCall.extrinsic_hash} ${bqExtrinsicCall.call_id} [${call.section}:${call.method}] ADDED`)
+                                calls.push(bqExtrinsicCall)
+                            }
+                        }
+                    }
                 }
+
                 let log_count = 0;
                 let logs = hdr.digest.logs.map((l) => {
                     let logID = `${block.number}-${log_count}`
@@ -4288,6 +4347,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         fs.writeSync(f["events"], JSON.stringify(e) + NL);
                     });
                 }
+
                 // write extrinsics
                 if (block.extrinsic_count > 0) {
                     extrinsics.forEach((e) => {
@@ -4299,6 +4359,18 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         }
                     });
                 }
+
+                // write calls
+                if (calls.length > 0 && processCalls) {
+                    calls.forEach((c) => {
+                        if (typeof c.call_section == "string" && typeof c.call_method == "string") {
+                            fs.writeSync(f["calls"], JSON.stringify(c) + NL);
+                        } else {
+                            console.log(`++c`, c)
+                        }
+                    });
+                }
+
                 // write transfers
                 if (transfers.length > 0) {
                     transfers.forEach((t) => {

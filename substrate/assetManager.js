@@ -3120,6 +3120,7 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     suppress_call(id, section, method) {
+        //console.log(`id=${id}, section=${section} method=${method}`)
         if (id == "nodle" && section == "allocations") {
             return (true);
         }
