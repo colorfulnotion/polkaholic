@@ -1500,46 +1500,32 @@ mysql> desc projectcontractabi;
         return lines;
     }
 
-    // sets up evm chain tables
+    // sets up evm chain tables for substrate chain
     async setup_chain_evm(chainID = null, isUpdate = false, execute = false) {
-        let projectID = `${this.project}`
+        let projectID = "substrate-etl";
         let opType = (isUpdate) ? 'update' : 'mk'
         let relayChain = "evm"
-
+        if (chainID == undefined){
+            console.log(`ERROR: chainID not specified`)
+            process.exit(1, "ERROR: chainID not specified")
+        }
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "logs", "token_transfers", "tokens", "traces", "transactions"]
-        let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
-        let sql = `select chainID, isEVM from chain where ( isEVM =1 or relayChain in ('ethereum', 'evm') ) ${p} order by chainID`
+        let tbls = ["blocks", "contracts", "logs", "token_transfers", "tokens", "traces", "transactions"]
+        let sql = `select chainID, isEVM, id from chain where ( isEVM =1 or relayChain in ('ethereum', 'evm') ) and chainID = ${chainID} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         console.log(`***** setup "chain" tables:${tbls} (chainID=${chainID}) ******`)
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
-            let evmChainID = chainID;
-            if (chainID == 2004 || chainID == 2002 || chainD == 2006 || chainID == 22023 || chainID == 22007) {
-                switch (chainID) {
-                    case 2000:
-                        evmChainID = 787;
-                        break;
-                    case 2002:
-                        evmChainID = 1024;
-                        break;
-                    case 2004:
-                        evmChainID = 1284;
-                        break;
-                    case 2006:
-                        evmChainID = 592;
-                        break;
-                    case 22000:
-                        evmChainID = 686;
-                        break;
-                    case 22023:
-                        evmChainID = 1285
-                        break;
-                    case 22007:
-                        evmChainID = 336;
-                }
+            let id = rec.id
+            if (id == undefined){
+                console.log(`ERROR: chain's id not specified`)
+                process.exit(1, "ERROR: chain's id not specified")
             }
-            let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to evm_dev for dev
+            //let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to evm_dev for dev
+            let bqDataset = `crypto_${id}`
+            let cmds = []
+            let dataSetCmd = `bq --location=${this.evmBQLocation} mk --dataset --description="Dataset for ${bqDataset}" ${projectID}:${bqDataset}`
+            cmds.push(dataSetCmd)
             for (const tbl of tbls) {
                 let fld = null;
                 switch (tbl) {
@@ -1556,13 +1542,15 @@ mysql> desc projectcontractabi;
                         break;
                 }
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}${evmChainID}`
+                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
+                cmds.push(cmd)
+
+            }
+            for (const cmd of cmds){
+                console.log(cmd);
                 try {
-                    if (cmd) {
-                        console.log(cmd);
-                        if (execute) {
-                            // await exec(cmd);
-                        }
+                    if (execute) {
+                        // await exec(cmd);
                     }
                 } catch (e) {
                     console.log(e);
@@ -1982,13 +1970,15 @@ mysql> desc projectcontractabi;
             case 1:
                 srcprojectID = "bigquery-public-data";
                 srcdataset = "crypto_ethereum";
+                id = 'ethereum';
                 break;
             case 137:
                 srcprojectID = "public-data-finance";
                 srcdataset = "crypto_polygon";
+                id = 'polygon';
                 break;
         }
-
+        console.log(`chainID=${chainID}, srcprojectID=${srcprojectID}, srcdataset=${srcdataset}, uri=gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/`)
         let tables = {
             "blocks": {
                 "ts": "timestamp",
@@ -2066,7 +2056,7 @@ mysql> desc projectcontractabi;
         for (const tbl of Object.keys(tables)) {
             let t = tables[tbl];
             //let [logTS, logYYYYMMDD, currDT, prevDT] = this.getAllTimeFormat(dt)
-            let destinationTbl = `crypto_ethereum.${tbl}$${logYYYYMMDD}`
+            let destinationTbl = `crypto_${id}.${tbl}$${logYYYYMMDD}`
             let partitionedFld = t.ts;
             let targetSQL = t.sql;
             let bqCmd = `bq query --quiet --format=sparse --max_rows=3 --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace --location=us --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
@@ -2091,8 +2081,8 @@ mysql> desc projectcontractabi;
                 // TODO optimization: do not create twice
             }
         }
-        await this.batchExec(bqCmds)
-        await this.batchExec(gsCmds)
+        //await this.batchExec(bqCmds)
+        //await this.batchExec(gsCmds)
     }
 
     async countLinesInFiles(pattern) {
