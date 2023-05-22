@@ -8299,7 +8299,7 @@ module.exports = class Indexer extends AssetManager {
 
 
     // given a row r fetched with "build_evm_block_from_row", processes the block, events + trace
-    async index_evm_chain_block_row(r, write_bq_log = false) {
+    async index_evm_chain_block_row(r, write_bq_log = false, mode = 'store_stream_evm') {
         //console.log('index_evm_chain_block_row', JSON.stringify(r))
 
         let contractABIs = this.contractABIs;
@@ -8336,7 +8336,11 @@ module.exports = class Indexer extends AssetManager {
         ])
         let [dTxns, dReceipts] = await statusesPromise
         //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
-        await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        if (mode == "store_stream_evm"){
+            await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        }else if (mode == "stream_evm"){
+            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        }
         return r;
     }
 
@@ -9407,6 +9411,22 @@ module.exports = class Indexer extends AssetManager {
         let evm_chain_id = chainID
         let evm_blk_num = block.number
         let blockTS = block.timestamp
+        let blockMicroTS = blockTS * 1000000
+        let blockHash = block.hash
+        let cres = {
+            key: paraTool.blockNumberToHex(evm_blk_num),
+            data: {
+                /*
+                blocks: {},
+                logs: {},
+                token_transfers: {},
+                traces: {},
+                transactions: {},
+                contracts: {},
+                */
+            }
+        }
+
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -9432,6 +9452,7 @@ module.exports = class Indexer extends AssetManager {
                 transaction_count: block.transactions.length
             }
         }
+
         //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
 
@@ -9636,6 +9657,51 @@ module.exports = class Indexer extends AssetManager {
             await this.process_evm_flush(blockTS)
         }
 
+
+        // store into bt
+        try {
+            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "traces"]
+            for (const tbl of tables) {
+                let rows = null
+                cres.data[tbl] = {}
+                switch (tbl) {
+                    case "blocks":
+                        cres.data[tbl][blockHash] = {
+                            value: JSON.stringify(rows_blocks[0].json),
+                            timestamp: blockMicroTS
+                        };
+                        break;
+                    case "transactions":
+                        let raw_transactions = [];
+                        for (const transaction of rows_transactions){
+                            raw_transactions.push(transaction.json)
+                        }
+                        cres.data[tbl][blockHash] = {
+                            value: JSON.stringify(raw_transactions),
+                            timestamp: blockMicroTS
+                        };
+                        //console.log(`transactions`, rows_transactions)
+                        break;
+                    case "logs":
+                        let raw_logs = [];
+                        for (const log of rows_logs){
+                            raw_logs.push(log.json)
+                        }
+                        cres.data[tbl][blockHash] = {
+                            value: JSON.stringify(raw_logs),
+                            timestamp: blockMicroTS
+                        };
+                        //console.log(`log`, rows_logs)
+                        break;
+                }
+                console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
+            }
+        } catch (e){
+            console.log(`bt error`, e)
+            cres = false
+        }
+
+
         // stream into blocks, transactions
         try {
             let dataset = "evm";
@@ -9756,7 +9822,18 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         }
+
+        let tbl = this.instance.table("evmchain" + chainID);
+        if (cres){
+            try {
+                console.log(`update bt evmchain${chainID}`, cres)
+                await this.insertBTRows(tbl, [cres], "evmchain");
+            } catch (e) {
+                console.log(`load err`, e);
+            }
+        }
     }
+
     // create table streamingerror (tableId varchar(128), op varchar(128), streamObject mediumblob, streamingError blob, lastErrorDT date, numErrors int default 0, primary key (tableId, op) )
     async log_streaming_error(tableId, op, json_object, streamingError, chainID, blockNumber) {
         try {
@@ -10053,6 +10130,35 @@ module.exports = class Indexer extends AssetManager {
 
     }
 
+    async index_block_evm_from_bt(chainID, blkNum){
+        let families = ["blocks", "logs", "traces", "transactions"]
+        let startTS = new Date().getTime();
+        const evmTableChain = this.getEvmTableChain(chainID);
+        let blkBNHex = paraTool.blockNumberToHex(blkNum);
+        let [rows] = await evmTableChain.getRows({
+            start: blkBNHex,
+            end: blkBNHex,
+            cellLimit: 1,
+            family: families
+        });
+
+        if (rows.length == 1){
+            try {
+                await this.setupEvm(chainID)
+                let row = rows[0];
+                console.log(`Using BT Rec`, row)
+                let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                //console.log(`rRow`, rRow)
+                let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
+                return r
+            } catch (err) {
+                console.log(err)
+                //this.log_indexing_error(err, `index_blocks_period`);
+            }
+        }
+        return false
+    }
+
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
@@ -10114,7 +10220,7 @@ module.exports = class Indexer extends AssetManager {
         let log_retry_ms = 2000
         let log_timeout_ms = 5000
 
-        let qnSupportedChainIDs = [paraTool.chainIDEthereum, paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
         let res = false
         if (qnSupportedChainIDs.includes(chainID)) {
             res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)

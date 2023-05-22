@@ -2071,11 +2071,9 @@ mysql> desc projectcontractabi;
         for (const cmd of cmds){
             try {
                 console.log(cmd, `\n`)
-                /*
                 await exec(cmd, {
                     maxBuffer: 1024 * 50000
                 });
-                */
             } catch (e) {
                 console.log(e);
                 // TODO optimization: do not create twice
@@ -2211,6 +2209,29 @@ mysql> desc projectcontractabi;
       }
     }
 
+    async processTablePartition(blocksMap, dirPath, tbl, fnType = "blocks") {
+        let path = `${dirPath}${fnType}_*`
+        let filepaths = glob.sync(path).sort();
+        console.log(`processTable filepaths`, filepaths)
+        let prevIncompleteBlkRecordsMaps = false
+        let currIncompleteBlkRecordsMaps = false
+        for (const fn of filepaths){
+            prevIncompleteBlkRecordsMaps = currIncompleteBlkRecordsMaps
+            /*
+            if (tblRec && tblRec.incompleteBlkRecordsMaps != undefined){
+                prevIncompleteBlkRecordsMaps = tblRec.incompleteBlkRecordsMaps
+            }
+            */
+            let tblRecs = await this.parseJSONL(fn, prevIncompleteBlkRecordsMaps)
+            currIncompleteBlkRecordsMaps = tblRecs.incompleteBlkRecordsMaps
+            console.log(`tblRec`, tblRecs)
+            //await this.loadTableRecs(blocksMap, tblRecs.blkRecordsMaps, tbl, fnType, fn)
+        }
+        if (currIncompleteBlkRecordsMaps){
+            //await this.loadTableRecs(blocksMap, currIncompleteBlkRecordsMaps, tbl, fnType, "Remaining")
+        }
+    }
+
     async processTable(blocksMap, dirPath, tbl, fnType = "blocks") {
         let path = `${dirPath}${fnType}_*`
         let filepaths = glob.sync(path).sort();
@@ -2335,6 +2356,48 @@ mysql> desc projectcontractabi;
         return blocksInfo
     }
 
+    async backfillpartition(dt, chainID, id = "ethereum") {
+        let projectID = "substrate-etl";
+        let dataset = null;
+        switch (chainID) {
+            case 1:
+                dataset = "crypto_ethereum";
+                break;
+            case 137:
+                dataset = "crypto_polygon";
+                break;
+        }
+
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let dirPath = `/disk1/evm/${logYYYY_MM_DD}/${chainID}/`
+        this.createWorkingDir(dirPath)
+
+        try {
+            let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
+            console.log(gsCmd)
+            let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
+            console.log(`res`, res)
+        } catch (e) {
+            console.log(`${e.toString()}`)
+        }
+        let tbl = this.instance.table("evmchain" + chainID);
+        console.log("HI");
+
+
+        let blocksInfo = await this.loadBlocksInfo(dirPath, "blocks")
+        console.log(`blocksInfo`, blocksInfo)
+        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${currDT}', '${blocksInfo.minBN}', '${blocksInfo.maxBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        console.log(`${sql}`)
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+        //process.exit(0)
+
+        let fnTypes = ["blocks", "logs", "traces", "transactions", "contracts", "token_transfers"]
+        //let fnTypes = ["blocks"]
+        for (const fnType of fnTypes){
+            await this.processTable(blocksInfo.blocks, dirPath, tbl, fnType)
+        }
+    }
 
     async backfill(dt, chainID, id = "ethereum") {
         let projectID = "substrate-etl";

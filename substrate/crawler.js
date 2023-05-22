@@ -2288,7 +2288,7 @@ module.exports = class Crawler extends Indexer {
             this.readyToCrawlParachains = true;
         }
         let evmChainList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-            paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDMoonriver, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
             paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
         ]
         if (evmChainList.includes(chainID)) {
