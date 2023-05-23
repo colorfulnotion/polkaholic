@@ -94,9 +94,16 @@ function dechex(number) {
     return parseInt(number, 10).toString(16)
 }
 
-module.exports = class EVMETL extends PolkaholicDB {
-    methodMap = {};
+const STEP0_createRec = 0
+const STEP1_blcp = 1
+const STEP2_backfill = 2
+const STEP3_indexEvmChain = 3
+const STEP4_cpEvmLogToGS = 4
+const STEP5_loadGSEvmRec = 5
 
+module.exports = class EVMETL extends PolkaholicDB {
+
+    methodMap = {};
     evmLocalSchemaMap = {};
     evmSchemaMap = {}; //by tableId
     evmFingerprintMap = {}; //by fingerprintID
@@ -1962,6 +1969,117 @@ mysql> desc projectcontractabi;
         return [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD]
     }
 
+    async getChainStep(dt, chainID){
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let sql = `select chainID, logDT, startBN, endBN, evmStep, evmStepDT from blocklog where chainID = ${chainID} and logDT='${currDT}' limit 1`
+        console.log(sql)
+        let recs = await this.poolREADONLY.query(sql);
+        let jobInfo = {
+            chainID: chainID,
+            logDT: currDT,
+            evmStep: 0,
+            evmStepDT: null
+        }
+        if (recs.length > 0){
+            let rec = recs[0]
+            jobInfo.evmStep = rec.evmStep
+            jobInfo.evmStepDT = `${rec.evmStepDT}`
+        }else{
+            let completedEvmStep = STEP0_createRec
+            let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
+            console.log(`[chainID=${chainID} logDT=${currDT}] Add new tasks\n`, updateSQL)
+            this.batchedSQL.push(updateSQL);
+            await this.update_batchedSQL();
+        }
+        return jobInfo
+    }
+
+    async processChainSteps(dt, chainID){
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let jobInfo = await this.getChainStep(dt, chainID)
+        if (jobInfo.evmStep >= 5){
+            console.log(`[chainID=${chainID} logDT=${currDT}] Already Completed`)
+            process.exit(0)
+        }
+        console.log(`jobInfo`, jobInfo)
+        let currEvmStep = jobInfo.evmStep;
+        let nextEvmStep;
+        let retries = new Array(6).fill(0);
+        do {
+            let currJobInfo = await this.processChainStep(dt, chainID, currEvmStep);
+            nextEvmStep = currJobInfo.evmStep
+            if (currEvmStep === nextEvmStep) {
+                retries[currEvmStep]++;
+                if (retries[currEvmStep] > 2) {
+                    let errorMsg = `Step ${currEvmStep} failed after 2 retries, exiting.`
+                    console.log(errorMsg);
+                    process.exit(1, errorMsg)
+                    break;
+                }
+            } else {
+                currEvmStep = nextEvmStep;
+            }
+        } while (nextEvmStep < 5);
+
+    }
+
+    /* Regnerate One day worth of data
+
+    ./evm-etl blcp -l 2023-05-12
+
+    ./evm-etl backfill -c 1 -l 2023-05-12
+
+    ./evm-etl indexchain -c 1 -l 2023-05-12
+
+    ./evm-etl cpevmlogtogs -c 1 -l 2023-05-12
+
+    ./evm-etl loadevmrec -l 2023-05-12
+
+    const step0_createRec = 0
+    const step1_blcp = 1
+    const step2_backfill = 2
+    const step3_indexEvmChain = 3
+    const step4_cpEvmLogToGS = 4
+    const step5_loadGSEvmRec = 5
+
+    */
+
+    async processChainStep(dt, chainID, currEvmStep){
+        switch (currEvmStep) {
+            case 0:
+                //blcp
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=0, blcp`)
+                await this.blcp(dt, chainID);
+                break;
+            case 1:
+                //backfill
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=1, backfill`)
+                await this.backfill(dt, chainID);
+                break;
+            case 2:
+                //index_evmchain
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=2, index_evmchain`)
+                await this.index_evmchain(chainID, dt);
+                break;
+            case 3:
+                //cp_evm_log_to_gs
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=3, cp_evm_log_to_gs`)
+                await this.cp_evm_log_to_gs(dt, chainID, false);
+                break;
+            case 4:
+                //load_gs_evmrec - this is not chain specific
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=4, load_gs_evmrec`)
+                await this.load_gs_evmrec(dt);
+                break;
+            case 5:
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=5, DONE`)
+                break;
+            default:
+        }
+        let jobInfo = await this.getChainStep(dt, chainID)
+        return jobInfo
+    }
+
     async blcp(dt, chainID, id = "ethereum") {
         let srcprojectID, srcdataset;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
@@ -2068,6 +2186,8 @@ mysql> desc projectcontractabi;
             cmds.push(bqCmd)
             cmds.push(gsCmd)
         }
+        let errCnt = 0
+        /*
         for (const cmd of cmds){
             try {
                 console.log(cmd, `\n`)
@@ -2076,11 +2196,19 @@ mysql> desc projectcontractabi;
                 });
             } catch (e) {
                 console.log(e);
+                errCnt++
                 // TODO optimization: do not create twice
             }
         }
-        //await this.batchExec(bqCmds)
-        //await this.batchExec(gsCmds)
+        */
+        await this.batchExec(bqCmds)
+        await this.batchExec(gsCmds)
+        if (errCnt == 0){
+            let completedEvmStep = STEP1_blcp
+            let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
+            this.batchedSQL.push(updateSQL);
+            await this.update_batchedSQL();
+        }
     }
 
     async countLinesInFiles(pattern) {
@@ -2356,49 +2484,6 @@ mysql> desc projectcontractabi;
         return blocksInfo
     }
 
-    async backfillpartition(dt, chainID, id = "ethereum") {
-        let projectID = "substrate-etl";
-        let dataset = null;
-        switch (chainID) {
-            case 1:
-                dataset = "crypto_ethereum";
-                break;
-            case 137:
-                dataset = "crypto_polygon";
-                break;
-        }
-
-        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
-        let dirPath = `/disk1/evm/${logYYYY_MM_DD}/${chainID}/`
-        this.createWorkingDir(dirPath)
-
-        try {
-            let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
-            console.log(gsCmd)
-            let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
-            console.log(`res`, res)
-        } catch (e) {
-            console.log(`${e.toString()}`)
-        }
-        let tbl = this.instance.table("evmchain" + chainID);
-        console.log("HI");
-
-
-        let blocksInfo = await this.loadBlocksInfo(dirPath, "blocks")
-        console.log(`blocksInfo`, blocksInfo)
-        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${currDT}', '${blocksInfo.minBN}', '${blocksInfo.maxBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
-        console.log(`${sql}`)
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-        //process.exit(0)
-
-        let fnTypes = ["blocks", "logs", "traces", "transactions", "contracts", "token_transfers"]
-        //let fnTypes = ["blocks"]
-        for (const fnType of fnTypes){
-            await this.processTable(blocksInfo.blocks, dirPath, tbl, fnType)
-        }
-    }
-
     async backfill(dt, chainID, id = "ethereum") {
         let projectID = "substrate-etl";
         let dataset = null;
@@ -2414,13 +2499,14 @@ mysql> desc projectcontractabi;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         let dirPath = `/disk1/evm/${logYYYY_MM_DD}/${chainID}/`
         this.createWorkingDir(dirPath)
-
+        let errCnt = 0
         try {
             let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
             console.log(gsCmd)
             let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
             console.log(`res`, res)
         } catch (e) {
+            errCnt++
             console.log(`${e.toString()}`)
         }
         let tbl = this.instance.table("evmchain" + chainID);
@@ -2438,6 +2524,12 @@ mysql> desc projectcontractabi;
         //let fnTypes = ["blocks"]
         for (const fnType of fnTypes){
             await this.processTable(blocksInfo.blocks, dirPath, tbl, fnType)
+        }
+        if (errCnt == 0){
+            let completedEvmStep = STEP2_backfill
+            let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
+            this.batchedSQL.push(updateSQL);
+            await this.update_batchedSQL();
         }
     }
 
@@ -2545,68 +2637,6 @@ mysql> desc projectcontractabi;
                 if (errorStr) {
                     console.log(`errorMsg`, errorStr)
                 }
-            }
-        }
-    }
-
-    async load_gs_evmrec(dt){
-        let project_id = 'substrate-etl'
-        let evmDatasetID = this.evmDatasetID
-
-        await this.initEvmLocalSchemaMap()
-        await this.generateTableSchemaJSON()
-        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
-        let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
-        console.log(`fns`, fns)
-        if (!fns){
-            console.log(`${logYYYY_MM_DD} evmrec not found`)
-            return
-        }
-        let loadCmds = []
-        let loadJobs = []
-        for (const fn of fns){
-            //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
-            let tableId = fn.split('/')[6]
-            let tableInfo = this.evmLocalSchemaMap[tableId]
-            if (tableInfo != undefined){
-                //console.log(`tableId ${tableId} Schema:`, tableInfo.tableSchema)
-                await this.writeTableSchemaJSON(tableId, tableInfo.tableSchema)
-                let jsonFN = `/disk1/evmschema/${tableId}.json`
-                let timePartitioningFld = (tableId.substr(0,4) == 'call')? "call_block_time": "evt_block_time"
-                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
-                let loadCmd = `bq load --nosynchronous_mode --max_bad_records=100 --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
-                loadCmds.push(loadCmd)
-                let jobInfo = {
-                    evmDatasetID: evmDatasetID,
-                    tableIdYYYYMMDD: `${tableId}$${logYYYYMMDD}`,
-                    tableSchema: tableInfo.tableSchema,
-                    timePartitioningFld: timePartitioningFld,
-                    loadPath: `${fn}`,
-                }
-                loadJobs.push(jobInfo)
-            }else{
-                console.log(`tableId ${tableId} missing schema`)
-            }
-        }
-        for (const loadJob of loadJobs){
-            //await this.bqLoadJob(loadJob)
-        }
-        for (const loadCmd of loadCmds){
-            console.log(loadCmd)
-        }
-        let i = 0;
-        let n = 0
-        let batchSize = 50; // safety check
-        let totalLen = loadCmds.length
-        let processedLen = 0
-        while (i < loadCmds.length) {
-            let currBatchLoads = loadCmds.slice(i, i + batchSize);
-            processedLen += currBatchLoads.length
-            console.log(`currBatchLoads#${n} ${processedLen}/${totalLen}`, currBatchLoads)
-            if (currBatchLoads.length > 0) {
-                await this.batchExec(currBatchLoads)
-                i += batchSize;
-                n++
             }
         }
     }
@@ -2750,16 +2780,110 @@ mysql> desc projectcontractabi;
                 "replace": indexlogvals
             });
         }
+
+        let errCnt = 0
+        if (errCnt == 0){
+            let completedEvmStep = STEP3_indexEvmChain
+            let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
+            this.batchedSQL.push(updateSQL);
+            await this.update_batchedSQL();
+        }
     }
 
     //load evmlog to gs
-    async cp_evm_log_to_gs(dt, chainID = 1){
+    async cp_evm_log_to_gs(dt, chainID = 1, dryRun = true){
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         //TODO: can't specify chainID and other filter here..
         let cmd = `gsutil -m cp -r /disk1/evmlog/${logYYYY_MM_DD}/* gs://evmrec/${logYYYY_MM_DD}/`
         console.log(cmd)
+        if (!dryRun){
+            try {
+                let res = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`res`, res)
+            } catch (e) {
+                console.log(`${e.toString()}`)
+                errCnt++
+            }
+            if (errCnt == 0){
+                let completedEvmStep = STEP4_cpEvmLogToGS
+                let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
+                this.batchedSQL.push(updateSQL);
+                await this.update_batchedSQL();
+            }
+        }
     }
 
+    async load_gs_evmrec(dt){
+        let project_id = 'substrate-etl'
+        let evmDatasetID = this.evmDatasetID
+
+        await this.initEvmLocalSchemaMap()
+        await this.generateTableSchemaJSON()
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
+        let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
+        console.log(`fns`, fns)
+        if (!fns){
+            console.log(`${logYYYY_MM_DD} evmrec not found`)
+            return
+        }
+        let loadCmds = []
+        let loadJobs = []
+        for (const fn of fns){
+            //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
+            let tableId = fn.split('/')[6]
+            let tableInfo = this.evmLocalSchemaMap[tableId]
+            if (tableInfo != undefined){
+                //console.log(`tableId ${tableId} Schema:`, tableInfo.tableSchema)
+                await this.writeTableSchemaJSON(tableId, tableInfo.tableSchema)
+                let jsonFN = `/disk1/evmschema/${tableId}.json`
+                let timePartitioningFld = (tableId.substr(0,4) == 'call')? "call_block_time": "evt_block_time"
+                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
+                let loadCmd = `bq load --nosynchronous_mode --max_bad_records=100 --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
+                loadCmds.push(loadCmd)
+                let jobInfo = {
+                    evmDatasetID: evmDatasetID,
+                    tableIdYYYYMMDD: `${tableId}$${logYYYYMMDD}`,
+                    tableSchema: tableInfo.tableSchema,
+                    timePartitioningFld: timePartitioningFld,
+                    loadPath: `${fn}`,
+                }
+                loadJobs.push(jobInfo)
+            }else{
+                console.log(`tableId ${tableId} missing schema`)
+            }
+        }
+        for (const loadJob of loadJobs){
+            //await this.bqLoadJob(loadJob)
+        }
+        for (const loadCmd of loadCmds){
+            console.log(loadCmd)
+        }
+        let i = 0;
+        let n = 0
+        let batchSize = 50; // safety check
+        let totalLen = loadCmds.length
+        let processedLen = 0
+        while (i < loadCmds.length) {
+            let currBatchLoads = loadCmds.slice(i, i + batchSize);
+            processedLen += currBatchLoads.length
+            console.log(`currBatchLoads#${n} ${processedLen}/${totalLen}`, currBatchLoads)
+            if (currBatchLoads.length > 0) {
+                await this.batchExec(currBatchLoads)
+                i += batchSize;
+                n++
+            }
+        }
+
+        let errCnt = 0
+        if (errCnt == 0){
+            let completedEvmStep = STEP5_loadGSEvmRec
+            let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
+            this.batchedSQL.push(updateSQL);
+            await this.update_batchedSQL();
+        }
+    }
 
     async dryrun(query = "SELECT count(`extrinsic_id`) AS `COUNT_extrinsic_id__a7d70` FROM `contracts`.`contractscall` LIMIT 50000") {
         console.log(query);
