@@ -2070,7 +2070,7 @@ mysql> desc projectcontractabi;
             case 4:
                 //load_gs_evmrec - this is not chain specific
                 console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=4, load_gs_evmrec`)
-                await this.load_gs_evmrec(dt);
+                await this.load_gs_evmrec(dt, chainID);
                 break;
             case 5:
                 console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=5, DONE`)
@@ -2817,7 +2817,7 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async load_gs_evmrec(dt){
+    async load_gs_evmrec(dt, chainID = null){
         let project_id = 'substrate-etl'
         let evmDatasetID = this.evmDatasetID
         await this.initEvmLocalSchemaMap()
@@ -2878,8 +2878,7 @@ mysql> desc projectcontractabi;
             }
         }
 
-
-        if (errCnt == 0){
+        if (errCnt == 0 && chainID != null){
             let completedEvmStep = STEP5_loadGSEvmRec
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);
