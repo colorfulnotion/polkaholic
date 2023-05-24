@@ -240,7 +240,7 @@ module.exports = class XCMCleaner extends Query {
                 let std = parseInt(xcmTeleportFees.teleportFeeDecimals_std, 10);
                 if (std == 0) std = avg * .2;
                 let diff = amountSent - (amountReceived + avg);
-
+                if (amountReceived > amountSent) return (0);
                 // ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 sum 1015819382911 83662580 diff -101581937246144970000 avg 83662580 std 19932769 x= -509622806226.8828
                 let x = Math.abs(diff / (std + 1));
                 // ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 avg 83662580 std 19932769 x= -509622806226.8828
@@ -391,7 +391,7 @@ module.exports = class XCMCleaner extends Query {
             let [logDT2, hr2] = paraTool.ts_to_logDT_hr(sourceTS + 86400);
             q = `  or DATE(block_time) = \"${logDT2}\"`;
         }
-        let sqlQuery = `SELECT event_id, extrinsic_id, block_number, section, method, UNIX_SECONDS(block_time) as ts, data FROM \`substrate-etl.${relayChain}.events${paraID}\` WHERE ( DATE(block_time) = \"${logDT}\" ${q} ) and block_time >= TIMESTAMP_SECONDS(${sourceTS}) and block_time < TIMESTAMP_SECONDS(${sourceTS+180}) and section in ("tokens", "balances", "currencies", "assets", "eqBalances")`;
+        let sqlQuery = `SELECT event_id, extrinsic_id, block_number, section, method, UNIX_SECONDS(block_time) as ts, data FROM \`substrate-etl.crypto_${relayChain}.events${paraID}\` WHERE ( DATE(block_time) = \"${logDT}\" ${q} ) and block_time >= TIMESTAMP_SECONDS(${sourceTS}) and block_time < TIMESTAMP_SECONDS(${sourceTS+180}) and section in ("tokens", "balances", "currencies", "assets", "eqBalances")`;
         console.log("substrate-etl search....", sqlQuery);
         // run query, get events matching destAddress
         let rows = this.cachedRows ? this.cachedRows : await this.execute_bqJobFn(sqlQuery);

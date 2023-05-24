@@ -22,6 +22,9 @@ const {
 const {
     BigQuery
 } = require('@google-cloud/bigquery');
+const {
+    Storage
+} = require('@google-cloud/storage');
 const stream = require("stream");
 const paraTool = require("./paraTool.js");
 const mysql = require("mysql2");
@@ -80,6 +83,7 @@ module.exports = class PolkaholicDB {
 
     BQ_SUBSTRATEETL_KEY = null;
     bigQuery = null;
+    googleStorage = null;
     bqTablesCallsEvents = null;
 
     constructor(serviceName = "polkaholic") {
@@ -487,6 +491,10 @@ module.exports = class PolkaholicDB {
         return this.instance.table("chain" + chainID);
     }
 
+    getEvmTableChain(chainID) {
+        return this.instance.table("evmchain" + chainID);
+    }
+
     currentTS() {
         return Math.floor(new Date().getTime() / 1000);
     }
@@ -820,7 +828,7 @@ from chain where chainID = '${chainID}' limit 1`);
             console.log("API using backfill endpoint", chain.WSEndpoint);
         }
         let isSubstrate = chain.chainID != chain.evmChainID
-        if (isSubstrate){
+        if (isSubstrate) {
             //for substrate, initiat with polkadotjs
             if (!this.api) {
                 this.api = await this.get_api(chain);
@@ -902,6 +910,15 @@ from chain where chainID = '${chainID}' limit 1`);
         this.disconnectedCnt += 1
     }
 
+    get_google_storage() {
+        if (this.googleStorage) return this.googleStorage;
+        this.googleStorage = new Storage({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        return this.googleStorage;
+    }
+
     get_big_query() {
         if (this.bigQuery) return this.bigQuery;
         this.bigQuery = new BigQuery({
@@ -916,7 +933,7 @@ from chain where chainID = '${chainID}' limit 1`);
         const bigqueryClient = this.get_big_query();
         const options = {
             query: sqlQuery,
-            location: (targetBQLocation)? targetBQLocation : this.defaultBQLocation,
+            location: (targetBQLocation) ? targetBQLocation : this.defaultBQLocation,
         };
 
         try {
@@ -1506,6 +1523,200 @@ from chain where chainID = '${chainID}' limit 1`);
             return (succ);
         }
     }
+
+    sortArrayByField(array, field, order = 'asc') {
+        return array.sort((a, b) => {
+            if (order === 'asc') {
+                return a[field] - b[field];
+            } else if (order === 'desc') {
+                return b[field] - a[field];
+            } else {
+                throw new Error("Invalid sorting order. Use 'asc' or 'desc'.");
+            }
+        });
+    }
+
+    // [blocks, contracts, logs, token_transfers, traces, transactions]
+    build_evm_block_from_row(row) {
+        let rowData = row.data;
+        let r = {
+            prefix: false,
+            chain_id: false,
+            block: false,
+            blockHash: false,
+            blockNumber: false,
+            blockTS: false,
+            contracts: false,
+            logs: false,
+            token_transfers: false,
+            traces: false,
+            transactions: false,
+        }
+        let evmColF = Object.keys(rowData)
+        //console.log(`evmColF`, evmColF)
+        r.blockNumber = parseInt(row.id.substr(2), 16);
+        r.prefix = row.id
+        //console.log(`${row.id} rowData`, rowData)
+        if (rowData["blocks"]) {
+            let columnFamily = rowData["blocks"];
+            let blkhashes = Object.keys(columnFamily)
+            console.log(`blkhashes`, blkhashes)
+            //TODO: remove the incorret finalizedhash here
+            if (blkhashes.length == 1) {
+                r.blockHash = blkhashes[0];
+            } else {
+                //use the correct finalized hash by checking and see if we can find the proper blockrow
+                console.log(`ERROR: multiple evm blkhashes found ${blkhashes} @ blockNumber:`, r.blockNumber, `cbt read chain prefix=${row.id}`)
+                this.logger.error({
+                    "op": "build_evm_block_from_row",
+                    "err": `multiple evm blkhashes found ${blkhashes}`
+                });
+                return false
+            }
+            //console.log(`rowData["blocks"]`, rowData["blocks"])
+            let cell = (rowData["blocks"][r.blockHash]) ? rowData["blocks"][r.blockHash][0] : false;
+            if (cell) {
+                let blk = JSON.parse(cell.value)
+                r.block = blk;
+                r.blockTS = blk.timestamp
+                r.chain_id = blk.chain_id
+            }
+        }
+        if (rowData["logs"]) {
+            let cell = (r.blockHash && rowData["logs"][r.blockHash]) ? rowData["logs"][r.blockHash][0] : false;
+            if (cell) {
+                r.logs = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["traces"]) {
+            let cell = (r.blockHash && rowData["traces"][r.blockHash]) ? rowData["traces"][r.blockHash][0] : false;
+            if (cell) {
+                r.traces = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["transactions"]) {
+            let cell = (r.blockHash && rowData["transactions"][r.blockHash]) ? rowData["transactions"][r.blockHash][0] : false;
+            if (cell) {
+                r.transactions = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["token_transfers"]) {
+            let cell = (r.blockHash && rowData["token_transfers"][r.blockHash]) ? rowData["token_transfers"][r.blockHash][0] : false;
+            if (cell) {
+                r.token_transfers = JSON.parse(cell.value);
+            }
+        }
+        if (rowData["contracts"]) {
+            let cell = (r.blockHash && rowData["contracts"][r.blockHash]) ? rowData["contracts"][r.blockHash][0] : false;
+            if (cell) {
+                r.contracts = JSON.parse(cell.value);
+            }
+        }
+        // want RPC style of blockWithTransaction, ReceiptsWithLogs and trace
+        let btBlkCols = ["timestamp", "number", "parent_hash", "nonce", "sha3_uncles", "logs_bloom", "transactions_root", "state_root", "miner", "difficulty", "total_difficulty"]
+        let rpcBlkCols = ["timestamp", "number", "parentHash", "nonce", "sha3Uncles", "logsBloom", "transactionsRoot", "stateRoot", "miner", "difficulty", "totalDifficulty"]
+        let rpcBlk = {}
+        // convert header
+        for (let i = 0; i < btBlkCols.length; i++) {
+            let btBlkCol = btBlkCols[i]
+            let rpcBlkCol = rpcBlkCols[i]
+            let btBlk = r.block
+            rpcBlk[rpcBlkCol] = btBlk[btBlkCol]
+        }
+
+        let btTxCols = ["block_hash", "block_number", "from_address", "gas", "gas_price", "max_fee_per_gas", "max_priority_fee_per_gas", "hash", "input", "nonce", "to_address", "transaction_index", "value", "transaction_type", "chain_id"]
+        let rpcTxCols = ["blockHash", "blockNumber", "from", "gas", "gasPrice", "maxFeePerGas", "maxPriorityFeePerGas", "hash", "input", "nonce", "to", "transactionIndex", "value", "type", "chainId"] //no accessList, v, r, s
+
+        // include transaction
+        let rpcTxns = []
+        let rpcReceipts = [] //receipt is a combinations of txn result + logs.. need to extract from both obj
+
+        let btReceiptCols = ["block_hash", "block_number", "receipt_contract_address", "receipt_cumulative_gas_used", "receipt_effective_gas_price", "from_address", "receipt_gas_used", "logs", "logsBloom", "receipt_status", "to_address", "hash", "transaction_index", "transaction_type"] //no bloom
+        let rpcReceiptCols = ["blockHash", "blockNumber", "contractAddress", "cumulativeGasUsed", "effectiveGasPrice", "from", "gasUsed", "logs", "logsBloom", "status", "to", "transactionHash", "transactionIndex", "type"]
+
+        let btLogCols = ["address", "topics", "data", "block_number", "transaction_hash", "transaction_index", "block_hash", "log_index", "removed"] //no removed
+        let rpcLogCols = ["address", "topics", "data", "blockNumber", "transactionHash", "transactionIndex", "blockHash", "logIndex", "removed"]
+
+        this.sortArrayByField(r.transactions, 'transaction_index', 'asc');
+        this.sortArrayByField(r.logs, 'log_index', 'asc');
+
+        let logMap = {} //hash -> []
+        for (let i = 0; i < r.logs.length; i++) {
+            let rpcLog = {}
+            let btLog = r.logs[i]
+            let transactionHash = btLog.transaction_hash
+            if (logMap[transactionHash] == undefined) logMap[transactionHash] = []
+            //console.log(`btLog`, btLog)
+            // convert receipt header
+            for (let i = 0; i < btLogCols.length; i++) {
+                let btLogCol = btLogCols[i]
+                let rpcLogCol = rpcLogCols[i]
+                if (rpcLogCol == "removed") {
+                    rpcLog["removed"] = false
+                    //It is true when the log was removed due to a chain reorganization, and false if it's a valid log. since we don't have this. will use false for all
+                } else {
+                    rpcLog[rpcLogCol] = (btLog[btLogCol] != undefined) ? btLog[btLogCol] : null
+                }
+            }
+            logMap[transactionHash].push(rpcLog)
+        }
+        //console.log(`logMap`, logMap)
+
+        for (let i = 0; i < r.transactions.length; i++) {
+            let btTxn = r.transactions[i]
+            let transactionHash = btTxn.hash
+            //console.log(`btTxn`, btTxn)
+            let rpcTxn = {}
+            let rpcReceipt = {}
+            // convert transaction
+            for (let i = 0; i < btTxCols.length; i++) {
+                let btTxCol = btTxCols[i]
+                let rpcTxCol = rpcTxCols[i]
+                rpcTxn[rpcTxCol] = (btTxn[btTxCol] != undefined) ? btTxn[btTxCol] : null
+            }
+            //btTxn is missing accessList, r, s, v
+            rpcTxns.push(rpcTxn)
+
+            // convert receipt header
+            for (let i = 0; i < btReceiptCols.length; i++) {
+                let btReceiptCol = btReceiptCols[i]
+                let rpcReceiptCol = rpcReceiptCols[i]
+                if (rpcReceiptCol == "logsBloom") {
+                    rpcReceipt["logsBloom"] = null
+                } else if (rpcReceiptCol == "logs") {
+                    if (logMap[transactionHash] == undefined) {
+                        rpcReceipt["logs"] = [] // TODO build logs using logs
+                    } else {
+                        //console.log(`${transactionHash} logs`, logMap[transactionHash])
+                        rpcReceipt["logs"] = logMap[transactionHash]
+                    }
+                } else {
+                    rpcReceipt[rpcReceiptCol] = (btTxn[btReceiptCol] != undefined) ? btTxn[btReceiptCol] : null
+                }
+            }
+            // rpcReceipts is missing logsbloom + removed
+            rpcReceipts.push(rpcReceipt)
+        }
+        //will have to sort for messy ordering
+        //rpcBlk.transactions = this.sortArrayByField(rpcTxns, 'transactionIndex', 'asc');
+        rpcBlk.transactions = rpcTxns
+        //console.log(`rpcBlk`, rpcBlk)
+        //console.log(`rpcReceipts`, rpcReceipts)
+        //TODO: traces...
+        let f = {
+            prefix: r.prefix,
+            chain_id: r.chain_id,
+            blockHash: r.blockHash,
+            blockNumber: r.blockNumber,
+            blockTS: paraTool.dechexToInt(r.blockTS),
+            block: rpcBlk,
+            evmReceipts: rpcReceipts,
+            traces: false
+        }
+        //process.exit(0)
+        return f
+    }
+
     build_block_from_row(row) {
         let rowData = row.data;
         let r = {

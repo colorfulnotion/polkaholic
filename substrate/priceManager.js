@@ -908,19 +908,18 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
             const resp = await axios.get(url, {
                 headers: headers
             });
-	    let vals = ["tokenAddress", "symbol", "name", "addDT"];
+            let vals = ["tokenAddress", "symbol", "name", "addDT"];
             const coins = resp.data;
-	    let out = [];
-	    for (const c of coins) {
-		for ( const platform of Object.keys(c.platforms) ) {
-		    let tokenAddress = c.platforms[platform];
-		    if (tokenAddress && tokenAddress.length < 128 ) {
-		    } else {
-			tokenAddress = "";
-		    }
-		    out.push(`(${mysql.escape(c.id)}, ${mysql.escape(platform)}, ${mysql.escape(tokenAddress)}, ${mysql.escape(c.symbol)}, ${mysql.escape(c.name)}, Now())`);
-		}
-	    }
+            let out = [];
+            for (const c of coins) {
+                for (const platform of Object.keys(c.platforms)) {
+                    let tokenAddress = c.platforms[platform];
+                    if (tokenAddress && tokenAddress.length < 128) {} else {
+                        tokenAddress = "";
+                    }
+                    out.push(`(${mysql.escape(c.id)}, ${mysql.escape(platform)}, ${mysql.escape(tokenAddress)}, ${mysql.escape(c.symbol)}, ${mysql.escape(c.name)}, Now())`);
+                }
+            }
             await this.upsertSQL({
                 "table": "coingeckoplatform",
                 "keys": ["id", "platform"],
@@ -928,11 +927,11 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
                 "data": out,
                 "replace": vals,
             })
-	} catch (e) {
-	    console.log(e);
-	}
+        } catch (e) {
+            console.log(e);
+        }
     }
-    
+
     async update_coingecko_backfill(startDate = '2022-01-01', endDate = '2022-04-01') {
         let coingeckoRecs = await this.poolREADONLY.query(`select coingeckoID, symbol, relayChain from xcmasset where coingeckoID is not null`);
         let coingeckoids = {};

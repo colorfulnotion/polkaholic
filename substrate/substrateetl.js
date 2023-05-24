@@ -117,7 +117,7 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers"]
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers", "calls"] //MK - TODO: remove "evmtxs", "evmtransfers". Add "calls"
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
@@ -161,7 +161,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const r of recs) {
                 let [logDT, hr] = paraTool.ts_to_logDT_hr(r.logTS);
                 let logYYYYMMDD = logDT.replaceAll('-', '')
-		let bqDataset = this.get_relayChain_dataset(relayChain);
+                let bqDataset = this.get_relayChain_dataset(relayChain);
                 let cmd = `bq query --destination_table '${bqDataset}.balances${paraID}$${logYYYYMMDD}' --project_id=${projectID} --time_partitioning_field ts --replace --use_legacy_sql=false 'select symbol,address_ss58,CONCAT(LEFT(address_pubkey, 2), RIGHT(address_pubkey, 40)) as address_pubkey,ts,id,chain_name,asset,para_id,free,free_usd,reserved,reserved_usd,misc_frozen,misc_frozen_usd,frozen,frozen_usd,price_usd from ${bqDataset}.balances${paraID} where DATE(ts) = "${logDT}"'`
                 try {
                     console.log(cmd);
@@ -315,9 +315,9 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     get_relayChain_dataset(relayChain, isProd = true) {
-	return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
+        return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
     }
-    
+
     async publishExchangeAddress() {
         //await this.ingestSystemAddress()
         //await this.ingestWalletAttribution()
@@ -326,7 +326,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let tbl = `knownpubs`
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd)
-        
+
         //let sql = `select nickname, accountName, address from account where is_exchange = 1`
         let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
         let sqlRecs = await this.poolREADONLY.query(sql);
@@ -624,7 +624,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
-	    let bqDataset = this.get_relayChain_dataset(relayChain);
+            let bqDataset = this.get_relayChain_dataset(relayChain);
             let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${bqDataset}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
             console.log(sqlQuery);
             let rows = await this.execute_bqJob(sqlQuery, paraTool.BQUSMulti);
@@ -1642,7 +1642,7 @@ Example of contractInfoOf:
         // 1. Build contractsevents{paraID} from startDT with a single bq load operation that generates an empirically small table
         if (loadSourceTables) {
             try {
-		let bqDataset = this.get_relayChain_dataset(relayChain);
+                let bqDataset = this.get_relayChain_dataset(relayChain);
                 let targetSQL = `SELECT * FROM \`substrate-etl.${bqDataset}.extrinsics${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
                 let destinationTbl = `contracts.contractsextrinsics${id}`
                 let partitionedFld = 'block_time'
@@ -2445,7 +2445,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         for (const relayChain of relayChains) {
             // 1. Generate system tables:
             let system_tables = ["chains", "xcmassets", "assets"];
-	    let bqDataset = this.get_relayChain_dataset(relayChain)
+            let bqDataset = this.get_relayChain_dataset(relayChain)
             for (const tbl of system_tables) {
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
@@ -3104,8 +3104,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let bqjobs = []
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let accountTbls = ["new", "reaped", "active", "all"]
-	let polkadot = this.get_relayChain_dataset("polkadot");
-	let kusama = this.get_relayChain_dataset("kusama");
+        let polkadot = this.get_relayChain_dataset("polkadot");
+        let kusama = this.get_relayChain_dataset("kusama");
         for (const tbl of accountTbls) {
             let tblName = `accounts${tbl}`
             let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
@@ -3254,7 +3254,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         //accountMetricsStatus, updateAddressBalanceStatus, crowdloanMetricsStatus, sourceMetricsStatus, poolsMetricsStatus, identityMetricsStatus, loaded
         switch (dumpType) {
             case "substrate-etl":
-            // how to check if dump substrate-etl is ready?
+                // how to check if dump substrate-etl is ready?
 
                 sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded >= 0 and logDT = '${logDT}' and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and chain.chainID = ${chainID} order by rand() limit 1`;
                 recs = await this.poolREADONLY.query(sql);
@@ -3866,7 +3866,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async update_xcm_summary(relayChain, logDT) {
         let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;
-	let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset = this.get_relayChain_dataset(relayChain);
         let sqla = {
             "xcmtransfers0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
@@ -3957,7 +3957,12 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let chain = await this.getChain(chainID);
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back
+        let id = this.getIDByChainID(chainID);
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back, TODO: add calls?
+        let processCalls = false
+        if (processCalls) {
+            tbls.push("calls")
+        }
         console.log(`dump_substrateetl paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID}), tbls=${tbls}`)
         if (chain.isEVM) {
             tbls.push("evmtxs");
@@ -4062,6 +4067,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let transfers = [];
                 let evmtxs = [];
                 let evmtransfers = [];
+
+                //MK: evmtxs and evmtransfers generated here. consider to skip
                 if (r.evmFullBlock) {
                     let gWei = 10 ** 9
                     let ether = 10 ** 18
@@ -4182,6 +4189,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let events = [];
 
                 let extrinsics = [];
+                let calls = [];
                 for (const ext of b.extrinsics) {
                     for (const ev of ext.events) {
                         let [dEvent, isTransferType] = await this.decorateEvent(ev, chainID, block.block_time, true, ["data", "address", "usd"], false)
@@ -4262,7 +4270,60 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     }
                     //console.log(`bqExtrinsic`, bqExtrinsic)
                     extrinsics.push(bqExtrinsic);
+                    if (processCalls) {
+                        let flattenedCalls = await this.paramToCalls(ext.extrinsicID, ext.section, ext.method, ext.callIndex, ext.params, ext.paramsDef, chainID, block.block_time, '0')
+                        for (const call of flattenedCalls) {
+                            let ext_fee = null
+                            let ext_fee_usd = null
+                            let ext_weight = null
+                            let call_root = (call.root != undefined) ? call.root : null
+                            let call_leaf = (call.leaf != undefined) ? call.leaf : null
+                            if (call_root) {
+                                //only store fee, fee_usd, weight at root
+                                ext_fee = ext.fee
+                                ext_fee_usd = feeUSD
+                                ext_weight = (ext.weight != undefined) ? ext.weight : null // TODO: ext.weight
+                            }
+                            let bqExtrinsicCall = {
+                                relay_chain: relayChain,
+                                para_id: paraID,
+                                id: id,
+                                block_hash: block.hash,
+                                block_number: block.number,
+                                block_time: block.block_time,
+                                extrinsic_hash: ext.extrinsicHash,
+                                extrinsic_id: ext.extrinsicID,
+                                lifetime: JSON.stringify(ext.lifetime),
+                                extrinsic_section: ext.section,
+                                extrinsic_method: ext.method,
+                                call_id: call.id,
+                                call_index: call.index,
+                                call_section: call.section,
+                                call_method: call.method,
+                                call_args: JSON.stringify(call.args),
+                                call_args_def: JSON.stringify(call.argsDef),
+                                root: call_root,
+                                leaf: call_leaf,
+                                fee: ext_fee,
+                                fee_usd: ext_fee_usd,
+                                //amounts: null
+                                //amount_usd: null,
+                                weight: ext_weight,
+                                signed: ext.signer ? true : false,
+                                signer_ss58: ext.signer ? ext.signer : null,
+                                signer_pub_key: ext.signer ? paraTool.getPubKey(ext.signer) : null
+                            }
+                            if (this.suppress_call(id, call.section, call.method)) {
+                                //console.log(`${bqExtrinsicCall.extrinsic_hash} ${bqExtrinsicCall.call_id} [${call.section}:${call.method}] SUPPRESSED`)
+                            } else {
+                                //let t = this.generate_call_rows(bqExtrinsicCall);
+                                //console.log(`${bqExtrinsicCall.extrinsic_hash} ${bqExtrinsicCall.call_id} [${call.section}:${call.method}] ADDED`)
+                                calls.push(bqExtrinsicCall)
+                            }
+                        }
+                    }
                 }
+
                 let log_count = 0;
                 let logs = hdr.digest.logs.map((l) => {
                     let logID = `${block.number}-${log_count}`
@@ -4286,6 +4347,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         fs.writeSync(f["events"], JSON.stringify(e) + NL);
                     });
                 }
+
                 // write extrinsics
                 if (block.extrinsic_count > 0) {
                     extrinsics.forEach((e) => {
@@ -4297,6 +4359,18 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         }
                     });
                 }
+
+                // write calls
+                if (calls.length > 0 && processCalls) {
+                    calls.forEach((c) => {
+                        if (typeof c.call_section == "string" && typeof c.call_method == "string") {
+                            fs.writeSync(f["calls"], JSON.stringify(c) + NL);
+                        } else {
+                            console.log(`++c`, c)
+                        }
+                    });
+                }
+
                 // write transfers
                 if (transfers.length > 0) {
                     transfers.forEach((t) => {
@@ -4733,7 +4807,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
-	let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset = this.get_relayChain_dataset(relayChain);
         let sqla = {
             "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from ${project}.${bqDataset}.balances${paraID} where DATE(ts) >= "${startDT}" group by logDT order by logDT`,
             "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics, sum(fee) fees from ${project}.${bqDataset}.extrinsics${paraID} where DATE(block_time) >= "${startDT}" group by logDT having logDT < "${today}" order by logDT`,
@@ -5287,9 +5361,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         try {
             const resp = await axios.get(url);
             let assets = resp.data.assets;
-	    let out = {}
+            let out = {}
             for (const relayChain of Object.keys(assets)) {
-		out[relayChain] = {}
+                out[relayChain] = {}
                 let rcassets = assets[relayChain];
                 for (const c of rcassets) {
                     let paraID = c.paraID;
@@ -5300,14 +5374,14 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                         if (currencyID == null && typeof a.asset == "object") {
                             currencyID = JSON.stringify(a.asset);
                         }
-			if ( out[relayChain][paraID] == undefined ) {
-			    out[relayChain][paraID] = {}
-			}
-			out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
+                        if (out[relayChain][paraID] == undefined) {
+                            out[relayChain][paraID] = {}
+                        }
+                        out[relayChain][paraID][currencyID] = [a.symbol, a.name, a.decimals];
                     }
                 }
-	    }
-	    let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
+            }
+            let xcmgarlibrary = `var m = ${JSON.stringify(out)}; function xcmgarmap(relayChain, paraID, currencyID) {
 if ( m[relayChain] && m[relayChain][paraID] && m[relayChain][paraID][currencyID] ) {
  let x = m[relayChain][paraID][currencyID]; return { symbol: x[0], name: x[1], decimals: x[2] }
 }
@@ -5317,7 +5391,7 @@ function xcmgarsymbol(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayC
 function xcmgarname(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.name : null )};
 function xcmgardecimals(relayChain, paraID, currencyID) { let x=  xcmgarmap(relayChain, paraID, currencyID); return ( x ? x.decimals: null )}`;
             let fn = "xcmgarlib3.js";
-	    let f = fs.openSync(fn, 'w', 0o666);
+            let f = fs.openSync(fn, 'w', 0o666);
             fs.writeSync(f, xcmgarlibrary);
         } catch (err) {
             console.log("ERROR", err);
