@@ -240,7 +240,7 @@ module.exports = class XCMCleaner extends Query {
                 let std = parseInt(xcmTeleportFees.teleportFeeDecimals_std, 10);
                 if (std == 0) std = avg * .2;
                 let diff = amountSent - (amountReceived + avg);
-		if ( amountReceived > amountSent ) return(0);
+                if (amountReceived > amountSent) return (0);
                 // ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 sum 1015819382911 83662580 diff -101581937246144970000 avg 83662580 std 19932769 x= -509622806226.8828
                 let x = Math.abs(diff / (std + 1));
                 // ===> compute_confidence snt 1045038690560.000000000000000000 rcv 1015819382911 avg 83662580 std 19932769 x= -509622806226.8828

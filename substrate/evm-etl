@@ -151,9 +151,9 @@ async function main() {
             let evmetl = new EVMETL();
 
             let dotsamaEvmChains = [paraTool.chainIDAcala, paraTool.chainIDKarura, paraTool.chainIDMoonbeam, paraTool.chainIDClover, paraTool.chainIDAstar, paraTool.chainIDMoonriver, paraTool.chainIDShiden]
-            if (dotsamaEvmChains.includes(dotsamaEvmChains)){
+            if (dotsamaEvmChains.includes(dotsamaEvmChains)) {
                 process.exit(1, "Use evm chainID to setup dataset");
-            }else{
+            } else {
                 await evmetl.setup_chain_evm(chainID, isUpdate);
             }
             process.exit(0);
@@ -276,16 +276,16 @@ async function main() {
         });
 
 
-        /* Regnerate One day worth of data
+    /* Regnerate One day worth of data
 
-        Step0 create blocklog rec
-        Step1 ./evm-etl blcp -l 2023-05-12
-        Step2 ./evm-etl backfill -c 1 -l 2023-05-12
-        Step3 ./evm-etl indexchain -c 1 -l 2023-05-12
-        Step4 ./evm-etl cpevmlogtogs -c 1 -l 2023-05-12
-        Step5 ./evm-etl loadevmrec -l 2023-05-12
+    Step0 create blocklog rec
+    Step1 ./evm-etl blcp -l 2023-05-12
+    Step2 ./evm-etl backfill -c 1 -l 2023-05-12
+    Step3 ./evm-etl indexchain -c 1 -l 2023-05-12
+    Step4 ./evm-etl cpevmlogtogs -c 1 -l 2023-05-12
+    Step5 ./evm-etl loadevmrec -l 2023-05-12
 
-        */
+    */
 
     program.command('processchainsteps')
         .description(`process a full day of chain data`)
@@ -324,9 +324,9 @@ async function main() {
             if (logDT) {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
-                        for (const dt of logDTRange) {
-                            await evmetl.blcp(dt, chainID);
-                        }
+                    for (const dt of logDTRange) {
+                        await evmetl.blcp(dt, chainID);
+                    }
                 } else {
                     await evmetl.blcp(logDT, chainID);
                 }

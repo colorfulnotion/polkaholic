@@ -320,7 +320,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 if (externalViewCmd) {
                     externalViewCmds.push(externalViewCmd)
                 }
-                if (historyTblCmd){
+                if (historyTblCmd) {
                     historyTblCmds.push(historyTblCmd)
                 }
             }
@@ -336,7 +336,7 @@ module.exports = class EVMETL extends PolkaholicDB {
                 if (externalViewCmd) {
                     externalViewCmds.push(externalViewCmd)
                 }
-                if (historyTblCmd){
+                if (historyTblCmd) {
                     historyTblCmds.push(historyTblCmd)
                 }
             }
@@ -379,7 +379,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
     }
 
-    async createDatasetSchema(datasetId = 'evm_dev', projectID = 'substrate-etl'){
+    async createDatasetSchema(datasetId = 'evm_dev', projectID = 'substrate-etl') {
         let description = `Table Schema for the Dataset: ${datasetId}.\n\n'AAA' in 'AAA_tableschema' stands for 'All About Accessibility' - it is designed to appear as the first result in your search, ensuring easy access to crucial information such as {table_id, time_partitioning_field, table_cols, table_schema}. For a quick overview of the available tables/views within the ${datasetId} dataset, please query this view.`;
         let schemaTbl = `${datasetId}.AAA_tableschema`;
         let sql = `WITH schemaInfo AS (
@@ -435,7 +435,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         return flds
     }
 
-    async fetchSchema(tableId, evmDataset='evm_dev'){
+    async fetchSchema(tableId, evmDataset = 'evm_dev') {
         let modifiedFingerprintID = ethTool.getFingerprintIDFromTableID(tableId)
         let cmd = `bq show --project_id=substrate-etl --format=prettyjson ${evmDataset}.${tableId} | jq -c '[.schema.fields[] | {mode, name, type}]'`
         let {
@@ -475,24 +475,24 @@ module.exports = class EVMETL extends PolkaholicDB {
                     let v = currBatchTableSchemas[j]
 
                     let tableSchema = null
-                    if (v.tableSchema){
+                    if (v.tableSchema) {
                         tableSchema = JSON.parse(v.tableSchema)
                         tableSchema = JSON.stringify(tableSchema)
                     }
                     console.log(`${v.tableId}`, tableSchema)
                     let tinySchema = `${mysql.escape(tableSchema)}`
-                    let abiType = (v.abiType == "function" || v.abiType == "call")? "function" : "event"
+                    let abiType = (v.abiType == "function" || v.abiType == "call") ? "function" : "event"
                     let row = `('${v.tableId}', '${v.modifiedFingerprintID}', ${tinySchema}, '${abiType}', '1', NOW())`
                     output.push(row)
                 }
-                if (output.length > 0 ){
+                if (output.length > 0) {
                     console.log(`output len=${output.length}`, output)
                     await this.upsertSQL({
                         "table": "evmschema",
                         "keys": ["tableId"],
-                        "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
+                        "vals": ["modifiedFingerprintID", "tableSchema", "abiType", "created", "lastUpdateDT"],
                         "data": output,
-                        "replaceIfNull": ["tableId","tableSchema","lastUpdateDT"], // once written, it should NOT get updated
+                        "replaceIfNull": ["tableId", "tableSchema", "lastUpdateDT"], // once written, it should NOT get updated
                         "replace": ["created", "abiType"]
                     }, true);
                 }
@@ -1144,7 +1144,7 @@ mysql> desc projectcontractabi;
         let knownSchema = {}
         let localSQL = `select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, lastUpdateDT from evmschema where tableSchema is not null`;
         let storedEvmSchemas = await this.poolREADONLY.query(localSQL);
-        for (const storedEvmSchema of storedEvmSchemas){
+        for (const storedEvmSchema of storedEvmSchemas) {
             knownSchema[knownSchema.modifiedFingerprintID] = 1
         }
         let targetSQL = null
@@ -1157,11 +1157,11 @@ mysql> desc projectcontractabi;
         for (let i = 0; i < res.length; i++) {
             let r = res[i]
             let modifiedFingerprintID = r.modifiedFingerprintID
-            if (knownSchema[modifiedFingerprintID] != undefined){
+            if (knownSchema[modifiedFingerprintID] != undefined) {
                 //skip
                 continue
             }
-            if (modifiedFingerprintIDMaps[modifiedFingerprintID] != undefined){
+            if (modifiedFingerprintIDMaps[modifiedFingerprintID] != undefined) {
                 //skip
                 continue
             }
@@ -1184,14 +1184,14 @@ mysql> desc projectcontractabi;
             let row = `('${tableId}', '${modifiedFingerprintID}', ${tableSchema}, '${abiType}', '0', NOW())`
             output.push(row)
 
-            if (output.length > batchSize){
+            if (output.length > batchSize) {
                 console.log(`output len=${output.length}`, output)
                 await this.upsertSQL({
                     "table": "evmschema",
                     "keys": ["tableId"],
-                    "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
+                    "vals": ["modifiedFingerprintID", "tableSchema", "abiType", "created", "lastUpdateDT"],
                     "data": output,
-                    "replaceIfNull": ["tableId","tableSchema","lastUpdateDT", "abiType", "created"], // once written, it should NOT get updated. do not mark created from 1 to 0
+                    "replaceIfNull": ["tableId", "tableSchema", "lastUpdateDT", "abiType", "created"], // once written, it should NOT get updated. do not mark created from 1 to 0
                 }, true);
                 output = []
             }
@@ -1225,14 +1225,14 @@ mysql> desc projectcontractabi;
             }
             */
         }
-        if (output.length > batchSize){
+        if (output.length > batchSize) {
             console.log(`output len=${output.length}`, output)
             await this.upsertSQL({
                 "table": "evmschema",
                 "keys": ["tableId"],
-                "vals": ["modifiedFingerprintID","tableSchema", "abiType", "created", "lastUpdateDT"],
+                "vals": ["modifiedFingerprintID", "tableSchema", "abiType", "created", "lastUpdateDT"],
                 "data": output,
-                "replaceIfNull": ["tableId","tableSchema","lastUpdateDT", "abiType", "created"], // once written, it should NOT get updated. do not mark created from 1 to 0
+                "replaceIfNull": ["tableId", "tableSchema", "lastUpdateDT", "abiType", "created"], // once written, it should NOT get updated. do not mark created from 1 to 0
             }, true);
             output = []
         }
@@ -1364,7 +1364,7 @@ mysql> desc projectcontractabi;
             "keys": ["fingerprintID"],
             "vals": ["modifiedFingerprintID", "secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", "firstSeenDT"],
             "data": abiRows,
-            "replace": ["modifiedFingerprintID", "secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated",],
+            "replace": ["modifiedFingerprintID", "secondaryID", "signatureID", "signatureRaw", "signature", "name", "abi", "abiType", "topicLength", "audited", "outdated", ],
             "replaceIfNull": ["firstSeenDT"]
         }, sqlDebug);
 
@@ -1513,7 +1513,7 @@ mysql> desc projectcontractabi;
         let projectID = "substrate-etl";
         let opType = (isUpdate) ? 'update' : 'mk'
         let relayChain = "evm"
-        if (chainID == undefined){
+        if (chainID == undefined) {
             console.log(`ERROR: chainID not specified`)
             process.exit(1, "ERROR: chainID not specified")
         }
@@ -1525,7 +1525,7 @@ mysql> desc projectcontractabi;
         for (const rec of recs) {
             let chainID = parseInt(rec.chainID, 10);
             let id = rec.id
-            if (id == undefined){
+            if (id == undefined) {
                 console.log(`ERROR: chain's id not specified`)
                 process.exit(1, "ERROR: chain's id not specified")
             }
@@ -1554,7 +1554,7 @@ mysql> desc projectcontractabi;
                 cmds.push(cmd)
 
             }
-            for (const cmd of cmds){
+            for (const cmd of cmds) {
                 console.log(cmd);
                 try {
                     if (execute) {
@@ -1970,7 +1970,7 @@ mysql> desc projectcontractabi;
         return [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD]
     }
 
-    async getChainStep(dt, chainID){
+    async getChainStep(dt, chainID) {
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         let sql = `select chainID, logDT, startBN, endBN, evmStep, evmStepDT from blocklog where chainID = ${chainID} and logDT='${currDT}' limit 1`
         console.log(sql)
@@ -1981,11 +1981,11 @@ mysql> desc projectcontractabi;
             evmStep: 0,
             evmStepDT: null
         }
-        if (recs.length > 0){
+        if (recs.length > 0) {
             let rec = recs[0]
             jobInfo.evmStep = rec.evmStep
             jobInfo.evmStepDT = `${rec.evmStepDT}`
-        }else{
+        } else {
             let completedEvmStep = STEP0_createRec
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             console.log(`[chainID=${chainID} logDT=${currDT}] Add new tasks\n`, updateSQL)
@@ -1995,10 +1995,10 @@ mysql> desc projectcontractabi;
         return jobInfo
     }
 
-    async processChainSteps(dt, chainID){
+    async processChainSteps(dt, chainID) {
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         let jobInfo = await this.getChainStep(dt, chainID)
-        if (jobInfo.evmStep >= 5){
+        if (jobInfo.evmStep >= 5) {
             console.log(`[chainID=${chainID} logDT=${currDT}] Already Completed`)
             process.exit(0)
         }
@@ -2045,7 +2045,7 @@ mysql> desc projectcontractabi;
 
     */
 
-    async processChainStep(dt, chainID, currEvmStep){
+    async processChainStep(dt, chainID, currEvmStep) {
         switch (currEvmStep) {
             case 0:
                 //blcp
@@ -2204,7 +2204,7 @@ mysql> desc projectcontractabi;
         */
         await this.batchExec(bqCmds)
         await this.batchExec(gsCmds)
-        if (errCnt == 0){
+        if (errCnt == 0) {
             let completedEvmStep = STEP1_blcp
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);
@@ -2213,129 +2213,135 @@ mysql> desc projectcontractabi;
     }
 
     async countLinesInFiles(pattern) {
-      const filepaths = glob.sync(pattern).sort();
-      let totalLineCount = 0;
-      for (const filepath of filepaths) {
-        const lineCount = await this.countLinesInFile(filepath);
-        console.log(`${filepath} recCnt=${lineCount}`)
-        totalLineCount += lineCount;
-      }
-      return totalLineCount;
+        const filepaths = glob.sync(pattern).sort();
+        let totalLineCount = 0;
+        for (const filepath of filepaths) {
+            const lineCount = await this.countLinesInFile(filepath);
+            console.log(`${filepath} recCnt=${lineCount}`)
+            totalLineCount += lineCount;
+        }
+        return totalLineCount;
     }
 
 
-    async countLinesInFile(fn='/disk1/evm/blocks_000000000000') {
-      return new Promise((resolve, reject) => {
-        const readStream = fs.createReadStream(fn, { encoding: 'utf8' });
+    async countLinesInFile(fn = '/disk1/evm/blocks_000000000000') {
+        return new Promise((resolve, reject) => {
+            const readStream = fs.createReadStream(fn, {
+                encoding: 'utf8'
+            });
+            let lineCount = 0;
+            let buffer = '';
+            let blockHashFld = (fn.includes("blocks")) ? "hash" : "block_hash"
+            let blockNumberFld = (fn.includes("blocks")) ? "number" : "block_number"
+
+            readStream.on('data', (chunk) => {
+                buffer += chunk;
+                let lines = buffer.split('\n');
+                buffer = lines.pop();
+                lineCount += lines.length;
+            });
+
+            readStream.on('end', () => {
+                // Account for the last line
+                if (buffer.length > 0) {
+                    lineCount++;
+                }
+                resolve(lineCount);
+            });
+
+            readStream.on('error', (error) => {
+                reject(error);
+            });
+        });
+    }
+
+    async parseJSONL(fn = '/disk1/evm/blocks_000000000000', prevIncompleteBlkRecordsMaps = false, offsetStart = 0, maxN = null) {
+        const fileStream = fs.createReadStream(fn, {
+            encoding: 'utf8'
+        });
+        const rl = readline.createInterface({
+            input: fileStream,
+            crlfDelay: Infinity,
+        });
+        //console.log(`rl`, rl)
+        let blkRecordsMaps = {}
+        let blkRecords = [];
+        //let lastBlkRecords = [];
         let lineCount = 0;
-        let buffer = '';
-        let blockHashFld = (fn.includes("blocks"))? "hash" : "block_hash"
-        let blockNumberFld = (fn.includes("blocks"))? "number" : "block_number"
+        let linesRead = 0;
+        let blockHashFld = (fn.includes("blocks")) ? "hash" : "block_hash"
+        let blockNumberFld = (fn.includes("blocks")) ? "number" : "block_number"
+        let prevKey = false; //previusly completed key
+        let currKey = false;
+        let prevIncompleteKey = false
 
-        readStream.on('data', (chunk) => {
-          buffer += chunk;
-          let lines = buffer.split('\n');
-          buffer = lines.pop();
-          lineCount += lines.length;
-        });
+        //load prevIncompleteBlkRecordsMaps
+        if (prevIncompleteBlkRecordsMaps) {
+            // if exist, creat key
+            let key = Object.keys(prevIncompleteBlkRecordsMaps)[0]
+            blkRecordsMaps[key] = prevIncompleteBlkRecordsMaps[key]
+            currKey = key
+            prevIncompleteKey = key
+        }
 
-        readStream.on('end', () => {
-          // Account for the last line
-          if (buffer.length > 0) {
-            lineCount++;
-          }
-          resolve(lineCount);
-        });
-
-        readStream.on('error', (error) => {
-          reject(error);
-        });
-      });
-    }
-
-    async parseJSONL(fn='/disk1/evm/blocks_000000000000', prevIncompleteBlkRecordsMaps = false, offsetStart=0, maxN=null) {
-      const fileStream = fs.createReadStream(fn, { encoding: 'utf8' });
-      const rl = readline.createInterface({
-        input: fileStream,
-        crlfDelay: Infinity,
-      });
-      //console.log(`rl`, rl)
-      let blkRecordsMaps = {}
-      let blkRecords = [];
-      //let lastBlkRecords = [];
-      let lineCount = 0;
-      let linesRead = 0;
-      let blockHashFld = (fn.includes("blocks"))? "hash" : "block_hash"
-      let blockNumberFld = (fn.includes("blocks"))? "number" : "block_number"
-      let prevKey = false; //previusly completed key
-      let currKey = false;
-      let prevIncompleteKey = false
-
-      //load prevIncompleteBlkRecordsMaps
-      if (prevIncompleteBlkRecordsMaps){
-          // if exist, creat key
-          let key = Object.keys(prevIncompleteBlkRecordsMaps)[0]
-          blkRecordsMaps[key] = prevIncompleteBlkRecordsMaps[key]
-          currKey = key
-          prevIncompleteKey = key
-      }
-
-      for await (const line of rl) {
-        if (lineCount >= offsetStart) {
-          try {
-            const jsonObject = JSON.parse(line);
-            let bn = jsonObject[blockNumberFld]
-            let bnHex = paraTool.blockNumberToHex(paraTool.dechexToInt(bn))
-            let blkHash = jsonObject[blockHashFld]
-            let key = `${bn}_${blkHash}_${bnHex}`
-            if (blkRecordsMaps[key] == undefined){
-                //if key not found, it's a start of a new block, last block is available to push
-                // mark last key as complete
-                prevKey = currKey
-                blkRecordsMaps[key] = []
-                blkRecordsMaps[key].push(jsonObject)
-                currKey = key
-            }else{
-                //currKey in process
-                blkRecordsMaps[key].push(jsonObject)
-                currKey = key
+        for await (const line of rl) {
+            if (lineCount >= offsetStart) {
+                try {
+                    const jsonObject = JSON.parse(line);
+                    let bn = jsonObject[blockNumberFld]
+                    let bnHex = paraTool.blockNumberToHex(paraTool.dechexToInt(bn))
+                    let blkHash = jsonObject[blockHashFld]
+                    let key = `${bn}_${blkHash}_${bnHex}`
+                    if (blkRecordsMaps[key] == undefined) {
+                        //if key not found, it's a start of a new block, last block is available to push
+                        // mark last key as complete
+                        prevKey = currKey
+                        blkRecordsMaps[key] = []
+                        blkRecordsMaps[key].push(jsonObject)
+                        currKey = key
+                    } else {
+                        //currKey in process
+                        blkRecordsMaps[key].push(jsonObject)
+                        currKey = key
+                    }
+                    linesRead++;
+                } catch (error) {
+                    console.error('Error parsing line:', line, error);
+                }
             }
-            linesRead++;
-          } catch (error) {
-            console.error('Error parsing line:', line, error);
-          }
+            if (maxN !== null && linesRead >= maxN) {
+                break;
+            }
+            lineCount++;
         }
-        if (maxN !== null && linesRead >= maxN) {
-            break;
-        }
-        lineCount++;
-      }
 
-      let incompleteBlkRecordsMaps = {}
-      incompleteBlkRecordsMaps[currKey] = blkRecordsMaps[currKey]
-      delete blkRecordsMaps[currKey]
-      let coveredBlocks = Object.keys(blkRecordsMaps).sort()
-      let resp = {
-          fn: fn,
-          linesReads: linesRead,
-          prevIncompleteKey: prevIncompleteKey,
-          completeStarKey: coveredBlocks[0],
-          completeEndKey: prevKey,
-          remainingKey: currKey,
-          blkRecordsMaps: blkRecordsMaps,
-          incompleteBlkRecordsMaps: incompleteBlkRecordsMaps,
-      }
-      return resp;
+        let incompleteBlkRecordsMaps = {}
+        incompleteBlkRecordsMaps[currKey] = blkRecordsMaps[currKey]
+        delete blkRecordsMaps[currKey]
+        let coveredBlocks = Object.keys(blkRecordsMaps).sort()
+        let resp = {
+            fn: fn,
+            linesReads: linesRead,
+            prevIncompleteKey: prevIncompleteKey,
+            completeStarKey: coveredBlocks[0],
+            completeEndKey: prevKey,
+            remainingKey: currKey,
+            blkRecordsMaps: blkRecordsMaps,
+            incompleteBlkRecordsMaps: incompleteBlkRecordsMaps,
+        }
+        return resp;
     }
 
-    createWorkingDir(targetPath='/disk1/evm/2023/04/01/1/') {
-      // Create the target directory if it does not exist
-      if (!fs.existsSync(targetPath)) {
-        fs.mkdirSync(targetPath, { recursive: true });
-        console.log(`Making Directory "${targetPath}"`);
-      } else {
-        console.log(`Directory "${targetPath}" already exists.`);
-      }
+    createWorkingDir(targetPath = '/disk1/evm/2023/04/01/1/') {
+        // Create the target directory if it does not exist
+        if (!fs.existsSync(targetPath)) {
+            fs.mkdirSync(targetPath, {
+                recursive: true
+            });
+            console.log(`Making Directory "${targetPath}"`);
+        } else {
+            console.log(`Directory "${targetPath}" already exists.`);
+        }
     }
 
     async processTablePartition(blocksMap, dirPath, tbl, fnType = "blocks") {
@@ -2344,7 +2350,7 @@ mysql> desc projectcontractabi;
         console.log(`processTable filepaths`, filepaths)
         let prevIncompleteBlkRecordsMaps = false
         let currIncompleteBlkRecordsMaps = false
-        for (const fn of filepaths){
+        for (const fn of filepaths) {
             prevIncompleteBlkRecordsMaps = currIncompleteBlkRecordsMaps
             /*
             if (tblRec && tblRec.incompleteBlkRecordsMaps != undefined){
@@ -2356,7 +2362,7 @@ mysql> desc projectcontractabi;
             console.log(`tblRec`, tblRecs)
             //await this.loadTableRecs(blocksMap, tblRecs.blkRecordsMaps, tbl, fnType, fn)
         }
-        if (currIncompleteBlkRecordsMaps){
+        if (currIncompleteBlkRecordsMaps) {
             //await this.loadTableRecs(blocksMap, currIncompleteBlkRecordsMaps, tbl, fnType, "Remaining")
         }
     }
@@ -2367,7 +2373,7 @@ mysql> desc projectcontractabi;
         console.log(`processTable filepaths`, filepaths)
         let prevIncompleteBlkRecordsMaps = false
         let currIncompleteBlkRecordsMaps = false
-        for (const fn of filepaths){
+        for (const fn of filepaths) {
             prevIncompleteBlkRecordsMaps = currIncompleteBlkRecordsMaps
             /*
             if (tblRec && tblRec.incompleteBlkRecordsMaps != undefined){
@@ -2379,22 +2385,22 @@ mysql> desc projectcontractabi;
             console.log(`tblRec`, tblRecs)
             await this.loadTableRecs(blocksMap, tblRecs.blkRecordsMaps, tbl, fnType, fn)
         }
-        if (currIncompleteBlkRecordsMaps){
+        if (currIncompleteBlkRecordsMaps) {
             await this.loadTableRecs(blocksMap, currIncompleteBlkRecordsMaps, tbl, fnType, "Remaining")
         }
     }
 
-    async loadTableRecs(blocksMap, blkRecordsMaps, tbl, fnType = "blocks", content = ""){
+    async loadTableRecs(blocksMap, blkRecordsMaps, tbl, fnType = "blocks", content = "") {
         let out = [];
         let batchSize = 100
         let batchN = 0;
         let fnTypeList = ["blocks", "logs", "token_transfers", "traces", "transactions", "contracts"]
-        if (!fnTypeList.includes(fnType)){
+        if (!fnTypeList.includes(fnType)) {
             console.log(`Invalid fnType=${fnType}`)
             return
         }
-        for (const blkKey of Object.keys(blkRecordsMaps)){
-            if (blocksMap[blkKey] == undefined){
+        for (const blkKey of Object.keys(blkRecordsMaps)) {
+            if (blocksMap[blkKey] == undefined) {
                 //should not get here
                 console.log(`${blkKey} missing from blocksMap`)
                 continue
@@ -2403,7 +2409,7 @@ mysql> desc projectcontractabi;
             let blockHash = blkKey.split(`_`)[1]
             let rec = blkRecordsMaps[blkKey]
             let blockTS = blocksMap[blkKey] * 1000000
-            if (fnType == "blocks"){
+            if (fnType == "blocks") {
                 rec = rec[0] //use array for blocks?
             }
             let cres = {
@@ -2427,7 +2433,7 @@ mysql> desc projectcontractabi;
             };
             //console.log(`cres['data'][${fnType}][${blockHash}]`, cres['data'][fnType][blockHash])
             out.push(cres);
-            if (out.length >= batchSize){
+            if (out.length >= batchSize) {
                 try {
                     await this.insertBTRows(tbl, out, "evmchain");
                     console.log(`${content}\n${fnType} batch#${batchN} insertBTRows ${out.length}`, out)
@@ -2439,7 +2445,7 @@ mysql> desc projectcontractabi;
             }
         }
 
-        if (out.length >= 0){
+        if (out.length >= 0) {
             try {
                 await this.insertBTRows(tbl, out, "evmchain");
                 console.log(`${content}\n ${fnType} last batch#${batchN} insertBTRows ${out.length}`, out)
@@ -2451,22 +2457,22 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async loadBlocksInfo(dirPath){
+    async loadBlocksInfo(dirPath) {
         let path = `${dirPath}blocks_*`
         let filepaths = glob.sync(path).sort();
         let blocksMap = {}
         let res = false
         let prevIncompleteBlkRecordsMaps = false
-        for (const fn of filepaths){
-            if (res && res.incompleteBlkRecordsMaps != undefined){
+        for (const fn of filepaths) {
+            if (res && res.incompleteBlkRecordsMaps != undefined) {
                 prevIncompleteBlkRecordsMaps = res.incompleteBlkRecordsMaps
             }
             res = await this.parseJSONL(fn, prevIncompleteBlkRecordsMaps)
-            for (const k of Object.keys(res.blkRecordsMaps)){
+            for (const k of Object.keys(res.blkRecordsMaps)) {
                 let r = res["blkRecordsMaps"][k][0]
                 blocksMap[k] = r.timestamp
             }
-            for (const k of Object.keys(res.incompleteBlkRecordsMaps)){
+            for (const k of Object.keys(res.incompleteBlkRecordsMaps)) {
                 let r = res["incompleteBlkRecordsMaps"][k][0]
                 blocksMap[k] = r.timestamp
             }
@@ -2504,7 +2510,9 @@ mysql> desc projectcontractabi;
         try {
             let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
             console.log(gsCmd)
-            let res = await exec(gsCmd, {maxBuffer: 1024 * 64000});
+            let res = await exec(gsCmd, {
+                maxBuffer: 1024 * 64000
+            });
             console.log(`res`, res)
         } catch (e) {
             errCnt++
@@ -2523,10 +2531,10 @@ mysql> desc projectcontractabi;
 
         let fnTypes = ["blocks", "logs", "traces", "transactions", "contracts", "token_transfers"]
         //let fnTypes = ["blocks"]
-        for (const fnType of fnTypes){
+        for (const fnType of fnTypes) {
             await this.processTable(blocksInfo.blocks, dirPath, tbl, fnType)
         }
-        if (errCnt == 0){
+        if (errCnt == 0) {
             let completedEvmStep = STEP2_backfill
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);
@@ -2534,37 +2542,39 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async fetch_gs_file_list(logYYYY_MM_DD = "2023/05/11", bucketName = "gs://evmrec"){
+    async fetch_gs_file_list(logYYYY_MM_DD = "2023/05/11", bucketName = "gs://evmrec") {
         let basePath = `${bucketName}/${logYYYY_MM_DD}/**`
         let cmd = `gsutil ls ${basePath} | jq -c -R -n '[inputs]'`
         console.log(`cmd`, cmd)
-        let res = await exec(cmd, {maxBuffer: 1024 * 640000});
+        let res = await exec(cmd, {
+            maxBuffer: 1024 * 640000
+        });
         let fnPathMap = {}
         try {
-            if (res.stderr != ''){
+            if (res.stderr != '') {
                 console.log(`${cmd} error`, res.stderr)
                 return false
             }
             let fns = JSON.parse(res.stdout) // this may contain file from many different chains and potentially many hours when we split day into hours. need to use path instead
-            for (const fn of fns){
+            for (const fn of fns) {
                 let fnPieces = fn.split('/')
                 let fnLast = fnPieces.pop() //{chainID_hr.json}
                 let fnWild = `${fnPieces.join('/')}/*.json`
                 fnPathMap[fnWild] = 1
             }
             return Object.keys(fnPathMap)
-        } catch (e){
+        } catch (e) {
             console.log(`error`, e)
             return false
         }
         return false
     }
 
-    async initEvmLocalSchemaMap(){
+    async initEvmLocalSchemaMap() {
         let sql = 'select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, abiType, created from evmschema order by tableId';
         let recs = await this.poolREADONLY.query(sql);
         let evmLocalSchemaMap = {}
-        for (const rec of recs){
+        for (const rec of recs) {
             evmLocalSchemaMap[rec.tableId] = rec
             //this.writeTableSchemaJSON(rec.tableId, rec.tableSchema)
         }
@@ -2573,10 +2583,10 @@ mysql> desc projectcontractabi;
         console.log(`Found ${recs.length} tableId in local evmschema`)
     }
 
-    async generateTableSchemaJSON(){
+    async generateTableSchemaJSON() {
         let sql = 'select tableId, modifiedFingerprintID, CONVERT(tableSchema USING utf8) tableSchema, abiType, created from evmschema order by tableId';
         let recs = await this.poolREADONLY.query(sql);
-        for (const rec of recs){
+        for (const rec of recs) {
             await this.writeTableSchemaJSON(rec.tableId, rec.tableSchema)
         }
     }
@@ -2608,7 +2618,7 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async batchExec(batchCmds){
+    async batchExec(batchCmds) {
         let cmdPromiseFn = []
         let cmdPromise = []
         for (const batchCmd of batchCmds) {
@@ -2616,7 +2626,7 @@ mysql> desc projectcontractabi;
             cmdPromise.push(
                 exec(batchCmd, {
                     maxBuffer: 1024 * 50000
-            }))
+                }))
         }
 
         let cmdStates;
@@ -2642,31 +2652,31 @@ mysql> desc projectcontractabi;
         }
     }
 
-/*
-    async bqLoadJob(jobInfo) {
-        console.log(`loadBQ JOB`, jobInfo)
-        const metadata = {
-            sourceFormat: 'NEWLINE_DELIMITED_JSON',
-            schema: {
-                fields: JSON.parse(jobInfo.tableSchema)
-            },
-            timePartitioning: {
-                type: 'DAY',
-                field: jobInfo.timePartitioningFld,
-            },
-            writeDisposition: 'WRITE_TRUNCATE',
-      };
-      const bigquery = this.get_big_query();
-      const storage = this.get_google_storage();
+    /*
+        async bqLoadJob(jobInfo) {
+            console.log(`loadBQ JOB`, jobInfo)
+            const metadata = {
+                sourceFormat: 'NEWLINE_DELIMITED_JSON',
+                schema: {
+                    fields: JSON.parse(jobInfo.tableSchema)
+                },
+                timePartitioning: {
+                    type: 'DAY',
+                    field: jobInfo.timePartitioningFld,
+                },
+                writeDisposition: 'WRITE_TRUNCATE',
+          };
+          const bigquery = this.get_big_query();
+          const storage = this.get_google_storage();
 
-      const [job] = await bigquery
-        .dataset(jobInfo.evmDatasetID)
-        .table(jobInfo.tableIdYYYYMMDD) // Appending $20230101 to load into the 2023-01-01 partition
-        .load(storage.bucket(bucketName).file(filename), metadata);
-        //.load(jobInfo.loadPath, metadata);
-        console.log(`Job ${jobInfo.tableIdYYYYMMDD} ${job.id} started.`);
-    }
-*/
+          const [job] = await bigquery
+            .dataset(jobInfo.evmDatasetID)
+            .table(jobInfo.tableIdYYYYMMDD) // Appending $20230101 to load into the 2023-01-01 partition
+            .load(storage.bucket(bucketName).file(filename), metadata);
+            //.load(jobInfo.loadPath, metadata);
+            console.log(`Job ${jobInfo.tableIdYYYYMMDD} ${job.id} started.`);
+        }
+    */
 
     async index_evmchain(chainID, logDT) {
         let crawler = new Crawler();
@@ -2675,11 +2685,12 @@ mysql> desc projectcontractabi;
         let blockchainID = chain.chainID
         //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
         let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-        paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
-        paraTool.chainIDArbitrum, paraTool.chainIDAvalanche]
+            paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
+        ]
         if (evmChainIDList.includes(blockchainID)) {
             await crawler.setupEvm(blockchainID)
-        }else{
+        } else {
             console.log(`Invalid chainID`)
             process.exit(1)
         }
@@ -2715,7 +2726,7 @@ mysql> desc projectcontractabi;
 
         for (let i = 0; i < batches.length; i++) {
             // debug only
-            if (i > 0){
+            if (i > 0) {
                 //return
             }
             let b = batches[i]
@@ -2725,7 +2736,7 @@ mysql> desc projectcontractabi;
             const evmTableChain = this.getEvmTableChain(chainID);
             let [rows] = await evmTableChain.getRows({
                 start: b.start,
-                end:  b.end,
+                end: b.end,
                 cellLimit: 1,
                 family: families
             });
@@ -2733,10 +2744,10 @@ mysql> desc projectcontractabi;
             let rowLen = rows.length
             let expectedLen = b.endBN - b.startBN + 1
             let missedBNs = []
-            if (rowLen != expectedLen){
+            if (rowLen != expectedLen) {
                 let expectedRangeBNs = [];
                 let observedBNs = []
-                for(let i = startBN; i <= endBN; i++) {
+                for (let i = startBN; i <= endBN; i++) {
                     expectedRangeBNs.push(i);
                 }
                 for (let j = 0; j < rows.length; j++) {
@@ -2774,7 +2785,7 @@ mysql> desc projectcontractabi;
         let evmindexLog = `('${chainID}','${tableID}', '${logDT}', '${numRecords}', NOW())`
         let indexlogvals = ["numRecords", "lastUpdateDT"];
         */
-        if (evmindexLogs.length > 0){
+        if (evmindexLogs.length > 0) {
             await this.upsertSQL({
                 "table": "evmlog",
                 "keys": ["chainID", "tableID", "logDT"],
@@ -2783,7 +2794,7 @@ mysql> desc projectcontractabi;
                 "replace": indexlogvals
             });
         }
-        if (errCnt == 0){
+        if (errCnt == 0) {
             let completedEvmStep = STEP3_indexEvmChain
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);
@@ -2792,13 +2803,13 @@ mysql> desc projectcontractabi;
     }
 
     //load evmlog to gs
-    async cp_evm_log_to_gs(dt, chainID = 1, dryRun = true){
+    async cp_evm_log_to_gs(dt, chainID = 1, dryRun = true) {
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         //TODO: can't specify chainID and other filter here..
         let cmd = `gsutil -m cp -r /disk1/evmlog/${logYYYY_MM_DD}/* gs://evmrec/${logYYYY_MM_DD}/`
         console.log(cmd)
         let errCnt = 0
-        if (!dryRun){
+        if (!dryRun) {
             try {
                 let res = await exec(cmd, {
                     maxBuffer: 1024 * 64000
@@ -2808,7 +2819,7 @@ mysql> desc projectcontractabi;
                 console.log(`${e.toString()}`)
                 errCnt++
             }
-            if (errCnt == 0){
+            if (errCnt == 0) {
                 let completedEvmStep = STEP4_cpEvmLogToGS
                 let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
                 this.batchedSQL.push(updateSQL);
@@ -2817,7 +2828,7 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async load_gs_evmrec(dt, chainID = null){
+    async load_gs_evmrec(dt, chainID = null) {
         let project_id = 'substrate-etl'
         let evmDatasetID = this.evmDatasetID
         await this.initEvmLocalSchemaMap()
@@ -2825,22 +2836,22 @@ mysql> desc projectcontractabi;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
         console.log(`fns`, fns)
-        if (!fns){
+        if (!fns) {
             console.log(`${logYYYY_MM_DD} evmrec not found`)
             return
         }
         let loadCmds = []
         let loadJobs = []
         let errCnt = 0
-        for (const fn of fns){
+        for (const fn of fns) {
             //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
             let tableId = fn.split('/')[6]
             let tableInfo = this.evmLocalSchemaMap[tableId]
-            if (tableInfo != undefined){
+            if (tableInfo != undefined) {
                 //console.log(`tableId ${tableId} Schema:`, tableInfo.tableSchema)
                 await this.writeTableSchemaJSON(tableId, tableInfo.tableSchema)
                 let jsonFN = `/disk1/evmschema/${tableId}.json`
-                let timePartitioningFld = (tableId.substr(0,4) == 'call')? "call_block_time": "evt_block_time"
+                let timePartitioningFld = (tableId.substr(0, 4) == 'call') ? "call_block_time" : "evt_block_time"
                 //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
                 let loadCmd = `bq load --nosynchronous_mode --max_bad_records=100 --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
                 loadCmds.push(loadCmd)
@@ -2852,14 +2863,14 @@ mysql> desc projectcontractabi;
                     loadPath: `${fn}`,
                 }
                 loadJobs.push(jobInfo)
-            }else{
+            } else {
                 console.log(`tableId ${tableId} missing schema`)
             }
         }
-        for (const loadJob of loadJobs){
+        for (const loadJob of loadJobs) {
             //await this.bqLoadJob(loadJob)
         }
-        for (const loadCmd of loadCmds){
+        for (const loadCmd of loadCmds) {
             console.log(loadCmd)
         }
         let i = 0;
@@ -2878,7 +2889,7 @@ mysql> desc projectcontractabi;
             }
         }
 
-        if (errCnt == 0 && chainID != null){
+        if (errCnt == 0 && chainID != null) {
             let completedEvmStep = STEP5_loadGSEvmRec
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);

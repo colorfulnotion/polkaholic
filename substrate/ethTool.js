@@ -1272,10 +1272,10 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
                 /* do something */
                 console.log(`TODO*** res[${fld}] is function`, val)
                 val = []
-            }else if (val != undefined){
+            } else if (val != undefined) {
                 try {
                     val = JSON.parse(JSON.stringify(val))
-                } catch (e1){
+                } catch (e1) {
                     console.log(`e1 res[${fld}] val!!`, res[fld])
                     console.log(`e1+++`, e1)
                 }
@@ -2834,7 +2834,7 @@ async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
 
-function getSchemaWithoutDesc(schema){
+function getSchemaWithoutDesc(schema) {
     let tinySchema = []
     for (let i = 0; i < schema.length; i++) {
         let s = schema[i]

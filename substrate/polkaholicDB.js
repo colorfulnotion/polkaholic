@@ -910,7 +910,7 @@ from chain where chainID = '${chainID}' limit 1`);
         this.disconnectedCnt += 1
     }
 
-    get_google_storage(){
+    get_google_storage() {
         if (this.googleStorage) return this.googleStorage;
         this.googleStorage = new Storage({
             projectId: 'substrate-etl',
@@ -1525,19 +1525,19 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     sortArrayByField(array, field, order = 'asc') {
-      return array.sort((a, b) => {
-        if (order === 'asc') {
-          return a[field] - b[field];
-        } else if (order === 'desc') {
-          return b[field] - a[field];
-        } else {
-          throw new Error("Invalid sorting order. Use 'asc' or 'desc'.");
-        }
-      });
+        return array.sort((a, b) => {
+            if (order === 'asc') {
+                return a[field] - b[field];
+            } else if (order === 'desc') {
+                return b[field] - a[field];
+            } else {
+                throw new Error("Invalid sorting order. Use 'asc' or 'desc'.");
+            }
+        });
     }
 
     // [blocks, contracts, logs, token_transfers, traces, transactions]
-    build_evm_block_from_row(row){
+    build_evm_block_from_row(row) {
         let rowData = row.data;
         let r = {
             prefix: false,
@@ -1625,17 +1625,17 @@ from chain where chainID = '${chainID}' limit 1`);
         }
 
         let btTxCols = ["block_hash", "block_number", "from_address", "gas", "gas_price", "max_fee_per_gas", "max_priority_fee_per_gas", "hash", "input", "nonce", "to_address", "transaction_index", "value", "transaction_type", "chain_id"]
-        let rpcTxCols = ["blockHash","blockNumber", "from", "gas","gasPrice","maxFeePerGas","maxPriorityFeePerGas","hash","input","nonce","to","transactionIndex","value","type","chainId"] //no accessList, v, r, s
+        let rpcTxCols = ["blockHash", "blockNumber", "from", "gas", "gasPrice", "maxFeePerGas", "maxPriorityFeePerGas", "hash", "input", "nonce", "to", "transactionIndex", "value", "type", "chainId"] //no accessList, v, r, s
 
         // include transaction
         let rpcTxns = []
         let rpcReceipts = [] //receipt is a combinations of txn result + logs.. need to extract from both obj
 
-        let btReceiptCols = ["block_hash","block_number","receipt_contract_address","receipt_cumulative_gas_used","receipt_effective_gas_price", "from_address","receipt_gas_used","logs", "logsBloom", "receipt_status","to_address","hash","transaction_index","transaction_type"] //no bloom
-        let rpcReceiptCols = ["blockHash","blockNumber","contractAddress","cumulativeGasUsed","effectiveGasPrice","from","gasUsed","logs", "logsBloom", "status","to","transactionHash","transactionIndex","type"]
+        let btReceiptCols = ["block_hash", "block_number", "receipt_contract_address", "receipt_cumulative_gas_used", "receipt_effective_gas_price", "from_address", "receipt_gas_used", "logs", "logsBloom", "receipt_status", "to_address", "hash", "transaction_index", "transaction_type"] //no bloom
+        let rpcReceiptCols = ["blockHash", "blockNumber", "contractAddress", "cumulativeGasUsed", "effectiveGasPrice", "from", "gasUsed", "logs", "logsBloom", "status", "to", "transactionHash", "transactionIndex", "type"]
 
-        let btLogCols = ["address","topics","data","block_number","transaction_hash","transaction_index","block_hash","log_index","removed"] //no removed
-        let rpcLogCols = ["address","topics","data","blockNumber","transactionHash","transactionIndex","blockHash","logIndex","removed"]
+        let btLogCols = ["address", "topics", "data", "block_number", "transaction_hash", "transaction_index", "block_hash", "log_index", "removed"] //no removed
+        let rpcLogCols = ["address", "topics", "data", "blockNumber", "transactionHash", "transactionIndex", "blockHash", "logIndex", "removed"]
 
         this.sortArrayByField(r.transactions, 'transaction_index', 'asc');
         this.sortArrayByField(r.logs, 'log_index', 'asc');
@@ -1651,11 +1651,11 @@ from chain where chainID = '${chainID}' limit 1`);
             for (let i = 0; i < btLogCols.length; i++) {
                 let btLogCol = btLogCols[i]
                 let rpcLogCol = rpcLogCols[i]
-                if (rpcLogCol == "removed"){
+                if (rpcLogCol == "removed") {
                     rpcLog["removed"] = false
                     //It is true when the log was removed due to a chain reorganization, and false if it's a valid log. since we don't have this. will use false for all
-                }else{
-                    rpcLog[rpcLogCol] = (btLog[btLogCol] != undefined)? btLog[btLogCol]: null
+                } else {
+                    rpcLog[rpcLogCol] = (btLog[btLogCol] != undefined) ? btLog[btLogCol] : null
                 }
             }
             logMap[transactionHash].push(rpcLog)
@@ -1672,7 +1672,7 @@ from chain where chainID = '${chainID}' limit 1`);
             for (let i = 0; i < btTxCols.length; i++) {
                 let btTxCol = btTxCols[i]
                 let rpcTxCol = rpcTxCols[i]
-                rpcTxn[rpcTxCol] = (btTxn[btTxCol] != undefined)?  btTxn[btTxCol] : null
+                rpcTxn[rpcTxCol] = (btTxn[btTxCol] != undefined) ? btTxn[btTxCol] : null
             }
             //btTxn is missing accessList, r, s, v
             rpcTxns.push(rpcTxn)
@@ -1681,17 +1681,17 @@ from chain where chainID = '${chainID}' limit 1`);
             for (let i = 0; i < btReceiptCols.length; i++) {
                 let btReceiptCol = btReceiptCols[i]
                 let rpcReceiptCol = rpcReceiptCols[i]
-                if (rpcReceiptCol == "logsBloom"){
+                if (rpcReceiptCol == "logsBloom") {
                     rpcReceipt["logsBloom"] = null
-                }else if (rpcReceiptCol == "logs"){
-                    if (logMap[transactionHash] == undefined){
+                } else if (rpcReceiptCol == "logs") {
+                    if (logMap[transactionHash] == undefined) {
                         rpcReceipt["logs"] = [] // TODO build logs using logs
-                    }else{
+                    } else {
                         //console.log(`${transactionHash} logs`, logMap[transactionHash])
                         rpcReceipt["logs"] = logMap[transactionHash]
                     }
-                }else{
-                    rpcReceipt[rpcReceiptCol] = (btTxn[btReceiptCol] != undefined)? btTxn[btReceiptCol] : null
+                } else {
+                    rpcReceipt[rpcReceiptCol] = (btTxn[btReceiptCol] != undefined) ? btTxn[btReceiptCol] : null
                 }
             }
             // rpcReceipts is missing logsbloom + removed

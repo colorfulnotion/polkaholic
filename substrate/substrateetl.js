@@ -161,7 +161,7 @@ module.exports = class SubstrateETL extends AssetManager {
             for (const r of recs) {
                 let [logDT, hr] = paraTool.ts_to_logDT_hr(r.logTS);
                 let logYYYYMMDD = logDT.replaceAll('-', '')
-		let bqDataset = this.get_relayChain_dataset(relayChain);
+                let bqDataset = this.get_relayChain_dataset(relayChain);
                 let cmd = `bq query --destination_table '${bqDataset}.balances${paraID}$${logYYYYMMDD}' --project_id=${projectID} --time_partitioning_field ts --replace --use_legacy_sql=false 'select symbol,address_ss58,CONCAT(LEFT(address_pubkey, 2), RIGHT(address_pubkey, 40)) as address_pubkey,ts,id,chain_name,asset,para_id,free,free_usd,reserved,reserved_usd,misc_frozen,misc_frozen_usd,frozen,frozen_usd,price_usd from ${bqDataset}.balances${paraID} where DATE(ts) = "${logDT}"'`
                 try {
                     console.log(cmd);
@@ -315,7 +315,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     get_relayChain_dataset(relayChain, isProd = true) {
-	return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
+        return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
     }
 
     async publishExchangeAddress() {
@@ -624,7 +624,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let paraID = paraTool.getParaIDfromChainID(chainID);
             let relayChain = paraTool.getRelayChainByChainID(chainID);
             let monthDT = r.monthDT ? r.monthDT.toISOString().split('T')[0] : "";
-	    let bqDataset = this.get_relayChain_dataset(relayChain);
+            let bqDataset = this.get_relayChain_dataset(relayChain);
             let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${bqDataset}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
             console.log(sqlQuery);
             let rows = await this.execute_bqJob(sqlQuery, paraTool.BQUSMulti);
@@ -1642,7 +1642,7 @@ Example of contractInfoOf:
         // 1. Build contractsevents{paraID} from startDT with a single bq load operation that generates an empirically small table
         if (loadSourceTables) {
             try {
-		let bqDataset = this.get_relayChain_dataset(relayChain);
+                let bqDataset = this.get_relayChain_dataset(relayChain);
                 let targetSQL = `SELECT * FROM \`substrate-etl.${bqDataset}.extrinsics${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
                 let destinationTbl = `contracts.contractsextrinsics${id}`
                 let partitionedFld = 'block_time'
@@ -2445,7 +2445,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         for (const relayChain of relayChains) {
             // 1. Generate system tables:
             let system_tables = ["chains", "xcmassets", "assets"];
-	    let bqDataset = this.get_relayChain_dataset(relayChain)
+            let bqDataset = this.get_relayChain_dataset(relayChain)
             for (const tbl of system_tables) {
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
@@ -3104,8 +3104,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let bqjobs = []
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let accountTbls = ["new", "reaped", "active", "all"]
-	let polkadot = this.get_relayChain_dataset("polkadot");
-	let kusama = this.get_relayChain_dataset("kusama");
+        let polkadot = this.get_relayChain_dataset("polkadot");
+        let kusama = this.get_relayChain_dataset("kusama");
         for (const tbl of accountTbls) {
             let tblName = `accounts${tbl}`
             let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
@@ -3254,7 +3254,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         //accountMetricsStatus, updateAddressBalanceStatus, crowdloanMetricsStatus, sourceMetricsStatus, poolsMetricsStatus, identityMetricsStatus, loaded
         switch (dumpType) {
             case "substrate-etl":
-            // how to check if dump substrate-etl is ready?
+                // how to check if dump substrate-etl is ready?
 
                 sql = `select UNIX_TIMESTAMP(logDT) indexTS, blocklog.chainID, chain.isEVM from blocklog, chain where blocklog.chainID = chain.chainID and blocklog.loaded >= 0 and logDT = '${logDT}' and ( loadAttemptDT is null or loadAttemptDT < DATE_SUB(Now(), INTERVAL POW(5, attempted) MINUTE) ) and chain.chainID = ${chainID} order by rand() limit 1`;
                 recs = await this.poolREADONLY.query(sql);
@@ -3866,7 +3866,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async update_xcm_summary(relayChain, logDT) {
         let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;
-	let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset = this.get_relayChain_dataset(relayChain);
         let sqla = {
             "xcmtransfers0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
@@ -3960,7 +3960,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let id = this.getIDByChainID(chainID);
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back, TODO: add calls?
         let processCalls = false
-        if (processCalls){
+        if (processCalls) {
             tbls.push("calls")
         }
         console.log(`dump_substrateetl paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID}), tbls=${tbls}`)
@@ -4270,7 +4270,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     }
                     //console.log(`bqExtrinsic`, bqExtrinsic)
                     extrinsics.push(bqExtrinsic);
-                    if (processCalls){
+                    if (processCalls) {
                         let flattenedCalls = await this.paramToCalls(ext.extrinsicID, ext.section, ext.method, ext.callIndex, ext.params, ext.paramsDef, chainID, block.block_time, '0')
                         for (const call of flattenedCalls) {
                             let ext_fee = null
@@ -4807,7 +4807,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let project = this.project;
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
-	let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset = this.get_relayChain_dataset(relayChain);
         let sqla = {
             "balances": `select date(ts) logDT, count(distinct address_pubkey) as numAddresses from ${project}.${bqDataset}.balances${paraID} where DATE(ts) >= "${startDT}" group by logDT order by logDT`,
             "extrinsics": `select date(block_time) logDT, count(*) as numExtrinsics, sum(if(signed, 1, 0)) as numSignedExtrinsics, sum(fee) fees from ${project}.${bqDataset}.extrinsics${paraID} where DATE(block_time) >= "${startDT}" group by logDT having logDT < "${today}" order by logDT`,

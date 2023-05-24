@@ -8308,7 +8308,7 @@ module.exports = class Indexer extends AssetManager {
         let autoTraces = false
         let blkNum = false
         let blkHash = false
-        let blockTS =  false
+        let blockTS = false
         let blockAvailable = false
         let traceAvailable = false
         let receiptsAvailable = false
@@ -8336,93 +8336,101 @@ module.exports = class Indexer extends AssetManager {
         ])
         let [dTxns, dReceipts] = await statusesPromise
         //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
-        if (mode == "store_stream_evm"){
+        if (mode == "store_stream_evm") {
             await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
-        }else if (mode == "stream_evm"){
+        } else if (mode == "stream_evm") {
             await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
         }
         return r;
     }
 
     async deleteFilesWithChainID(basePath, chainID) {
-      // Helper function to delete a file
-      console.log(`basePath: ${basePath}`)
-      const deleteFile = (filePath) => {
-        try {
-          fs.unlinkSync(filePath);
-          console.log(`Deleted file: ${filePath}`);
-        } catch (error) {
-          console.error(`Error deleting file: ${filePath}`, error);
+        // Helper function to delete a file
+        console.log(`basePath: ${basePath}`)
+        const deleteFile = (filePath) => {
+            try {
+                fs.unlinkSync(filePath);
+                console.log(`Deleted file: ${filePath}`);
+            } catch (error) {
+                console.error(`Error deleting file: ${filePath}`, error);
+            }
+        };
+
+        // Helper function to recursively search and delete files
+        const searchAndDelete = (dirPath) => {
+            const entries = fs.readdirSync(dirPath, {
+                withFileTypes: true
+            });
+            for (const entry of entries) {
+                const entryPath = path.join(dirPath, entry.name);
+                if (entry.isFile() && entry.name.endsWith(`${chainID}.json`)) {
+                    deleteFile(entryPath);
+                } else if (entry.isDirectory()) {
+                    searchAndDelete(entryPath);
+                }
+            }
+        };
+
+        // Create base path if it doesn't exist
+        if (!fs.existsSync(basePath)) {
+            fs.mkdirSync(basePath, {
+                recursive: true
+            });
+            console.log(`Created base path: ${basePath}`);
         }
-      };
 
-      // Helper function to recursively search and delete files
-      const searchAndDelete = (dirPath) => {
-        const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-        for (const entry of entries) {
-          const entryPath = path.join(dirPath, entry.name);
-          if (entry.isFile() && entry.name.endsWith(`${chainID}.json`)) {
-            deleteFile(entryPath);
-          } else if (entry.isDirectory()) {
-            searchAndDelete(entryPath);
-          }
-        }
-      };
-
-      // Create base path if it doesn't exist
-      if (!fs.existsSync(basePath)) {
-          fs.mkdirSync(basePath, { recursive: true });
-          console.log(`Created base path: ${basePath}`);
-      }
-
-      // Start the search and delete process
-      searchAndDelete(basePath);
+        // Start the search and delete process
+        searchAndDelete(basePath);
     }
 
     async streamWrite(fn, JSONNLArray, isReplace = false) {
-      // Ensure the directory exists
-      let dir = path.dirname(fn)
-      if (!fs.existsSync(dir)) {
-        fs.mkdirSync(dir, { recursive: true });
-        console.log(`Making Directory "${dir}"`);
-      } else {
-        console.log(`Directory "${dir}" already exists.`);
-      }
-      // Delete the existing file if isReplace is true
-      if (isReplace && fs.existsSync(fn)) {
-        fs.unlinkSync(fn);
-      }
-      console.log(`${fn} replaced=${isReplace}`, JSONNLArray)
-      // Create a readable stream from the JSONNLArray
-      let readableStream = new stream.Readable({
-        read() {
-          JSONNLArray.forEach((jsonObject) => {
-            let str = JSON.stringify(jsonObject) + '\n'
-            //console.log(`*** str`, str)
-            this.push(str);
-          });
-          this.push(null); // Signal the end of the stream
-        },
-      });
-      //console.log(`readableStream`, readableStream)
+        // Ensure the directory exists
+        let dir = path.dirname(fn)
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, {
+                recursive: true
+            });
+            console.log(`Making Directory "${dir}"`);
+        } else {
+            console.log(`Directory "${dir}" already exists.`);
+        }
+        // Delete the existing file if isReplace is true
+        if (isReplace && fs.existsSync(fn)) {
+            fs.unlinkSync(fn);
+        }
+        console.log(`${fn} replaced=${isReplace}`, JSONNLArray)
+        // Create a readable stream from the JSONNLArray
+        let readableStream = new stream.Readable({
+            read() {
+                JSONNLArray.forEach((jsonObject) => {
+                    let str = JSON.stringify(jsonObject) + '\n'
+                    //console.log(`*** str`, str)
+                    this.push(str);
+                });
+                this.push(null); // Signal the end of the stream
+            },
+        });
+        //console.log(`readableStream`, readableStream)
 
-      // Create a write stream to the local file in append mode
-      const writeStream = fs.createWriteStream(fn, { flags: 'a' });
+        // Create a write stream to the local file in append mode
+        const writeStream = fs.createWriteStream(fn, {
+            flags: 'a'
+        });
 
-      // Pipe the readable stream to the write stream and return a Promise
-      return new Promise((resolve, reject) => {
-        console.log('Starting to consume the readableStream');
-        readableStream
-          .pipe(writeStream)
-          .on('error', (error) => {
-            console.error('Error during streaming:', error);
-            reject(error);
-          })
-          .on('finish', () => {
-            //console.log('Data streamed successfully to the local file:', fn);
-            resolve();
-          });
-      });
+        // Pipe the readable stream to the write stream and return a Promise
+        return new Promise((resolve, reject) => {
+            console.log('Starting to consume the readableStream');
+            readableStream
+                .pipe(writeStream)
+                .on('error', (error) => {
+                    console.error('Error during streaming:', error);
+                    reject(error);
+                })
+                .on('finish', () => {
+                    //console.log('Data streamed successfully to the local file:', fn);
+                    resolve();
+                });
+        });
     }
 
     async store_stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
@@ -8762,8 +8770,10 @@ module.exports = class Indexer extends AssetManager {
         let autoEvmStorePromise = []
         let autoEvmStorePromiseFn = []
         if (!fs.existsSync(evmLogBasePath)) {
-          fs.mkdirSync(evmLogBasePath, { recursive: true });
-          console.log(`Making Directory "${evmLogBasePath}"`);
+            fs.mkdirSync(evmLogBasePath, {
+                recursive: true
+            });
+            console.log(`Making Directory "${evmLogBasePath}"`);
         }
         for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
@@ -8771,13 +8781,17 @@ module.exports = class Indexer extends AssetManager {
             let fn = `${evmLogBasePath}${tableId}/${chainID}.json`
             if (rows && rows.length > 0) {
                 let recs = []
-                for (const row of rows){
+                for (const row of rows) {
                     recs.push(row.json)
                 }
                 let replace = false
                 console.log(`${evmDatasetID}:${tableId} -> ${fn}`, recs)
                 //await this.streamWrite(fn, recs, replace);
-                autoEvmStorePromiseFn.push({fn: fn, tableId: tableId, rowCnt: rows.length})
+                autoEvmStorePromiseFn.push({
+                    fn: fn,
+                    tableId: tableId,
+                    rowCnt: rows.length
+                })
                 autoEvmStorePromise.push(this.streamWrite(fn, recs, replace))
             }
         }
@@ -9673,7 +9687,7 @@ module.exports = class Indexer extends AssetManager {
                         break;
                     case "transactions":
                         let raw_transactions = [];
-                        for (const transaction of rows_transactions){
+                        for (const transaction of rows_transactions) {
                             raw_transactions.push(transaction.json)
                         }
                         cres.data[tbl][blockHash] = {
@@ -9684,7 +9698,7 @@ module.exports = class Indexer extends AssetManager {
                         break;
                     case "logs":
                         let raw_logs = [];
-                        for (const log of rows_logs){
+                        for (const log of rows_logs) {
                             raw_logs.push(log.json)
                         }
                         cres.data[tbl][blockHash] = {
@@ -9696,7 +9710,7 @@ module.exports = class Indexer extends AssetManager {
                 }
                 console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
             }
-        } catch (e){
+        } catch (e) {
             console.log(`bt error`, e)
             cres = false
         }
@@ -9824,7 +9838,7 @@ module.exports = class Indexer extends AssetManager {
         }
 
         let tbl = this.instance.table("evmchain" + chainID);
-        if (cres){
+        if (cres) {
             try {
                 console.log(`update bt evmchain${chainID}`, cres)
                 await this.insertBTRows(tbl, [cres], "evmchain");
@@ -10080,7 +10094,7 @@ module.exports = class Indexer extends AssetManager {
         return false;
     }
 
-    async setupEvm(chainID){
+    async setupEvm(chainID) {
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
         await this.initEvmSchemaMap()
@@ -10130,7 +10144,7 @@ module.exports = class Indexer extends AssetManager {
 
     }
 
-    async index_block_evm_from_bt(chainID, blkNum){
+    async index_block_evm_from_bt(chainID, blkNum) {
         let families = ["blocks", "logs", "traces", "transactions"]
         let startTS = new Date().getTime();
         const evmTableChain = this.getEvmTableChain(chainID);
@@ -10142,7 +10156,7 @@ module.exports = class Indexer extends AssetManager {
             family: families
         });
 
-        if (rows.length == 1){
+        if (rows.length == 1) {
             try {
                 await this.setupEvm(chainID)
                 let row = rows[0];
