@@ -96,11 +96,11 @@ function dechex(number) {
 }
 
 const STEP0_createRec = 0
-const STEP1_blcp = 1
+const STEP1_cpblk = 1
 const STEP2_backfill = 2
 const STEP3_indexEvmChain = 3
-const STEP4_cpEvmLogToGS = 4
-const STEP5_loadGSEvmRec = 5
+const STEP4_cpEvmDecodedToGS = 4
+const STEP5_loadGSEvmDecoded = 5
 
 module.exports = class EVMETL extends PolkaholicDB {
 
@@ -2026,31 +2026,42 @@ mysql> desc projectcontractabi;
 
     /* Regnerate One day worth of data
 
-    ./evm-etl blcp -l 2023-05-12
-
-    ./evm-etl backfill -c 1 -l 2023-05-12
-
-    ./evm-etl indexchain -c 1 -l 2023-05-12
-
-    ./evm-etl cpevmlogtogs -c 1 -l 2023-05-12
-
-    ./evm-etl loadevmrec -l 2023-05-12
-
     const step0_createRec = 0
-    const step1_blcp = 1
-    const step2_backfill = 2
-    const step3_indexEvmChain = 3
-    const step4_cpEvmLogToGS = 4
-    const step5_loadGSEvmRec = 5
+        function: cpblk(dt, chainID)
 
+    const step1_cpblk = 1
+        function: cpblk()
+        Source: crypto_ethereum..
+        Output: gs://evm_etl/YYYY/MM/DD/chainID/
+
+    const step2_backfill = 2
+        function: backfill(dt, chainID)
+        Source: gs://evm_etl/YYYY/MM/DD/chainID/
+        LocalTmp: /tmp/evm_etl/YYYY/MM/DD/chainID/
+        Output: cbt evmchain${chainID}
+
+    const step3_indexEvmChain = 3
+        function: index_evmchain(chainID, dt)
+        Source: cbt evmchain${chainID}
+        LocalTmp: /tmp/evm_decoded/YYYY/MM/DD/
+
+    const STEP4_cpEvmDecodedToGS = 4
+        function: cpEvmDecodedToGS(dt, chainID, dryrun)
+        Input: /tmp/evm_decoded/YYYY/MM/DD/
+        Output: gs://evm_decoded/YYYY/MM/DD/
+
+    const STEP5_loadGSEvmDecoded = 5
+        function: loadGSEvmDecoded(dt, chainID)
+        Input:gs://evm_decoded/YYYY/MM/DD/
+        localInput: /disk1/evmschema
     */
 
     async processChainStep(dt, chainID, currEvmStep) {
         switch (currEvmStep) {
             case 0:
-                //blcp
-                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=0, blcp`)
-                await this.blcp(dt, chainID);
+                //cpblk
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=0, cpblk`)
+                await this.cpblk(dt, chainID);
                 break;
             case 1:
                 //backfill
@@ -2063,14 +2074,14 @@ mysql> desc projectcontractabi;
                 await this.index_evmchain(chainID, dt);
                 break;
             case 3:
-                //cp_evm_log_to_gs
-                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=3, cp_evm_log_to_gs`)
-                await this.cp_evm_log_to_gs(dt, chainID, false);
+                //cpEvmDecodedToGS
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=3, cpEvmDecodedToGS`)
+                await this.cpEvmDecodedToGS(dt, chainID, false);
                 break;
             case 4:
-                //load_gs_evmrec - this is not chain specific
-                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=4, load_gs_evmrec`)
-                await this.load_gs_evmrec(dt, chainID);
+                //loadGSEvmDecoded - this is not chain specific
+                console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=4, loadGSEvmDecoded`)
+                await this.loadGSEvmDecoded(dt, chainID);
                 break;
             case 5:
                 console.log(`[chainID=${chainID}, logDT=${dt}] evmStep=5, DONE`)
@@ -2081,7 +2092,7 @@ mysql> desc projectcontractabi;
         return jobInfo
     }
 
-    async blcp(dt, chainID, id = "ethereum") {
+    async cpblk(dt, chainID, id = "ethereum") {
         let srcprojectID, srcdataset;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
 
@@ -2097,13 +2108,13 @@ mysql> desc projectcontractabi;
                 id = 'polygon';
                 break;
         }
-        console.log(`chainID=${chainID}, srcprojectID=${srcprojectID}, srcdataset=${srcdataset}, uri=gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/`)
+        console.log(`chainID=${chainID}, srcprojectID=${srcprojectID}, srcdataset=${srcdataset}, uri=gs://evm_etl/${logYYYY_MM_DD}/${chainID}/`)
         let tables = {
             "blocks": {
                 "ts": "timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner, difficulty, total_difficulty from \`${srcprojectID}.${srcdataset}.blocks\` where date(timestamp) = "${currDT}" order by number, timestamp`,
                 "flds": `chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/blocks_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/blocks_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, unix_seconds(timestamp) timestamp, number, \`hash\`, parent_hash, nonce, sha3_uncles, logs_bloom, transactions_root, state_root, receipts_root, miner,  CAST(difficulty as string) difficulty, CAST(total_difficulty as string) total_difficulty
                 FROM \`substrate-etl.crypto_ethereum.blocks\` WHERE DATE(timestamp) = "${currDT}"
                 ORDER BY number, timestamp`
@@ -2112,7 +2123,7 @@ mysql> desc projectcontractabi;
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, address, bytecode, function_sighashes, is_erc20, is_erc721, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.contracts\` where date(block_timestamp) = "${currDT}" order by block_number, block_timestamp`,
                 "flds": `chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/contracts_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/contracts_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, address, bytecode, function_sighashes, is_erc20, is_erc721, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
                 FROM \`substrate-etl.crypto_ethereum.contracts\` WHERE DATE(block_timestamp) = "${currDT}"
                 ORDER BY block_number, block_timestamp`
@@ -2121,7 +2132,7 @@ mysql> desc projectcontractabi;
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, log_index, transaction_hash, transaction_index, address, data, topics, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.logs\` where date(block_timestamp) = "${currDT}" order by block_number, log_index, transaction_index, block_timestamp`,
                 "flds": `chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/logs_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/logs_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, log_index, transaction_hash, transaction_index, address, data, topics, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
                 FROM \`substrate-etl.crypto_ethereum.logs\` WHERE DATE(block_timestamp) = "${currDT}"
                 ORDER BY block_number, log_index, transaction_index, block_timestamp`
@@ -2130,7 +2141,7 @@ mysql> desc projectcontractabi;
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, token_address, from_address, to_address, value, transaction_hash, log_index, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.token_transfers\` where date(block_timestamp) = "${currDT}" order by block_number, log_index, block_timestamp`,
                 "flds": `chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/token_transfers_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/token_transfers_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, token_address, from_address, to_address, value, transaction_hash, log_index, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
                 FROM \`substrate-etl.crypto_ethereum.token_transfers\` WHERE DATE(block_timestamp) = "${currDT}"
                 ORDER BY block_number, log_index, block_timestamp`
@@ -2139,7 +2150,7 @@ mysql> desc projectcontractabi;
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, address, symbol, name, decimals, total_supply, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.tokens\` where date(block_timestamp) = "${currDT}" order by block_number, block_timestamp`,
                 "flds": `chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/tokens_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/tokens_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, address, symbol, name, decimals, total_supply, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
                 FROM \`substrate-etl.crypto_ethereum.tokens\` WHERE DATE(block_timestamp) = "${currDT}"
                 ORDER BY block_number, block_timestamp
@@ -2150,7 +2161,7 @@ mysql> desc projectcontractabi;
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, block_timestamp, block_number, block_hash from \`${srcprojectID}.${srcdataset}.traces\` where date(block_timestamp) = "${currDT}" order by block_number, transaction_index, trace_address, subtraces`,
                 "flds": `chain_id, id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/traces_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/traces_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, transaction_hash, transaction_index, from_address, to_address, value, input, output, trace_type, call_type, reward_type, gas, gas_used, subtraces, trace_address, error, status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash
                 FROM \`substrate-etl.crypto_ethereum.traces\`where date(block_timestamp) = "${currDT}"
                 ORDER BY block_number, transaction_index, trace_address, subtraces
@@ -2161,7 +2172,7 @@ mysql> desc projectcontractabi;
                 "ts": "block_timestamp",
                 "sql": `select ${chainID} as chain_id, "${id}" as id, \`hash\`, nonce, transaction_index, from_address, to_address, value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price from \`${srcprojectID}.${srcdataset}.transactions\` where date(block_timestamp) = "${currDT}" order by block_number, transaction_index`,
                 "flds": `chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price`,
-                "gs": `EXPORT DATA OPTIONS( uri="gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/transactions_*", format="JSON", overwrite=true) AS
+                "gs": `EXPORT DATA OPTIONS( uri="gs://evm_etl/${logYYYY_MM_DD}/${chainID}/transactions_*", format="JSON", overwrite=true) AS
                 SELECT chain_id, id, \`hash\`, nonce, transaction_index, from_address, to_address, CAST(value as string) value, gas, gas_price, input, receipt_cumulative_gas_used, receipt_gas_used, receipt_contract_address, receipt_root, receipt_status, unix_seconds(block_timestamp) block_timestamp, block_number, block_hash, max_fee_per_gas, max_priority_fee_per_gas, transaction_type, receipt_effective_gas_price
                 FROM \`substrate-etl.crypto_ethereum.transactions\`where date(block_timestamp) = "${currDT}"
                 ORDER BY block_number, transaction_index
@@ -2205,7 +2216,7 @@ mysql> desc projectcontractabi;
         await this.batchExec(bqCmds)
         await this.batchExec(gsCmds)
         if (errCnt == 0) {
-            let completedEvmStep = STEP1_blcp
+            let completedEvmStep = STEP1_cpblk
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);
             await this.update_batchedSQL();
@@ -2224,7 +2235,7 @@ mysql> desc projectcontractabi;
     }
 
 
-    async countLinesInFile(fn = '/disk1/evm/blocks_000000000000') {
+    async countLinesInFile(fn) {
         return new Promise((resolve, reject) => {
             const readStream = fs.createReadStream(fn, {
                 encoding: 'utf8'
@@ -2255,7 +2266,7 @@ mysql> desc projectcontractabi;
         });
     }
 
-    async parseJSONL(fn = '/disk1/evm/blocks_000000000000', prevIncompleteBlkRecordsMaps = false, offsetStart = 0, maxN = null) {
+    async parseJSONL(fn, prevIncompleteBlkRecordsMaps = false, offsetStart = 0, maxN = null) {
         const fileStream = fs.createReadStream(fn, {
             encoding: 'utf8'
         });
@@ -2332,7 +2343,7 @@ mysql> desc projectcontractabi;
         return resp;
     }
 
-    createWorkingDir(targetPath = '/disk1/evm/2023/04/01/1/') {
+    createWorkingDir(targetPath) {
         // Create the target directory if it does not exist
         if (!fs.existsSync(targetPath)) {
             fs.mkdirSync(targetPath, {
@@ -2503,12 +2514,13 @@ mysql> desc projectcontractabi;
                 break;
         }
 
+        let rootDir = '/tmp'
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
-        let dirPath = `/disk1/evm/${logYYYY_MM_DD}/${chainID}/`
+        let dirPath = `${rootDir}/evm_etl/${logYYYY_MM_DD}/${chainID}/`
         this.createWorkingDir(dirPath)
         let errCnt = 0
         try {
-            let gsCmd = `gsutil -m cp gs://ethereum_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
+            let gsCmd = `gsutil -m cp gs://evm_etl/${logYYYY_MM_DD}/${chainID}/* ${dirPath}`
             console.log(gsCmd)
             let res = await exec(gsCmd, {
                 maxBuffer: 1024 * 64000
@@ -2540,9 +2552,10 @@ mysql> desc projectcontractabi;
             this.batchedSQL.push(updateSQL);
             await this.update_batchedSQL();
         }
+        //TODO: delete dirPath
     }
 
-    async fetch_gs_file_list(logYYYY_MM_DD = "2023/05/11", bucketName = "gs://evmrec") {
+    async fetch_gs_file_list(logYYYY_MM_DD = "2023/05/11", bucketName = "gs://evm_decoded") {
         let basePath = `${bucketName}/${logYYYY_MM_DD}/**`
         let cmd = `gsutil ls ${basePath} | jq -c -R -n '[inputs]'`
         console.log(`cmd`, cmd)
@@ -2593,7 +2606,8 @@ mysql> desc projectcontractabi;
 
     // since bq load does not allow NULLABLE/REQUIRED with inline schema. write to disk1 instead
     async writeTableSchemaJSON(tableId, tableSchema, replace = false) {
-        const filePath = path.join('/disk1', 'evmschema', `${tableId}.json`);
+        let rootDir = '/disk1'
+        const filePath = path.join(rootDir, 'evmschema', `${tableId}.json`);
         let data = tableSchema
         //console.log(`filePath=${filePath} replace=${replace}, data=${data}`);
         try {
@@ -2705,8 +2719,9 @@ mysql> desc projectcontractabi;
         let errCnt = 0
         //delete previously generated files for chainID
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
-        let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
-        await crawler.deleteFilesWithChainID(evmLogBasePath, chainID)
+        let rootDir = '/tmp'
+        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/`
+        await crawler.deleteFilesWithChainID(evmDecodedBasePath, chainID)
 
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             let startBN = bn
@@ -2802,11 +2817,12 @@ mysql> desc projectcontractabi;
         }
     }
 
-    //load evmlog to gs
-    async cp_evm_log_to_gs(dt, chainID = 1, dryRun = true) {
+    //load evm_decoded to gs
+    async cpEvmDecodedToGS(dt, chainID = 1, dryRun = true) {
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         //TODO: can't specify chainID and other filter here..
-        let cmd = `gsutil -m cp -r /disk1/evmlog/${logYYYY_MM_DD}/* gs://evmrec/${logYYYY_MM_DD}/`
+        let rootDir = '/tmp'
+        let cmd = `gsutil -m cp -r ${rootDir}/evm_decoded/${logYYYY_MM_DD}/* gs://evm_decoded/${logYYYY_MM_DD}/`
         console.log(cmd)
         let errCnt = 0
         if (!dryRun) {
@@ -2820,7 +2836,7 @@ mysql> desc projectcontractabi;
                 errCnt++
             }
             if (errCnt == 0) {
-                let completedEvmStep = STEP4_cpEvmLogToGS
+                let completedEvmStep = STEP4_cpEvmDecodedToGS
                 let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
                 this.batchedSQL.push(updateSQL);
                 await this.update_batchedSQL();
@@ -2828,7 +2844,7 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async load_gs_evmrec(dt, chainID = null) {
+    async loadGSEvmDecoded(dt, chainID = null) {
         let project_id = 'substrate-etl'
         let evmDatasetID = this.evmDatasetID
         await this.initEvmLocalSchemaMap()
@@ -2837,22 +2853,23 @@ mysql> desc projectcontractabi;
         let fns = await this.fetch_gs_file_list(logYYYY_MM_DD)
         console.log(`fns`, fns)
         if (!fns) {
-            console.log(`${logYYYY_MM_DD} evmrec not found`)
+            console.log(`${logYYYY_MM_DD} evm_decoded not found`)
             return
         }
         let loadCmds = []
         let loadJobs = []
         let errCnt = 0
         for (const fn of fns) {
-            //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
+            //gs://evm_decoded/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
             let tableId = fn.split('/')[6]
             let tableInfo = this.evmLocalSchemaMap[tableId]
             if (tableInfo != undefined) {
                 //console.log(`tableId ${tableId} Schema:`, tableInfo.tableSchema)
                 await this.writeTableSchemaJSON(tableId, tableInfo.tableSchema)
-                let jsonFN = `/disk1/evmschema/${tableId}.json`
+                let rootDir = '/disk1'
+                let jsonFN = `${rootDir}/evmschema/${tableId}.json`
                 let timePartitioningFld = (tableId.substr(0, 4) == 'call') ? "call_block_time" : "evt_block_time"
-                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evmrec/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
+                //bq load --project_id=substrate-etl --replace --source_format=NEWLINE_DELIMITED_JSON 'evm_test.evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3$20230501' gs://evm_decoded/2023/05/01/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_3/*.json   '<JSON_SCHEMA>'
                 let loadCmd = `bq load --nosynchronous_mode --max_bad_records=100 --project_id=${project_id} --replace --time_partitioning_type=DAY --time_partitioning_field=${timePartitioningFld} --source_format=NEWLINE_DELIMITED_JSON '${evmDatasetID}.${tableId}$${logYYYYMMDD}' ${fn} ${jsonFN}`
                 loadCmds.push(loadCmd)
                 let jobInfo = {
@@ -2890,7 +2907,7 @@ mysql> desc projectcontractabi;
         }
 
         if (errCnt == 0 && chainID != null) {
-            let completedEvmStep = STEP5_loadGSEvmRec
+            let completedEvmStep = STEP5_loadGSEvmDecoded
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             this.batchedSQL.push(updateSQL);
             await this.update_batchedSQL();

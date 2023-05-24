@@ -279,11 +279,11 @@ async function main() {
     /* Regnerate One day worth of data
 
     Step0 create blocklog rec
-    Step1 ./evm-etl blcp -l 2023-05-12
+    Step1 ./evm-etl cpblk -l 2023-05-12
     Step2 ./evm-etl backfill -c 1 -l 2023-05-12
     Step3 ./evm-etl indexchain -c 1 -l 2023-05-12
-    Step4 ./evm-etl cpevmlogtogs -c 1 -l 2023-05-12
-    Step5 ./evm-etl loadevmrec -l 2023-05-12
+    Step4 ./evm-etl cpevmdecoded -c 1 -l 2023-05-12
+    Step5 ./evm-etl loadevmdecoded -l 2023-05-12
 
     */
 
@@ -294,7 +294,7 @@ async function main() {
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .action(async (opt) => {
             var evmetl = new EVMETL();
-            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400)
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 3600)
             let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
             let logDT = opt.logDT ? opt.logDT : prevDT;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
@@ -312,7 +312,7 @@ async function main() {
         });
 
 
-    program.command('blcp')
+    program.command('cpblk')
         .option('-c, --chainID <chainID>', 'ChainID to cpoy', myParseInt, paraTool.chainIDEthereum)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
@@ -325,10 +325,10 @@ async function main() {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
                     for (const dt of logDTRange) {
-                        await evmetl.blcp(dt, chainID);
+                        await evmetl.cpblk(dt, chainID);
                     }
                 } else {
-                    await evmetl.blcp(logDT, chainID);
+                    await evmetl.cpblk(logDT, chainID);
                 }
             }
             process.exit(0);
@@ -378,13 +378,13 @@ async function main() {
             process.exit(0);
         });
 
-    program.command('cpevmlogtogs')
-        .option('-c, --chainID <chainID>', 'ChainID to Copy result into gs bucket: gs://evmrec/', myParseInt, paraTool.chainIDEthereum)
+    program.command('copyevmdecoded')
+        .option('-c, --chainID <chainID>', 'ChainID to Copy result into gs bucket: gs://evm_decoded/', myParseInt, paraTool.chainIDEthereum)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .action(async (opt) => {
             var evmetl = new EVMETL();
-            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400)
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 3600)
             let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
             let logDT = opt.logDT ? opt.logDT : prevDT;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
@@ -392,33 +392,33 @@ async function main() {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
                     for (const dt of logDTRange) {
-                        await evmetl.cp_evm_log_to_gs(dt, chainID);
+                        await evmetl.cpEvmDecodedToGS(dt, chainID);
                     }
                 } else {
-                    await evmetl.cp_evm_log_to_gs(logDT, chainID);
+                    await evmetl.cpEvmDecodedToGS(logDT, chainID);
                 }
             }
             process.exit(0);
         });
 
-    //loadevmrec cannot support chainID-specific update
-    program.command('loadevmrec')
+    //loadevmdecoded cannot support chainID-specific update
+    program.command('loadevmdecoded')
         //.option('-c, --chainID <chainID>', 'ChainID to load result', myParseInt, paraTool.chainIDEthereum)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .action(async (opt) => {
             var evmetl = new EVMETL();
-            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400)
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 3600)
             let logDT = opt.logDT ? opt.logDT : prevDT;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
             if (logDT) {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
                     for (const dt of logDTRange) {
-                        await evmetl.load_gs_evmrec(dt);
+                        await evmetl.loadGSEvmDecoded(dt);
                     }
                 } else {
-                    await evmetl.load_gs_evmrec(logDT);
+                    await evmetl.loadGSEvmDecoded(logDT);
                 }
             }
             process.exit(0);
