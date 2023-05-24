@@ -11,6 +11,7 @@ const path = require('path');
 const Crawler = require("./crawler");
 
 const fs = require('fs');
+const fsPromises = require('fs').promises;
 const readline = require('readline');
 const glob = require('glob');
 
@@ -2171,6 +2172,7 @@ mysql> desc projectcontractabi;
         let cmds = []
         let bqCmds = []
         let gsCmds = []
+        let errCnt = 0
         for (const tbl of Object.keys(tables)) {
             let t = tables[tbl];
             //let [logTS, logYYYYMMDD, currDT, prevDT] = this.getAllTimeFormat(dt)
@@ -2186,7 +2188,6 @@ mysql> desc projectcontractabi;
             cmds.push(bqCmd)
             cmds.push(gsCmd)
         }
-        let errCnt = 0
         /*
         for (const cmd of cmds){
             try {
@@ -2584,13 +2585,13 @@ mysql> desc projectcontractabi;
     async writeTableSchemaJSON(tableId, tableSchema, replace = false) {
         const filePath = path.join('/disk1', 'evmschema', `${tableId}.json`);
         let data = tableSchema
-        //console.log(`filePath=${filePath} replace=${replace}, data=${data}`)
+        //console.log(`filePath=${filePath} replace=${replace}, data=${data}`);
         try {
-            await fs.stat(filePath, () => {});
+            await fsPromises.access(filePath);
             // File exists
             if (replace) {
                 // Replace the file
-                await fs.writeFile(filePath, data, () => {});
+                await fsPromises.writeFile(filePath, data);
                 console.log(`Table schema replaced in ${filePath}`);
             } else {
                 //console.log(`File ${filePath} already exists, skipping`);
@@ -2598,7 +2599,7 @@ mysql> desc projectcontractabi;
         } catch (err) {
             if (err.code === 'ENOENT') {
                 // File does not exist, so write it
-                await fs.writeFile(filePath, data, () => {});
+                await fsPromises.writeFile(filePath, data);
                 console.log(`Table schema written to ${filePath}`);
             } else {
                 // Some other error occurred
@@ -2690,6 +2691,7 @@ mysql> desc projectcontractabi;
         let currPeriod = recs[0];
         let evmindexLogs = []
         let batches = []
+        let errCnt = 0
         //delete previously generated files for chainID
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
         let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
@@ -2730,6 +2732,7 @@ mysql> desc projectcontractabi;
 
             let rowLen = rows.length
             let expectedLen = b.endBN - b.startBN + 1
+            let missedBNs = []
             if (rowLen != expectedLen){
                 let expectedRangeBNs = [];
                 let observedBNs = []
@@ -2742,7 +2745,7 @@ mysql> desc projectcontractabi;
                 }
                 // await this.audit_chain(chain, startBN, endBN)
                 // can we do a more robost audit_chain here?
-                let missedBNs = expectedRangeBNs.filter(function(num) {
+                missedBNs = expectedRangeBNs.filter(function(num) {
                     return observedBNs.indexOf(num) === -1;
                 });
             }
@@ -2780,8 +2783,6 @@ mysql> desc projectcontractabi;
                 "replace": indexlogvals
             });
         }
-
-        let errCnt = 0
         if (errCnt == 0){
             let completedEvmStep = STEP3_indexEvmChain
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
@@ -2796,6 +2797,7 @@ mysql> desc projectcontractabi;
         //TODO: can't specify chainID and other filter here..
         let cmd = `gsutil -m cp -r /disk1/evmlog/${logYYYY_MM_DD}/* gs://evmrec/${logYYYY_MM_DD}/`
         console.log(cmd)
+        let errCnt = 0
         if (!dryRun){
             try {
                 let res = await exec(cmd, {
@@ -2818,7 +2820,6 @@ mysql> desc projectcontractabi;
     async load_gs_evmrec(dt){
         let project_id = 'substrate-etl'
         let evmDatasetID = this.evmDatasetID
-
         await this.initEvmLocalSchemaMap()
         await this.generateTableSchemaJSON()
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
@@ -2830,6 +2831,7 @@ mysql> desc projectcontractabi;
         }
         let loadCmds = []
         let loadJobs = []
+        let errCnt = 0
         for (const fn of fns){
             //gs://evmrec/2023/05/11/evt_Transfer_0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef_1/1.json
             let tableId = fn.split('/')[6]
@@ -2862,7 +2864,7 @@ mysql> desc projectcontractabi;
         }
         let i = 0;
         let n = 0
-        let batchSize = 50; // safety check
+        let batchSize = 20; // safety check
         let totalLen = loadCmds.length
         let processedLen = 0
         while (i < loadCmds.length) {
@@ -2876,7 +2878,7 @@ mysql> desc projectcontractabi;
             }
         }
 
-        let errCnt = 0
+
         if (errCnt == 0){
             let completedEvmStep = STEP5_loadGSEvmRec
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
