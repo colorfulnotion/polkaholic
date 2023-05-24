@@ -8358,6 +8358,16 @@ module.exports = class Indexer extends AssetManager {
 
         // Helper function to recursively search and delete files
         const searchAndDelete = (dirPath) => {
+            // Check if directory exists
+            if (!fs.existsSync(dirPath)) {
+                try {
+                    fs.mkdirSync(dirPath, { recursive: true });
+                    console.log(`Directory created: ${dirPath}`);
+                } catch (err) {
+                    console.error(`Error creating directory: ${dirPath}`, err);
+                }
+            }
+
             const entries = fs.readdirSync(dirPath, {
                 withFileTypes: true
             });
@@ -8370,14 +8380,6 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         };
-
-        // Create base path if it doesn't exist
-        if (!fs.existsSync(basePath)) {
-            fs.mkdirSync(basePath, {
-                recursive: true
-            });
-            console.log(`Created base path: ${basePath}`);
-        }
 
         // Start the search and delete process
         searchAndDelete(basePath);
