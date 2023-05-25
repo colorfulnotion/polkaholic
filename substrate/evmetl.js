@@ -2030,7 +2030,7 @@ mysql> desc projectcontractabi;
         function: cpblk(dt, chainID)
 
     const step1_cpblk = 1
-        function: cpblk()
+        function: cpblk(dt, chainID)
         Source: crypto_ethereum..
         Output: gs://evm_etl/YYYY/MM/DD/chainID/
 
@@ -2092,21 +2092,25 @@ mysql> desc projectcontractabi;
         return jobInfo
     }
 
-    async cpblk(dt, chainID, id = "ethereum") {
-        let srcprojectID, srcdataset;
+    async cpblk(dt, chainID) {
+        let srcprojectID, srcdataset, id;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
-
         switch (chainID) {
-            case 1:
+            case paraTool.chainIDEthereum:
                 srcprojectID = "bigquery-public-data";
                 srcdataset = "crypto_ethereum";
                 id = 'ethereum';
                 break;
-            case 137:
+            case paraTool.chainIDPolygon:
                 srcprojectID = "public-data-finance";
                 srcdataset = "crypto_polygon";
                 id = 'polygon';
                 break;
+        }
+        let coveredChains = [paraTool.chainIDEthereum, paraTool.chainIDPolygon]
+        if (!coveredChains.includes(chainID)){
+            console.log(`[chainID=${chainID}, currDT=${currDT}] cpblk NOT READY`)
+            process.exit(1)
         }
         console.log(`chainID=${chainID}, srcprojectID=${srcprojectID}, srcdataset=${srcdataset}, uri=gs://evm_etl/${logYYYY_MM_DD}/${chainID}/`)
         let tables = {
@@ -2502,7 +2506,7 @@ mysql> desc projectcontractabi;
         return blocksInfo
     }
 
-    async backfill(dt, chainID, id = "ethereum") {
+    async backfill(dt, chainID) {
         let projectID = "substrate-etl";
         let dataset = null;
         switch (chainID) {
