@@ -2226,7 +2226,7 @@ module.exports = class Crawler extends Indexer {
         });
         */
 
-        let lastHeaderReceivedSecAgoExitThreshold = 40
+        let lastHeaderReceivedSecAgoExitThreshold = 100
         setInterval(() => {
             if (this.getCurrentTS() - lastHeaderReceived > lastHeaderReceivedSecAgoExitThreshold) {
                 console.log(`EXIT: lastHeaderReceivedSecAgo ${this.getCurrentTS() - lastHeaderReceived}`, )
