@@ -125,6 +125,7 @@ module.exports = class PolkaholicDB {
                 this.GC_BIGTABLE_CLUSTER = dbconfig.gc.bigtableCluster;
                 this.GC_STORAGE_BUCKET = dbconfig.gc.storageBucket;
             }
+
             if (dbconfig.ws != undefined) {
                 this.EXTERNAL_WS_PROVIDER_KEY = dbconfig.ws.key;
                 this.EXTERNAL_WS_PROVIDER_URL = dbconfig.ws.url;
@@ -209,7 +210,9 @@ module.exports = class PolkaholicDB {
                 err
             });
         }
-        const bigtable = new Bigtable();
+            const bigtable = new Bigtable({
+	    projectId: this.GC_PROJECT
+	    });
         const instanceName = this.GC_BIGTABLE_INSTANCE;
         const tableAddressExtrinsic = "addressextrinsic";
         const tableAccountRealtime = "accountrealtime";
