@@ -8344,6 +8344,26 @@ module.exports = class Indexer extends AssetManager {
         return r;
     }
 
+    async deleteFilesFromPath(basePath) {
+        // Check if path exists
+        if (fs.existsSync(basePath)) {
+            try {
+                // Delete the directory and all its contents
+                fs.rmSync(basePath, { recursive: true, force: true });
+                console.log(`Path deleted: ${basePath}`);
+            } catch (err) {
+                console.error(`Error deleting path: ${basePath}`, err);
+            }
+        }
+        try {
+            // Create the directory
+            fs.mkdirSync(basePath, { recursive: true });
+            console.log(`Path created: ${basePath}`);
+        } catch (err) {
+            console.error(`Error creating path: ${basePath}`, err);
+        }
+    }
+
     async deleteFilesWithChainID(basePath, chainID) {
         // Helper function to delete a file
         console.log(`basePath: ${basePath}`)

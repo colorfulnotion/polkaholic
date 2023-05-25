@@ -2043,12 +2043,12 @@ mysql> desc projectcontractabi;
     const step3_indexEvmChain = 3
         function: index_evmchain(chainID, dt)
         Source: cbt evmchain${chainID}
-        LocalTmp: /tmp/evm_decoded/YYYY/MM/DD/
+        LocalTmp: /tmp/evm_decoded/YYYY/MM/DD/chainID/tableId*
 
     const STEP4_cpEvmDecodedToGS = 4
         function: cpEvmDecodedToGS(dt, chainID, dryrun)
-        Input: /tmp/evm_decoded/YYYY/MM/DD/
-        Output: gs://evm_decoded/YYYY/MM/DD/
+        Input: /tmp/evm_decoded/YYYY/MM/DD/chainID/tableId..
+        Output: gs://evm_decoded/YYYY/MM/DD/tableId../chainID.json
 
     const STEP5_loadGSEvmDecoded = 5
         function: loadGSEvmDecoded(dt, chainID)
@@ -2724,8 +2724,9 @@ mysql> desc projectcontractabi;
         //delete previously generated files for chainID
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
         let rootDir = '/tmp'
-        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/`
-        await crawler.deleteFilesWithChainID(evmDecodedBasePath, chainID)
+        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
+        //await crawler.deleteFilesWithChainID(evmDecodedBasePath, chainID)
+        await crawler.deleteFilesFromPath(evmDecodedBasePath)
 
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             let startBN = bn
@@ -2826,7 +2827,7 @@ mysql> desc projectcontractabi;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(dt)
         //TODO: can't specify chainID and other filter here..
         let rootDir = '/tmp'
-        let cmd = `gsutil -m cp -r ${rootDir}/evm_decoded/${logYYYY_MM_DD}/* gs://evm_decoded/${logYYYY_MM_DD}/`
+        let cmd = `gsutil -m cp -r ${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/* gs://evm_decoded/${logYYYY_MM_DD}/`
         console.log(cmd)
         let errCnt = 0
         if (!dryRun) {
