@@ -2250,11 +2250,13 @@ module.exports = class Crawler extends Indexer {
                 chain.WSEndpoint, {
                     clientConfig: {
                         keepalive: true,
-                        keepaliveInterval: -1
+                        keepaliveInterval: 60000,
+                        maxReceivedFrameSize: 10000000, // bytes - default: 1MiB, current: 2MiB
+                        maxReceivedMessageSize: 10000000, // bytes - default: 8MiB, current: 10Mib
                     },
                     reconnect: {
                         auto: true,
-                        delay: 5000,
+                        delay: 50000,
                         maxAttempts: 5,
                         onTimeout: false
                     }
