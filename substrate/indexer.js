@@ -8459,7 +8459,7 @@ module.exports = class Indexer extends AssetManager {
         let [currDT, _c] = paraTool.ts_to_logDT_hr(blockTS)
         let logYYYY_MM_DD = currDT.replaceAll('-', '/')
         let rootDir = '/tmp'
-        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/`
+        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
