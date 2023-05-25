@@ -8344,6 +8344,26 @@ module.exports = class Indexer extends AssetManager {
         return r;
     }
 
+    async deleteFilesFromPath(basePath) {
+        // Check if path exists
+        if (fs.existsSync(basePath)) {
+            try {
+                // Delete the directory and all its contents
+                fs.rmSync(basePath, { recursive: true, force: true });
+                console.log(`Path deleted: ${basePath}`);
+            } catch (err) {
+                console.error(`Error deleting path: ${basePath}`, err);
+            }
+        }
+        try {
+            // Create the directory
+            fs.mkdirSync(basePath, { recursive: true });
+            console.log(`Path created: ${basePath}`);
+        } catch (err) {
+            console.error(`Error creating path: ${basePath}`, err);
+        }
+    }
+
     async deleteFilesWithChainID(basePath, chainID) {
         // Helper function to delete a file
         console.log(`basePath: ${basePath}`)
@@ -8358,6 +8378,16 @@ module.exports = class Indexer extends AssetManager {
 
         // Helper function to recursively search and delete files
         const searchAndDelete = (dirPath) => {
+            // Check if directory exists
+            if (!fs.existsSync(dirPath)) {
+                try {
+                    fs.mkdirSync(dirPath, { recursive: true });
+                    console.log(`Directory created: ${dirPath}`);
+                } catch (err) {
+                    console.error(`Error creating directory: ${dirPath}`, err);
+                }
+            }
+
             const entries = fs.readdirSync(dirPath, {
                 withFileTypes: true
             });
@@ -8370,14 +8400,6 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
         };
-
-        // Create base path if it doesn't exist
-        if (!fs.existsSync(basePath)) {
-            fs.mkdirSync(basePath, {
-                recursive: true
-            });
-            console.log(`Created base path: ${basePath}`);
-        }
 
         // Start the search and delete process
         searchAndDelete(basePath);
@@ -8456,7 +8478,8 @@ module.exports = class Indexer extends AssetManager {
         let blockTS = block.timestamp
         let [currDT, _c] = paraTool.ts_to_logDT_hr(blockTS)
         let logYYYY_MM_DD = currDT.replaceAll('-', '/')
-        let evmLogBasePath = `/disk1/evmlog/${logYYYY_MM_DD}/`
+        let rootDir = '/tmp'
+        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8769,16 +8792,16 @@ module.exports = class Indexer extends AssetManager {
         let tableIds = Object.keys(auto_evm_rows_map)
         let autoEvmStorePromise = []
         let autoEvmStorePromiseFn = []
-        if (!fs.existsSync(evmLogBasePath)) {
-            fs.mkdirSync(evmLogBasePath, {
+        if (!fs.existsSync(evmDecodedBasePath)) {
+            fs.mkdirSync(evmDecodedBasePath, {
                 recursive: true
             });
-            console.log(`Making Directory "${evmLogBasePath}"`);
+            console.log(`Making Directory "${evmDecodedBasePath}"`);
         }
         for (const tableId of Object.keys(auto_evm_rows_map)) {
             let rows = auto_evm_rows_map[tableId]
             //call_buyWithETHWert_0x5173ffaa/1.json
-            let fn = `${evmLogBasePath}${tableId}/${chainID}.json`
+            let fn = `${evmDecodedBasePath}${tableId}/${chainID}.json`
             if (rows && rows.length > 0) {
                 let recs = []
                 for (const row of rows) {
