@@ -2739,8 +2739,10 @@ mysql> desc projectcontractabi;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
         let rootDir = '/tmp'
         let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
+        let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
         //await crawler.deleteFilesWithChainID(evmDecodedBasePath, chainID)
         await crawler.deleteFilesFromPath(evmDecodedBasePath)
+        await crawler.deleteFilesFromPath(evmETLLocalBasePath)
 
         for (let bn = currPeriod.startBN; bn <= currPeriod.endBN; bn += jmp) {
             let startBN = bn

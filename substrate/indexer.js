@@ -8485,7 +8485,7 @@ module.exports = class Indexer extends AssetManager {
         let logYYYY_MM_DD = currDT.replaceAll('-', '/')
         let rootDir = '/tmp'
         let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
-        let evmETLBasePath = `${rootDir}/evm_etl/${logYYYY_MM_DD}/${chainID}/`
+        let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8742,7 +8742,7 @@ module.exports = class Indexer extends AssetManager {
                         recs.push(row.json)
                     }
                     let replace = false
-                    let fn = `${evmETLBasePath}/${tbl}_000000000000`
+                    let fn = `${evmETLLocalBasePath}/${tbl}_000000000000`
                     await this.streamWrite(fn, recs, replace)
                     console.log(`WRITE -> ${fn} len=${recs.length}`, )
                 }
