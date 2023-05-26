@@ -2160,6 +2160,12 @@ module.exports = {
     getXCMTransactList: function(msgHash, msgStr) {
         return getXCMTransactList(msgHash, msgStr)
     },
+    getCurrentDayTS: function(){
+        const now = new Date();
+        now.setUTCHours(0, 0, 0, 0);
+        let ts = 86400 + Math.floor(now.getTime() / 1000) - 1
+        return ts;
+    },
     getXCMErrorDescription: function(errorDesc) {
         let errorMap = {}
         let officialErrors = [

@@ -9703,6 +9703,7 @@ module.exports = class Indexer extends AssetManager {
             // store into bt
             try {
                 let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "traces"]
+                let currentDayMicroTS = paraTool.getCurrentDayTS() * 1000000 //last microsecond of a day - to be garbage collected 7 days after this
                 for (const tbl of tables) {
                     let rows = null
                     cres.data[tbl] = {}
@@ -9710,7 +9711,7 @@ module.exports = class Indexer extends AssetManager {
                         case "blocks":
                             cres.data[tbl][blockHash] = {
                                 value: JSON.stringify(rows_blocks[0].json),
-                                timestamp: blockMicroTS
+                                timestamp: currentDayMicroTS
                             };
                             break;
                         case "transactions":
@@ -9720,7 +9721,7 @@ module.exports = class Indexer extends AssetManager {
                             }
                             cres.data[tbl][blockHash] = {
                                 value: JSON.stringify(raw_transactions),
-                                timestamp: blockMicroTS
+                                timestamp: currentDayMicroTS
                             };
                             //console.log(`transactions`, rows_transactions)
                             break;
@@ -9731,7 +9732,7 @@ module.exports = class Indexer extends AssetManager {
                             }
                             cres.data[tbl][blockHash] = {
                                 value: JSON.stringify(raw_logs),
-                                timestamp: blockMicroTS
+                                timestamp: currentDayMicroTS
                             };
                             //console.log(`log`, rows_logs)
                             break;

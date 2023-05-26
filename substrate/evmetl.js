@@ -2359,29 +2359,6 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async processTablePartition(blocksMap, dirPath, tbl, fnType = "blocks") {
-        let path = `${dirPath}${fnType}_*`
-        let filepaths = glob.sync(path).sort();
-        console.log(`processTable filepaths`, filepaths)
-        let prevIncompleteBlkRecordsMaps = false
-        let currIncompleteBlkRecordsMaps = false
-        for (const fn of filepaths) {
-            prevIncompleteBlkRecordsMaps = currIncompleteBlkRecordsMaps
-            /*
-            if (tblRec && tblRec.incompleteBlkRecordsMaps != undefined){
-                prevIncompleteBlkRecordsMaps = tblRec.incompleteBlkRecordsMaps
-            }
-            */
-            let tblRecs = await this.parseJSONL(fn, prevIncompleteBlkRecordsMaps)
-            currIncompleteBlkRecordsMaps = tblRecs.incompleteBlkRecordsMaps
-            console.log(`tblRec`, tblRecs)
-            //await this.loadTableRecs(blocksMap, tblRecs.blkRecordsMaps, tbl, fnType, fn)
-        }
-        if (currIncompleteBlkRecordsMaps) {
-            //await this.loadTableRecs(blocksMap, currIncompleteBlkRecordsMaps, tbl, fnType, "Remaining")
-        }
-    }
-
     async processTable(blocksMap, dirPath, tbl, fnType = "blocks") {
         let path = `${dirPath}${fnType}_*`
         let filepaths = glob.sync(path).sort();
@@ -2409,6 +2386,7 @@ mysql> desc projectcontractabi;
         let out = [];
         let batchSize = 100
         let batchN = 0;
+        let currentDayMicroTS = paraTool.getCurrentDayTS() * 1000000 //last microsecond of a day - to be garbage collected 7 days after this
         let fnTypeList = ["blocks", "logs", "token_transfers", "traces", "transactions", "contracts"]
         if (!fnTypeList.includes(fnType)) {
             console.log(`Invalid fnType=${fnType}`)
@@ -2444,7 +2422,7 @@ mysql> desc projectcontractabi;
             cres.data[fnType] = {}
             cres['data'][fnType][blockHash] = {
                 value: JSON.stringify(rec),
-                timestamp: blockTS
+                timestamp: currentDayMicroTS
             };
             //console.log(`cres['data'][${fnType}][${blockHash}]`, cres['data'][fnType][blockHash])
             out.push(cres);
@@ -2973,7 +2951,7 @@ mysql> desc projectcontractabi;
 
     async get_blockTS(chain, bn) {
         let hexBlocknumber = "0x" + parseInt(bn, 10).toString(16);
-	// do 
+	// do
         let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
     "jsonrpc": "2.0",
     "method": "eth_getBlockByNumber",
@@ -3018,7 +2996,7 @@ mysql> desc projectcontractabi;
             }
         }
         startBN = n;
-	
+
 	m = startBN;
 	n = endBN;
         while (m <= n) {
@@ -3044,7 +3022,7 @@ mysql> desc projectcontractabi;
 	await this.update_batchedSQL();
 	process.exit(0);
     }
-    
+
 
     async load_project_views(datasetId = null, projectId = 'blockchain-etl-internal') {
         let query = `select table_name, view_definition from  \`blockchain-etl-internal.${datasetId}.INFORMATION_SCHEMA.VIEWS\``;

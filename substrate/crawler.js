@@ -2133,9 +2133,7 @@ module.exports = class Crawler extends Indexer {
                     block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
                     */
                     block = ethTool.standardizeRPCBlock(res.block)
-
-
-                    let evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                    let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
                     //let evmReceipts = res.receipts
                     let evmTrace = false
                     if (evmRPCInternalApi) {
