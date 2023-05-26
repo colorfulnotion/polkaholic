@@ -8301,7 +8301,7 @@ module.exports = class Indexer extends AssetManager {
 
 
     // given a row r fetched with "build_evm_block_from_row", processes the block, events + trace
-    async index_evm_chain_block_row(r, write_bq_log = false, mode = 'store_stream_evm') {
+    async index_evm_chain_block_row(r, write_bq_log = false, mode = 'store_evm') {
         //console.log('index_evm_chain_block_row', JSON.stringify(r))
 
         let contractABIs = this.contractABIs;
@@ -8341,8 +8341,8 @@ module.exports = class Indexer extends AssetManager {
         ])
         let [dTxns, dReceipts] = await statusesPromise
         //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
-        if (mode == "store_stream_evm") {
-            await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        if (mode == "store_evm") {
+            await this.store_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
         } else if (mode == "stream_evm") {
             await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
         }
@@ -8460,7 +8460,7 @@ module.exports = class Indexer extends AssetManager {
         });
     }
 
-    async store_stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
+    async store_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
         const {
             BigQuery
         } = require('@google-cloud/bigquery');
@@ -8485,6 +8485,7 @@ module.exports = class Indexer extends AssetManager {
         let logYYYY_MM_DD = currDT.replaceAll('-', '/')
         let rootDir = '/tmp'
         let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
+        let evmETLBasePath = `${rootDir}/evm_etl/${logYYYY_MM_DD}/${chainID}/`
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8716,8 +8717,7 @@ module.exports = class Indexer extends AssetManager {
         }
         */
 
-        // stream into blocks, transactions
-        /*
+        // store evm_etl_local
         try {
             let dataset = "evm";
             let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
@@ -8737,19 +8737,19 @@ module.exports = class Indexer extends AssetManager {
                         break;
                 }
                 if (rows && rows.length > 0) {
-                    await bigquery
-                        .dataset(dataset)
-                        .table(tbl)
-                        .insert(rows, {
-                            raw: true
-                        });
-                    console.log(`WRITE ${dataset}:${tbl} len=${rows.length}`)
+                    let recs = []
+                    for (const row of rows) {
+                        recs.push(row.json)
+                    }
+                    let replace = false
+                    let fn = `${evmETLBasePath}/${tbl}_000000000000`
+                    await this.streamWrite(fn, recs, replace)
+                    console.log(`WRITE -> ${fn} len=${recs.length}`, )
                 }
             }
         } catch (err) {
             console.log("err", JSON.stringify(err)); // TODO: logger
         }
-        */
 
         // evm _call _evt datasetId
         let evmDatasetID = this.evmDatasetID;
