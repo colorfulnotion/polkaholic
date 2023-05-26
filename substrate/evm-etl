@@ -436,6 +436,23 @@ async function main() {
             await evmetl.updateEvmschema();
         });
 
+    program.command('views')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.loadProjectViews();
+        });
+
+    program.command('blocklogbounds')
+        .option('-c, --chainID <chainID>', 'ChainID to bound', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+	    let chainID = opt.chainID;
+	    let logDT = opt.logDT;
+            await evmetl.detectBlocklogBounds(chainID, logDT);
+        });
+    
     await program.parseAsync(process.argv);
 }
 

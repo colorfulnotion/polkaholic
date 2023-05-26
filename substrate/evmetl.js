@@ -2932,18 +2932,155 @@ mysql> desc projectcontractabi;
         }
     }
 
-    async dryrun(query = "SELECT count(`extrinsic_id`) AS `COUNT_extrinsic_id__a7d70` FROM `contracts`.`contractscall` LIMIT 50000") {
-        console.log(query);
-
-        const options = {
-            query: query,
-            // Location must match that of the dataset(s) referenced in the query.
-            location: this.evmBQLocation,
-            dryRun: true,
-        };
-        const bigquery = this.get_big_query();
-        const [job] = await bigquery.createQueryJob(options);
-        console.log(JSON.stringify(job.metadata));
+    async loadProjectViews() {
+	let sql = `select distinct datasetId from projectdatasetcolumns`
+        let sqlRecs = await this.poolREADONLY.query(sql);
+	for (const r of sqlRecs) {
+	    console.log(r.datasetId);
+	    try {
+		await this.load_project_views(r.datasetId);
+	    } catch (err) {
+		console.log(err);
+	    }
+	}
     }
 
+    binarySearch(ar, el, compare_fn) {
+        var m = 0;
+        var n = ar.length - 1;
+        if (m > n) return (false);
+
+        while (m <= n) {
+            var k = (n + m) >> 1;
+            var cmp = compare_fn(el, ar[k]);
+
+            if (cmp > 0) {
+                m = k + 1;
+            } else if (cmp < 0) {
+                n = k - 1;
+            } else {
+                return ar[k];
+            }
+        }
+        let r = m - 1;
+
+        if (r < 0) return ar[0];
+        if (r > ar.length - 1) {
+            return ar[ar.length - 1];
+        }
+        return ar[r];
+    }
+
+    async get_blockTS(chain, bn) {
+        let hexBlocknumber = "0x" + parseInt(bn, 10).toString(16);
+	// do 
+        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
+    "jsonrpc": "2.0",
+    "method": "eth_getBlockByNumber",
+    "params": ["${hexBlocknumber}", true],
+    "id": 1
+  }' "${chain.RPCBackfill}"`
+	const {
+            stdout,
+            stderr
+        } = await exec(cmd, {
+            maxBuffer: 1024 * 64000
+        });
+        let res= JSON.parse(stdout);
+	if ( res.result && res.result.timestamp ) {
+	    return paraTool.dechexToInt(res.result.timestamp);
+	}
+	return null;
+    }
+    async detectBlocklogBounds(chainID, logDT, startBN = 29983413, endBN = 30508689) {
+        let chain = await this.getChain(chainID);
+
+	let m = startBN;
+	let n = endBN;
+        if (m > n) return (false);
+
+	let startTS = paraTool.logDT_hr_to_ts(logDT, 0);
+	let endTS = startTS + 86400- 1;
+
+        while (m <= n) {
+            var k = (n + m) >> 1;
+	    let blockTS = await this.get_blockTS(chain, k);
+            var cmp = startTS - blockTS;
+	    console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
+            if (cmp > 0) {
+                m = k + 1;
+            } else if (cmp < 0) {
+                n = k - 1;
+            } else {
+		m = k;
+		n = k;
+		break;
+            }
+        }
+        startBN = n;
+	
+	m = startBN;
+	n = endBN;
+        while (m <= n) {
+            var k = (n + m) >> 1;
+	    let blockTS = await this.get_blockTS(chain, k);
+            var cmp = endTS - blockTS;
+	    console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
+            if (cmp > 0) {
+                m = k + 1;
+            } else if (cmp < 0) {
+                n = k - 1;
+            } else {
+		m = k;
+		n = k;
+		break;
+            }
+        }
+	endBN = n;
+
+	let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${startBN}', '${endBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+	console.log(sql);
+	this.batchedSQL.push(sql);
+	await this.update_batchedSQL();
+	process.exit(0);
+    }
+    
+
+    async load_project_views(datasetId = null, projectId = 'blockchain-etl-internal') {
+        let query = `select table_name, view_definition from  \`blockchain-etl-internal.${datasetId}.INFORMATION_SCHEMA.VIEWS\``;
+	console.log(query);
+        const bigquery = this.get_big_query();
+        let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+        for (const r of recs) {
+            let sa = r.table_name.split("_");
+            let abiType = "";
+	    let contractName = "";
+            let name = "";
+	    let idx = null;
+	    for (let i = 0; i < sa.length; i++) {
+                if ((sa[i] == "event") || sa[i] == "call" || sa[i] == "swaps") {
+                    idx = i;
+                    i = sa.length;
+                }
+            }
+            if (idx == null) {
+                console.log("FAILED to parse table name", r.table_name, "datasetId", projectId, datasetId);
+            } else {
+                abiType = sa[idx];
+                contractName = sa.slice(0, idx).join("_");
+                name = sa.slice(idx + 1).join("_");
+                //console.log('contractName', contractName, "abitype", abiType, "name", name)
+            }
+	    let view_definition = r.view_definition;
+	    const regex = /address in([\s\S]*?)\n/
+	    const match = view_definition.match(regex);
+	    let addressSQL = "";
+	    if (match && match[1]) {
+		addressSQL = match[1];
+	    }
+            let sql = `insert into projectdatasetviews ( projectId, datasetId, table_name, view_definition, contractName, abiType, name, addDT, addressSQL ) values ( '${projectId}', '${datasetId}', '${r.table_name}', ${mysql.escape(r.view_definition)},  ${mysql.escape(contractName)}, ${mysql.escape(abiType)}, ${mysql.escape(name)}, Now(), ${mysql.escape(addressSQL)} ) on duplicate key update contractName = values(contractName), abiType = values(abiType), name = values(name), addressSQL = values(addressSQL)`
+            this.batchedSQL.push(sql);
+	    await this.update_batchedSQL();
+        }
+    }
 }
