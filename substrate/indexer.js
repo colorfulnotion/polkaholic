@@ -5811,7 +5811,9 @@ module.exports = class Indexer extends AssetManager {
             return `${paraTool.assetTypeERC1155}`
         }
 
-        {
+        //MK: TODO: not sure what we are doing here.
+        let contractInfo;
+        if (contractInfo) {
             this.initERCAsset(contractAddress, chainID, contractInfo, tx, paraTool.assetTypeContract);
             return `${paraTool.assetTypeContract}`
         }
@@ -8316,6 +8318,9 @@ module.exports = class Indexer extends AssetManager {
         let chainID = r.chain_id
         let evmReceipts = []
         let evmTrace = false
+        let stream_bq = false
+        let write_bt = false
+
         if (r.block) {
             blockAvailable = true
             blkNum = blk.number;
@@ -8339,7 +8344,7 @@ module.exports = class Indexer extends AssetManager {
         if (mode == "store_stream_evm") {
             await this.store_stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
         } else if (mode == "stream_evm") {
-            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
         }
         return r;
     }
@@ -9427,7 +9432,7 @@ module.exports = class Indexer extends AssetManager {
         this.addressLabelCandidates = {}
     }
 
-    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
+    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures, stream_bq = true, write_bt = true) {
         const {
             BigQuery
         } = require('@google-cloud/bigquery');
@@ -9694,50 +9699,64 @@ module.exports = class Indexer extends AssetManager {
             await this.process_evm_flush(blockTS)
         }
 
-
-        // store into bt
-        try {
-            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "traces"]
-            for (const tbl of tables) {
-                let rows = null
-                cres.data[tbl] = {}
-                switch (tbl) {
-                    case "blocks":
-                        cres.data[tbl][blockHash] = {
-                            value: JSON.stringify(rows_blocks[0].json),
-                            timestamp: blockMicroTS
-                        };
-                        break;
-                    case "transactions":
-                        let raw_transactions = [];
-                        for (const transaction of rows_transactions) {
-                            raw_transactions.push(transaction.json)
-                        }
-                        cres.data[tbl][blockHash] = {
-                            value: JSON.stringify(raw_transactions),
-                            timestamp: blockMicroTS
-                        };
-                        //console.log(`transactions`, rows_transactions)
-                        break;
-                    case "logs":
-                        let raw_logs = [];
-                        for (const log of rows_logs) {
-                            raw_logs.push(log.json)
-                        }
-                        cres.data[tbl][blockHash] = {
-                            value: JSON.stringify(raw_logs),
-                            timestamp: blockMicroTS
-                        };
-                        //console.log(`log`, rows_logs)
-                        break;
+        if (write_bt){
+            // store into bt
+            try {
+                let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "traces"]
+                for (const tbl of tables) {
+                    let rows = null
+                    cres.data[tbl] = {}
+                    switch (tbl) {
+                        case "blocks":
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(rows_blocks[0].json),
+                                timestamp: blockMicroTS
+                            };
+                            break;
+                        case "transactions":
+                            let raw_transactions = [];
+                            for (const transaction of rows_transactions) {
+                                raw_transactions.push(transaction.json)
+                            }
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(raw_transactions),
+                                timestamp: blockMicroTS
+                            };
+                            //console.log(`transactions`, rows_transactions)
+                            break;
+                        case "logs":
+                            let raw_logs = [];
+                            for (const log of rows_logs) {
+                                raw_logs.push(log.json)
+                            }
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(raw_logs),
+                                timestamp: blockMicroTS
+                            };
+                            //console.log(`log`, rows_logs)
+                            break;
+                    }
+                    console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
                 }
-                console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
+            } catch (e) {
+                console.log(`bt error`, e)
+                cres = false
             }
-        } catch (e) {
-            console.log(`bt error`, e)
-            cres = false
+
+            let tbl = this.instance.table("evmchain" + chainID);
+            if (cres) {
+                try {
+                    console.log(`update bt evmchain${chainID}`, cres)
+                    await this.insertBTRows(tbl, [cres], "evmchain");
+                } catch (e) {
+                    console.log(`load err`, e);
+                }
+            }
         }
 
+        if (!stream_bq){
+            return
+        }
 
         // stream into blocks, transactions
         try {
@@ -9857,16 +9876,6 @@ module.exports = class Indexer extends AssetManager {
                         })
                     }
                 }
-            }
-        }
-
-        let tbl = this.instance.table("evmchain" + chainID);
-        if (cres) {
-            try {
-                console.log(`update bt evmchain${chainID}`, cres)
-                await this.insertBTRows(tbl, [cres], "evmchain");
-            } catch (e) {
-                console.log(`load err`, e);
             }
         }
     }
@@ -10196,6 +10205,96 @@ module.exports = class Indexer extends AssetManager {
         return false
     }
 
+    // not optimized
+    async crawl_block_evm(chainID, blkNum) {
+        let web3 = this.web3Api
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
+        let evmRPCInternalApi = this.evmRPCInternal
+
+        let blockNumber = blkNum;
+        let block = null;
+        let blockHash = null
+        let block_tries = 0;
+        let block_retry_max = 10
+        let block_retry_ms = 200
+        let log_retry_max = 10
+        let log_retry_ms = 2000
+        let log_timeout_ms = 5000
+
+        let stream_bq = false
+        let write_bt = true
+
+        let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let res = false
+        if (qnSupportedChainIDs.includes(chainID)) {
+            res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+        }
+        if (res && res.block != undefined && res.receipts != undefined) {
+            console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
+            block = ethTool.standardizeRPCBlock(res.block)
+            let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
+            //let evmReceipts = res.receipts
+            let evmTrace = false
+            if (evmRPCInternalApi) {
+                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                //console.log(`[${block.number}] evmTrace`, evmTrace)
+            }
+            var statusesPromise = Promise.all([
+                ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+            ])
+            let [dTxns, dReceipts] = await statusesPromise
+            console.log(`dTxns`, dTxns)
+            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+        } else {
+            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+            //console.log(`blk #${blockNumber}`, block)
+            //TODO: ethereum has withdrawals flds
+            let numTransactions = block && block.transactions ? block.transactions.length : 0;
+            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+            let rows_blocks = [];
+            let rows_transactions = [];
+            let rows_logs = [];
+            try {
+                blockHash = block.hash
+                if (numTransactions >= 0) {
+                    let isParallel = true
+                    let evmReceipts = false
+
+                    if (evmRPCBlockReceiptsApi) {
+                        evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                    } else {
+                        let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                    }
+
+                    if (!evmReceipts) evmReceipts = [];
+                    evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                    console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+                    var statusesPromise = Promise.all([
+                        ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                        ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                    ])
+                    let [dTxns, dReceipts] = await statusesPromise
+                    console.log(`dTxns`, dTxns)
+                    let evmTrace = false
+                    if (evmRPCInternalApi) {
+                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
+                        //console.log(`[${block.number}] evmTrace`, evmTrace)
+                    }
+                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+                }
+            } catch (err) {
+                console.log(err)
+            }
+        }
+    }
+
     async index_block_evm(chainID, blkNum) {
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
@@ -10256,6 +10355,8 @@ module.exports = class Indexer extends AssetManager {
         let log_retry_max = 10
         let log_retry_ms = 2000
         let log_timeout_ms = 5000
+        let stream_bq = false
+        let write_bt = true
 
         let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
         let res = false
@@ -10289,7 +10390,7 @@ module.exports = class Indexer extends AssetManager {
             ])
             let [dTxns, dReceipts] = await statusesPromise
             console.log(`dTxns`, dTxns)
-            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
         } else {
             let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
             let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
@@ -10334,7 +10435,7 @@ module.exports = class Indexer extends AssetManager {
                         evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
                         //console.log(`[${block.number}] evmTrace`, evmTrace)
                     }
-                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                 }
             } catch (err) {
                 console.log(err)

@@ -2696,6 +2696,42 @@ mysql> desc projectcontractabi;
         }
     */
 
+    async fetch_evmchain_rows(chainID, startBN, endBN){
+        let start = paraTool.blockNumberToHex(startBN);
+        let end = paraTool.blockNumberToHex(endBN);
+        let families = ["blocks", "logs", "traces", "transactions"]
+        let startTS = new Date().getTime();
+        const evmTableChain = this.getEvmTableChain(chainID);
+        let [rows] = await evmTableChain.getRows({
+            start: start,
+            end: end,
+            cellLimit: 1,
+            family: families
+        });
+
+        let rowLen = rows.length
+        let expectedLen = endBN - startBN + 1
+        let missedBNs = []
+        if (rowLen != expectedLen) {
+            let expectedRangeBNs = [];
+            let observedBNs = []
+            for (let i = startBN; i <= endBN; i++) {
+                expectedRangeBNs.push(i);
+            }
+            for (let j = 0; j < rows.length; j++) {
+                let blockNum = paraTool.dechexToInt(rows[j].id)
+                observedBNs.push(blockNum);
+            }
+            // await this.audit_chain(chain, startBN, endBN)
+            // can we do a more robost audit_chain here?
+            missedBNs = expectedRangeBNs.filter(function(num) {
+                return observedBNs.indexOf(num) === -1;
+            });
+        }
+        console.log(`${startBN}(${start}), ${endBN}(${end}) expectedLen=${endBN - startBN+1} MISSING BNs`, missedBNs)
+        return [rows, missedBNs]
+    }
+
     async index_evmchain(chainID, logDT) {
         let crawler = new Crawler();
         crawler.setDebugLevel(paraTool.debugTracing)
@@ -2751,39 +2787,16 @@ mysql> desc projectcontractabi;
             }
             let b = batches[i]
             console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1}`)
-            let families = ["blocks", "logs", "traces", "transactions"]
-            let startTS = new Date().getTime();
-            const evmTableChain = this.getEvmTableChain(chainID);
-            let [rows] = await evmTableChain.getRows({
-                start: b.start,
-                end: b.end,
-                cellLimit: 1,
-                family: families
-            });
+            let [rows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
 
-            let rowLen = rows.length
-            let expectedLen = b.endBN - b.startBN + 1
-            let missedBNs = []
-            if (rowLen != expectedLen) {
-                let expectedRangeBNs = [];
-                let observedBNs = []
-                for (let i = startBN; i <= endBN; i++) {
-                    expectedRangeBNs.push(i);
-                }
-                for (let j = 0; j < rows.length; j++) {
-                    let blockNum = paraTool.dechexToInt(rows[j].id)
-                    observedBNs.push(blockNum);
-                }
-                // await this.audit_chain(chain, startBN, endBN)
-                // can we do a more robost audit_chain here?
-                missedBNs = expectedRangeBNs.filter(function(num) {
-                    return observedBNs.indexOf(num) === -1;
-                });
-            }
-
-            console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1} MISSING BNs`, missedBNs)
             //TODO: if missing, we need to get the missing blocks
-
+            if (missedBNs.length > 0){
+                for (const missedBN of missedBNs){
+                    await crawler.crawl_block_evm(chainID, missedBN);
+                }
+                [rows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
+            }
+            //process.exit(0)
             for (let i = 0; i < rows.length; i++) {
                 try {
                     let row = rows[i];

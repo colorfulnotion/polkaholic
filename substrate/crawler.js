@@ -2116,6 +2116,8 @@ module.exports = class Crawler extends Indexer {
                 let log_retry_max = 10
                 let log_retry_ms = 2000
                 let log_timeout_ms = 5000
+                let stream_bq = true
+                let write_bt = true
 
                 let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
                 let res = false
@@ -2150,7 +2152,7 @@ module.exports = class Crawler extends Indexer {
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                     ])
                     let [dTxns, dReceipts] = await statusesPromise
-                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                 } else {
                     let evmBlockFunc = web3.eth.getBlock(result.hash, true)
                     let evmBlockCtx = `web3.eth.getBlock(${result.hash}, true)`
@@ -2206,7 +2208,7 @@ module.exports = class Crawler extends Indexer {
                                 ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                             ])
                             let [dTxns, dReceipts] = await statusesPromise
-                            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+                            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                         }
                     } catch (err) {
                         console.log(`crawlEvmReceipts err`, err)
