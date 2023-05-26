@@ -8765,30 +8765,6 @@ module.exports = class Indexer extends AssetManager {
             let timePartitioning = schema.timePartitioning
             console.log(`${evmDatasetID}:${schemaTableId} `, sch)
             console.log(`${evmDatasetID}:${schemaTableId} tinySchema`, JSON.stringify(tinySchema))
-            //TODO: need a way to clear older record ONCE
-            /*
-            try {
-                const [table] = await bigquery
-                    .dataset(evmDatasetID)
-                    .createTable(schemaTableId, {
-                        schema: sch,
-                        location: this.evmBQLocation,
-                        timePartitioning: timePartitioning,
-                    });
-            } catch (err) {
-                let errorStr = err.toString()
-                if (!errorStr.includes('Already Exists')) {
-                    console.log(`${evmDatasetID}:${schemaTableId} Error`, errorStr, `\nSchema:`, sch)
-                    this.logger.error({
-                        op: "auto_evm_schema_create",
-                        tableId: `${schemaTableId}`,
-                        error: errorStr,
-                        schema: sch
-                    })
-                    await this.log_streaming_error(schemaTableId, "auto_evm_schema_create", sch, errorStr, evm_chain_id, evm_blk_num);
-                }
-            }
-            */
         }
 
         // stream into call_ ,  evt_ table
@@ -9627,7 +9603,7 @@ module.exports = class Indexer extends AssetManager {
                         block_number: block.number,
                         block_hash: block.hash,
                         signature: eSig,
-                        events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
+                        events: (l.events) ? JSON.stringify(l.events) : null // blockchain-etl does NOT have signature, events
                     }
                     let bqEvmLog = {
                         insertId: `${tx.transactionHash}_${l.logIndex}`,
@@ -9761,10 +9737,12 @@ module.exports = class Indexer extends AssetManager {
 
         // stream into blocks, transactions
         try {
-            let dataset = "evm";
+            //let dataset = "evm";
+            let dataset = "crypto_evm"
             let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
             for (const tbl of tables) {
                 let rows = null
+                let tblID = `${tbl}${chainID}`
                 switch (tbl) {
                     case "blocks":
                         rows = rows_blocks;
@@ -9781,11 +9759,11 @@ module.exports = class Indexer extends AssetManager {
                 if (rows && rows.length > 0) {
                     await bigquery
                         .dataset(dataset)
-                        .table(tbl)
+                        .table(tblID)
                         .insert(rows, {
                             raw: true
                         });
-                    console.log(`WRITE ${dataset}:${tbl} len=${rows.length}`)
+                    console.log(`WRITE ${dataset}:${tblID} len=${rows.length}`)
                 }
             }
         } catch (err) {
