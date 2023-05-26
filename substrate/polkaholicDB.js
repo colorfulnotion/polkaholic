@@ -210,9 +210,9 @@ module.exports = class PolkaholicDB {
                 err
             });
         }
-            const bigtable = new Bigtable({
-	    projectId: this.GC_PROJECT
-	    });
+        const bigtable = new Bigtable({
+            projectId: this.GC_PROJECT
+        });
         const instanceName = this.GC_BIGTABLE_INSTANCE;
         const tableAddressExtrinsic = "addressextrinsic";
         const tableAccountRealtime = "accountrealtime";
@@ -1616,8 +1616,8 @@ from chain where chainID = '${chainID}' limit 1`);
             }
         }
         // want RPC style of blockWithTransaction, ReceiptsWithLogs and trace
-        let btBlkCols = ["timestamp", "number", "parent_hash", "nonce", "sha3_uncles", "logs_bloom", "transactions_root", "state_root", "miner", "difficulty", "total_difficulty"]
-        let rpcBlkCols = ["timestamp", "number", "parentHash", "nonce", "sha3Uncles", "logsBloom", "transactionsRoot", "stateRoot", "miner", "difficulty", "totalDifficulty"]
+        let btBlkCols = ["timestamp", "number", "hash", "parent_hash", "nonce", "sha3_uncles", "logs_bloom", "transactions_root", "state_root", "receipts_root", "miner", "difficulty", "total_difficulty", "size", 'gas_limit', "gas_used"]
+        let rpcBlkCols = ["timestamp", "number", "hash", "parentHash", "nonce", "sha3Uncles", "logsBloom", "transactionsRoot", "stateRoot", "receipts_root", "miner", "difficulty", "totalDifficulty", "size", "gas_limit", "gas_used"]
         let rpcBlk = {}
         // convert header
         for (let i = 0; i < btBlkCols.length; i++) {

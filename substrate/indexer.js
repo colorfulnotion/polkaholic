@@ -8354,7 +8354,10 @@ module.exports = class Indexer extends AssetManager {
         if (fs.existsSync(basePath)) {
             try {
                 // Delete the directory and all its contents
-                fs.rmSync(basePath, { recursive: true, force: true });
+                fs.rmSync(basePath, {
+                    recursive: true,
+                    force: true
+                });
                 console.log(`Path deleted: ${basePath}`);
             } catch (err) {
                 console.error(`Error deleting path: ${basePath}`, err);
@@ -8362,7 +8365,9 @@ module.exports = class Indexer extends AssetManager {
         }
         try {
             // Create the directory
-            fs.mkdirSync(basePath, { recursive: true });
+            fs.mkdirSync(basePath, {
+                recursive: true
+            });
             console.log(`Path created: ${basePath}`);
         } catch (err) {
             console.error(`Error creating path: ${basePath}`, err);
@@ -8386,7 +8391,9 @@ module.exports = class Indexer extends AssetManager {
             // Check if directory exists
             if (!fs.existsSync(dirPath)) {
                 try {
-                    fs.mkdirSync(dirPath, { recursive: true });
+                    fs.mkdirSync(dirPath, {
+                        recursive: true
+                    });
                     console.log(`Directory created: ${dirPath}`);
                 } catch (err) {
                     console.error(`Error creating directory: ${dirPath}`, err);
@@ -8486,6 +8493,7 @@ module.exports = class Indexer extends AssetManager {
         let rootDir = '/tmp'
         let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
         let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
+        //console.log(`!!! block`, block)
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8739,12 +8747,14 @@ module.exports = class Indexer extends AssetManager {
                 if (rows && rows.length > 0) {
                     let recs = []
                     for (const row of rows) {
-                        recs.push(row.json)
+                        let rec = row.json
+                        console.log(`${tbl} rec`, rec)
+                        recs.push(rec)
                     }
                     let replace = false
                     let fn = `${evmETLLocalBasePath}/${tbl}_000000000000`
                     await this.streamWrite(fn, recs, replace)
-                    console.log(`WRITE -> ${fn} len=${recs.length}`, )
+                    console.log(`WRITE -> ${fn} len=${recs.length}`)
                 }
             }
         } catch (err) {
@@ -9675,7 +9685,7 @@ module.exports = class Indexer extends AssetManager {
             await this.process_evm_flush(blockTS)
         }
 
-        if (write_bt){
+        if (write_bt) {
             // store into bt
             try {
                 let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "traces"]
@@ -9731,7 +9741,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
-        if (!stream_bq){
+        if (!stream_bq) {
             return
         }
 
@@ -10173,7 +10183,7 @@ module.exports = class Indexer extends AssetManager {
                 let row = rows[0];
                 console.log(`Using BT Rec`, row)
                 let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
-                //console.log(`rRow`, rRow)
+                console.log(`rRow`, rRow)
                 let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
                 return r
             } catch (err) {
@@ -10260,11 +10270,11 @@ module.exports = class Indexer extends AssetManager {
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                     ])
                     let [dTxns, dReceipts] = await statusesPromise
-                    console.log(`dTxns`, dTxns)
+                    //console.log(`dTxns`, dTxns)
                     let evmTrace = false
                     if (evmRPCInternalApi) {
                         evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
-                        //console.log(`[${block.number}] evmTrace`, evmTrace)
+                        console.log(`[${block.number}] evmTrace`, evmTrace)
                     }
                     await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                 }

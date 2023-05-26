@@ -369,10 +369,10 @@ async function main() {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
                     for (const dt of logDTRange) {
-                        await evmetl.index_evmchain(chainID, dt);
+                        await evmetl.index_evmchain_full(chainID, dt);
                     }
                 } else {
-                    await evmetl.index_evmchain(chainID, logDT);
+                    await evmetl.index_evmchain_full(chainID, logDT);
                 }
             }
             process.exit(0);
@@ -448,11 +448,11 @@ async function main() {
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .action(async (opt) => {
             var evmetl = new EVMETL();
-	    let chainID = opt.chainID;
-	    let logDT = opt.logDT;
+            let chainID = opt.chainID;
+            let logDT = opt.logDT;
             await evmetl.detectBlocklogBounds(chainID, logDT);
         });
-    
+
     await program.parseAsync(process.argv);
 }
 
