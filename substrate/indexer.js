@@ -6,6 +6,8 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const btTool = require("./btTool");
 const mysql = require("mysql2");
+const stream = require('stream');
+
 const {
     WebSocket
 } = require('ws');
@@ -5807,8 +5809,12 @@ module.exports = class Indexer extends AssetManager {
         if (erc1155ContractInfo) {
             this.initERCAsset(contractAddress, chainID, erc1155ContractInfo, tx, paraTool.assetTypeERC1155);
             return `${paraTool.assetTypeERC1155}`
-        } else {
-            //this.initERCAsset(contractAddress, chainID, contractInfo, tx, paraTool.assetTypeContract);
+        }
+
+        //MK: TODO: not sure what we are doing here.
+        let contractInfo;
+        if (contractInfo) {
+            this.initERCAsset(contractAddress, chainID, contractInfo, tx, paraTool.assetTypeContract);
             return `${paraTool.assetTypeContract}`
         }
         return (false);
@@ -5992,6 +5998,7 @@ module.exports = class Indexer extends AssetManager {
         //let assetChain = this.getErc721TokenIDAssetChain(cAddress, tokenID, chainID)
         let erc721TokenIDMeta = await this.process_token_address(cAddress, chainID, tokenID);
         if (erc721TokenIDMeta) {
+            console.log("process_erc721_token_transfer -- ", erc721TokenIDMeta);
             let prevHolder = erc721TokenIDMeta.owner
             erc721TokenIDMeta.owner = recipient
             erc721TokenIDMeta.blockNumber = bn
@@ -8292,6 +8299,542 @@ module.exports = class Indexer extends AssetManager {
         await this.chainParser.getSystemProperties(this, chain);
     }
 
+
+    // given a row r fetched with "build_evm_block_from_row", processes the block, events + trace
+    async index_evm_chain_block_row(r, write_bq_log = false, mode = 'store_evm') {
+        //console.log('index_evm_chain_block_row', JSON.stringify(r))
+
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+
+        let autoTraces = false
+        let blkNum = false
+        let blkHash = false
+        let blockTS = false
+        let blockAvailable = false
+        let traceAvailable = false
+        let receiptsAvailable = false
+        let blk = r.block
+        let chainID = r.chain_id
+        let evmReceipts = []
+        let evmTrace = false
+        let stream_bq = false
+        let write_bt = false
+
+        if (r.block) {
+            blockAvailable = true
+            blkNum = blk.number;
+            blkHash = r.blockHash;
+            blockTS = r.blockTS;
+        }
+        if (r.trace) {
+            traceAvailable = true
+        }
+        if (r.evmReceipts) {
+            receiptsAvailable = true
+            evmReceipts = r.evmReceipts
+        }
+        console.log(`[${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receiptss=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
+        var statusesPromise = Promise.all([
+            ethTool.processTranssctions(blk.transactions, contractABIs, contractABISignatures),
+            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+        ])
+        let [dTxns, dReceipts] = await statusesPromise
+        //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
+        if (mode == "store_evm") {
+            await this.store_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        } else if (mode == "stream_evm") {
+            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+        }
+        return r;
+    }
+
+    async deleteFilesFromPath(basePath) {
+        // Check if path exists
+        if (fs.existsSync(basePath)) {
+            try {
+                // Delete the directory and all its contents
+                fs.rmSync(basePath, {
+                    recursive: true,
+                    force: true
+                });
+                console.log(`Path deleted: ${basePath}`);
+            } catch (err) {
+                console.error(`Error deleting path: ${basePath}`, err);
+            }
+        }
+        try {
+            // Create the directory
+            fs.mkdirSync(basePath, {
+                recursive: true
+            });
+            console.log(`Path created: ${basePath}`);
+        } catch (err) {
+            console.error(`Error creating path: ${basePath}`, err);
+        }
+    }
+
+    async deleteFilesWithChainID(basePath, chainID) {
+        // Helper function to delete a file
+        console.log(`basePath: ${basePath}`)
+        const deleteFile = (filePath) => {
+            try {
+                fs.unlinkSync(filePath);
+                console.log(`Deleted file: ${filePath}`);
+            } catch (error) {
+                console.error(`Error deleting file: ${filePath}`, error);
+            }
+        };
+
+        // Helper function to recursively search and delete files
+        const searchAndDelete = (dirPath) => {
+            // Check if directory exists
+            if (!fs.existsSync(dirPath)) {
+                try {
+                    fs.mkdirSync(dirPath, {
+                        recursive: true
+                    });
+                    console.log(`Directory created: ${dirPath}`);
+                } catch (err) {
+                    console.error(`Error creating directory: ${dirPath}`, err);
+                }
+            }
+
+            const entries = fs.readdirSync(dirPath, {
+                withFileTypes: true
+            });
+            for (const entry of entries) {
+                const entryPath = path.join(dirPath, entry.name);
+                if (entry.isFile() && entry.name.endsWith(`${chainID}.json`)) {
+                    deleteFile(entryPath);
+                } else if (entry.isDirectory()) {
+                    searchAndDelete(entryPath);
+                }
+            }
+        };
+
+        // Start the search and delete process
+        searchAndDelete(basePath);
+    }
+
+    async streamWrite(fn, JSONNLArray, isReplace = false) {
+        // Ensure the directory exists
+        let dir = path.dirname(fn)
+        if (!fs.existsSync(dir)) {
+            fs.mkdirSync(dir, {
+                recursive: true
+            });
+            console.log(`Making Directory "${dir}"`);
+        } else {
+            console.log(`Directory "${dir}" already exists.`);
+        }
+        // Delete the existing file if isReplace is true
+        if (isReplace && fs.existsSync(fn)) {
+            fs.unlinkSync(fn);
+        }
+        console.log(`${fn} replaced=${isReplace}`, JSONNLArray)
+        // Create a readable stream from the JSONNLArray
+        let readableStream = new stream.Readable({
+            read() {
+                JSONNLArray.forEach((jsonObject) => {
+                    let str = JSON.stringify(jsonObject) + '\n'
+                    //console.log(`*** str`, str)
+                    this.push(str);
+                });
+                this.push(null); // Signal the end of the stream
+            },
+        });
+        //console.log(`readableStream`, readableStream)
+
+        // Create a write stream to the local file in append mode
+        const writeStream = fs.createWriteStream(fn, {
+            flags: 'a'
+        });
+
+        // Pipe the readable stream to the write stream and return a Promise
+        return new Promise((resolve, reject) => {
+            console.log('Starting to consume the readableStream');
+            readableStream
+                .pipe(writeStream)
+                .on('error', (error) => {
+                    console.error('Error during streaming:', error);
+                    reject(error);
+                })
+                .on('finish', () => {
+                    //console.log('Data streamed successfully to the local file:', fn);
+                    resolve();
+                });
+        });
+    }
+
+    async store_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: 'substrate-etl',
+            keyFilename: this.BQ_SUBSTRATEETL_KEY
+        })
+        let chain = await this.getChain(chainID);
+        let rows_blocks = [];
+        let rows_transactions = [];
+        let rows_logs = [];
+        let auto_evm_rows_map = {} // tableID => rows
+        let auto_evm_schema_map = {} // tableID => rows
+
+        let block = JSON.parse(JSON.stringify(evmlBlock))
+        let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
+        //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
+        let evm_chain_id = chainID
+        let evm_blk_num = block.number
+        let blockTS = block.timestamp
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(blockTS)
+        let logYYYY_MM_DD = currDT.replaceAll('-', '/')
+        let rootDir = '/tmp'
+        let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
+        let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
+        //console.log(`!!! block`, block)
+        let bqEvmBlock = {
+            insertId: `${block.hash}`,
+            json: {
+                chain_id: chainID,
+                id: chain.id,
+                timestamp: block.timestamp,
+                number: block.number,
+                hash: block.hash,
+                parent_hash: block.parentHash,
+                nonce: block.nonce,
+                sha3_uncles: block.sha3Uncles,
+                logs_bloom: block.logsBloom,
+                transactions_root: block.transactionsRoot,
+                state_root: block.stateRoot,
+                receipts_root: block.receiptsRoot,
+                miner: block.miner,
+                difficulty: paraTool.dechexToInt(block.difficulty),
+                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
+                size: block.size,
+                extra_data: block.extraData,
+                gas_limit: block.gasLimit,
+                gas_used: block.gasUsed,
+                transaction_count: block.transactions.length
+            }
+        }
+        //console.log(`bqEvmBlock`, bqEvmBlock)
+        rows_blocks.push(bqEvmBlock);
+
+        for (let i = 0; i < evmFullBlock.transactions.length; i++) {
+            let rawTx = block.transactions[i];
+            let tx = evmFullBlock.transactions[i];
+            //console.log(`rawTx`, rawTx)
+            //console.log(`tx`, tx)
+            let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
+            let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
+            let txhash = tx.transactionHash
+            tx.raw = tx.input; // ???
+            tx.decodedLogs = logs; // fuse here
+            let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+            //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
+            let methodID = null
+            if (tx.to && tx.input.length >= 10) {
+                methodID = tx.input.substr(0, 10)
+            }
+            let evmTx = {
+                chain_id: chainID,
+                id: chain.id,
+                hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
+                nonce: tx.nonce,
+                transaction_index: tx.transactionIndex,
+                from_address: tx.from.toLowerCase(),
+                to_address: (tx.to != undefined) ? tx.to.toLowerCase() : null,
+                value: rawTx.value,
+                gas: rawTx.gas,
+                gas_price: rawTx.gasPrice,
+                input: tx.input,
+                receipt_cumulative_gas_used: receipt && receipt.cumulativeGasUsed ? receipt.cumulativeGasUsed : null,
+                receipt_gas_used: receipt && receipt.gasUsed ? receipt.gasUsed : null,
+                receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
+                receipt_root: null, // irrelevant
+                receipt_status: receipt && receipt.status ? 1 : 0,
+                block_timestamp: block.timestamp,
+                block_number: tx.blockNumber,
+                block_hash: tx.blockHash,
+                decoded: false,
+                method_id: methodID,
+                signature: null,
+                params: null
+            }
+            //arbitrum 0x0 values??
+            if (evmTx.value == "0x0") evmTx.value = 0
+            if (evmTx.gas == "0x0") evmTx.gas = 0
+            if (evmTx.gas_price == "0x0") evmTx.gas_price = 0
+            if (evmTx.receipt_cumulative_gas_used == "0x0") evmTx.receipt_cumulative_gas_used = 0
+            if (evmTx.receipt_gas_used == "0x0") evmTx.receipt_gas_used = 0
+
+            if (decodedInput) {
+                evmTx.decoded = (decodedInput.decodeStatus == 'success');
+                evmTx.method_id = methodID;
+                if (evmTx.decoded) {
+                    evmTx.signature = decodedInput.signature;
+                    evmTx.params = JSON.stringify(decodedInput.params);
+                    // write specific call_ table
+                    // try to find tableID
+                    if (methodID != null) { //skip nativeTransfer
+                        let acctAddr = tx.from.toLowerCase() // signer of the tx
+
+                        let [tableID, projectTableInfo] = this.getTableIDFromFingerprintID(methodID, tx.to);
+                        if (tableID) {
+                            let [bqCall, bqCall2] = this.generateCallBqRec(tableID, projectTableInfo, methodID, evmTx, acctAddr)
+                            if (bqCall) {
+                                //console.log(`Auto generated bqCall ${methodID}->${tableID}\n`, bqCall)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push(bqCall)
+                            }
+                            // if there is no projectTableInfo set up yet, set it up with the same schema
+                            if (projectTableInfo) {
+                                let subtableID = projectTableInfo.subtableId;
+                                if (projectTableInfo.status == "Unknown") {
+                                    let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures);
+                                    if (schemaInfo) {
+                                        auto_evm_schema_map[subtableID] = schemaInfo
+                                        console.log("*******1 CREATING SUBTABLEID", subtableID, schemaInfo);
+                                    }
+                                } else if (bqCall2) {
+                                    if (auto_evm_rows_map[subtableID] == undefined) {
+                                        auto_evm_rows_map[subtableID] = []
+                                    }
+                                    auto_evm_rows_map[subtableID].push(bqCall2)
+                                    console.log("*******2 ADDING ROW SUBTABLEID", subtableID, bqCall2);
+                                }
+                            }
+                        } else {
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(evmTx.signature, methodID, contractABIs, contractABISignatures)
+                            if (schemaInfo) {
+                                tableID = schemaInfo.schema.tableId
+                                let [bqCall, bqCall2] = this.generateCallBqRec(tableID, projectTableInfo, methodID, evmTx, acctAddr)
+                                // TODO: bqCall's label
+                                if (schemaInfo && tableID) {
+                                    console.log(`New call schemaInfo ${methodID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n call:\n`, evmTx.params)
+                                    auto_evm_schema_map[tableID] = schemaInfo
+                                }
+                            } else {
+                                //shouldn't get here?
+                                console.log(`Unknown methodID ${methodID}\n`)
+                            }
+                        }
+
+                    }
+                }
+            }
+            let bqEvmTransaction = {
+                insertId: `${tx.transactionHash}`,
+                json: evmTx
+            }
+            //console.log(`bq+`, bqEvmTransaction)
+            rows_transactions.push(bqEvmTransaction);
+            if (logs) {
+                for (let j = 0; j < logs.length; j++) {
+                    let l = logs[j]
+                    let eSig = l.signature ? l.signature : null
+                    let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
+                    let evmLog = {
+                        chain_id: chainID,
+                        id: chain.id,
+                        log_index: l.logIndex,
+                        transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
+                        transaction_index: i,
+                        address: l.address.toLowerCase(),
+                        data: l.data,
+                        topics: l.topics,
+                        block_timestamp: block.timestamp,
+                        block_number: block.number,
+                        block_hash: block.hash,
+                        signature: eSig,
+                        events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
+                    }
+                    let bqEvmLog = {
+                        insertId: `${tx.transactionHash}_${l.logIndex}`,
+                        json: evmLog
+                    }
+                    //console.log(`bqEvmLog`, bqEvmLog)
+                    rows_logs.push(bqEvmLog);
+
+                    // write specific evt_ table
+                    if (eSig) {
+                        // try to find tableID
+                        let acctAddr = tx.from.toLowerCase() // signer of the tx
+                        let [tableID, projectTableInfo] = this.getTableIDFromFingerprintID(eFingerprintID, l.address)
+
+                        if (tableID) { // existing table
+                            let [bqEvent, bqEvent2] = this.generateEventBqRec(tableID, projectTableInfo, eFingerprintID, evmLog, acctAddr)
+                            if (bqEvent && tableID) {
+                                //console.log(`Auto generated bqEvent ${eFingerprintID}->${tableID}\n`, bqEvent)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push(bqEvent)
+                            }
+                            if (projectTableInfo) {
+                                let subtableID = projectTableInfo.subtableId;
+                                if (projectTableInfo.status == "Unknown") {
+                                    console.log("*******3 CREATE PROJECT EVENTS TABLE", subtableID)
+                                    let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                                    if (schemaInfo) {
+                                        auto_evm_schema_map[subtableID] = schemaInfo
+                                    }
+                                } else if (bqEvent2) {
+                                    console.log(`*******4 PROJECTS EVENTS ROW ${subtableID}\n`, bqEvent2)
+                                    if (auto_evm_rows_map[subtableID] == undefined) {
+                                        auto_evm_rows_map[subtableID] = []
+                                    }
+                                    auto_evm_rows_map[subtableID].push(bqEvent2)
+                                }
+                            }
+                        } else { // do the abi lookup
+                            let schemaInfo = await this.setupEvmCallEventSchemaInfo(eSig, eFingerprintID, contractABIs, contractABISignatures)
+                            if (schemaInfo) {
+                                tableID = schemaInfo.schema.tableId
+                                let [bqEvent, bqEvent2] = this.generateEventBqRec(tableID, projectTableInfo, eFingerprintID, evmLog, acctAddr)
+                                if (auto_evm_rows_map[tableID] == undefined) {
+                                    auto_evm_rows_map[tableID] = []
+                                }
+                                auto_evm_rows_map[tableID].push()
+                                if (schemaInfo && tableID) {
+                                    console.log(`New event schemaInfo ${eFingerprintID}->${schemaInfo.schema.tableId}`, schemaInfo.schema, `\n event:\n`, evmLog.events)
+                                    auto_evm_schema_map[tableID] = schemaInfo
+                                }
+                            } else { //shouldn't get here?
+                                console.log(`Unknown eFingerprintID ${eFingerprintID}\n`, eSig)
+                            }
+                        }
+
+
+                    }
+                }
+            }
+            // NOTE: we do not write out hashes yet (development)
+            this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
+        }
+
+        /*
+        if (blockTS) {
+            // crawl any token addresses, write to btRealtime
+            await this.crawl_erc_tokens(evm_blk_num, blockTS, chainID);
+            await this.process_evm_flush(blockTS)
+        }
+        */
+
+        // store evm_etl_local
+        try {
+            let dataset = "evm";
+            let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
+            for (const tbl of tables) {
+                let rows = null
+                switch (tbl) {
+                    case "blocks":
+                        rows = rows_blocks;
+                        break;
+                    case "transactions":
+                        rows = rows_transactions;
+                        //console.log(`transactions`, rows_transactions)
+                        break;
+                    case "logs":
+                        rows = rows_logs;
+                        //console.log(`log`, rows_logs)
+                        break;
+                }
+                if (rows && rows.length > 0) {
+                    let recs = []
+                    for (const row of rows) {
+                        let rec = row.json
+                        console.log(`${tbl} rec`, rec)
+                        recs.push(rec)
+                    }
+                    let replace = false
+                    let fn = `${evmETLLocalBasePath}/${tbl}_000000000000`
+                    await this.streamWrite(fn, recs, replace)
+                    console.log(`WRITE -> ${fn} len=${recs.length}`)
+                }
+            }
+        } catch (err) {
+            console.log("err", JSON.stringify(err)); // TODO: logger
+        }
+
+        // evm _call _evt datasetId
+        let evmDatasetID = this.evmDatasetID;
+
+        // update schems
+        console.log(`new schemas`, Object.keys(auto_evm_schema_map))
+
+        for (const schemaTableId of Object.keys(auto_evm_schema_map)) {
+            let schemaInfo = auto_evm_schema_map[schemaTableId]
+            let schema = schemaInfo.schema
+            let sch = schema.schema
+            let tinySchema = ethTool.getSchemaWithoutDesc(sch)
+            let timePartitioning = schema.timePartitioning
+            console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            console.log(`${evmDatasetID}:${schemaTableId} tinySchema`, JSON.stringify(tinySchema))
+        }
+
+        // stream into call_ ,  evt_ table
+        console.log(`updated tableIds`, Object.keys(auto_evm_rows_map))
+
+        let tableIds = Object.keys(auto_evm_rows_map)
+        let autoEvmStorePromise = []
+        let autoEvmStorePromiseFn = []
+        if (!fs.existsSync(evmDecodedBasePath)) {
+            fs.mkdirSync(evmDecodedBasePath, {
+                recursive: true
+            });
+            console.log(`Making Directory "${evmDecodedBasePath}"`);
+        }
+        for (const tableId of Object.keys(auto_evm_rows_map)) {
+            let rows = auto_evm_rows_map[tableId]
+            //call_buyWithETHWert_0x5173ffaa/1.json
+            let fn = `${evmDecodedBasePath}${tableId}/${chainID}.json`
+            if (rows && rows.length > 0) {
+                let recs = []
+                for (const row of rows) {
+                    recs.push(row.json)
+                }
+                let replace = false
+                console.log(`${evmDatasetID}:${tableId} -> ${fn}`, recs)
+                //await this.streamWrite(fn, recs, replace);
+                autoEvmStorePromiseFn.push({
+                    fn: fn,
+                    tableId: tableId,
+                    rowCnt: rows.length
+                })
+                autoEvmStorePromise.push(this.streamWrite(fn, recs, replace))
+            }
+        }
+
+        let autoEvmStoreStates;
+        try {
+            autoEvmStoreStates = await Promise.allSettled(autoEvmStorePromise);
+            //{ status: 'fulfilled', value: ... },
+            //{ status: 'rejected', reason: Error: '.....'}
+        } catch (e) {
+            //if (this.debugLevel >= paraTool.debugErrorOnly) console.log(`crawlerInitPromise error`, e, crawlerInitStates)
+            this.log_manager_error(e, "batchStreamWrite", "Promise.allSettled");
+        }
+        for (let i = 0; i < autoEvmStoreStates.length; i += 1) {
+            let autoEvmStoreState = autoEvmStoreStates[i]
+            let fnInfo = autoEvmStorePromiseFn[i]
+            if (autoEvmStoreState.status != undefined && autoEvmStoreState.status == "fulfilled") {
+                //console.log(`autoEvmStoreState[${i}] fulfilled`, autoEvmStoreState)
+                //console.log(`Stored\tlen=${fnInfo.rowCnt}\t${fnInfo.fn} `)
+            } else {
+                let rejectedReason = JSON.parse(JSON.stringify(autoEvmStoreState['reason']))
+                let errorStr = rejectedReason.message
+                if (errorStr) {
+                    console.log(`errorMsg`, errorStr)
+                }
+            }
+        }
+    }
+
     // given a row r fetched with "fetch_block_row", processes the block, events + trace
     async index_chain_block_row(r, signedBlock = false, write_bq_log = false, refreshAPI = false, isTip = false, isFinalized = true, traceParseTS = 1670544000) {
         /* index_chain_block_row shall process trace(if available) + block + events in orders
@@ -8879,7 +9422,7 @@ module.exports = class Indexer extends AssetManager {
         this.addressLabelCandidates = {}
     }
 
-    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures) {
+    async stream_evm(evmlBlock, dTxns, dReceipts, evmTrace = false, chainID, contractABIs, contractABISignatures, stream_bq = true, write_bt = true) {
         const {
             BigQuery
         } = require('@google-cloud/bigquery');
@@ -8900,6 +9443,22 @@ module.exports = class Indexer extends AssetManager {
         let evm_chain_id = chainID
         let evm_blk_num = block.number
         let blockTS = block.timestamp
+        let blockMicroTS = blockTS * 1000000
+        let blockHash = block.hash
+        let cres = {
+            key: paraTool.blockNumberToHex(evm_blk_num),
+            data: {
+                /*
+                blocks: {},
+                logs: {},
+                token_transfers: {},
+                traces: {},
+                transactions: {},
+                contracts: {},
+                */
+            }
+        }
+
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8916,8 +9475,8 @@ module.exports = class Indexer extends AssetManager {
                 state_root: block.stateRoot,
                 receipts_root: block.receiptsRoot,
                 miner: block.miner,
-                difficulty: block.difficulty,
-                total_difficulty: block.totalDifficulty,
+                difficulty: paraTool.dechexToInt(block.difficulty),
+                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
                 size: block.size,
                 extra_data: block.extraData,
                 gas_limit: block.gasLimit,
@@ -8925,6 +9484,7 @@ module.exports = class Indexer extends AssetManager {
                 transaction_count: block.transactions.length
             }
         }
+
         //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
 
@@ -8969,6 +9529,13 @@ module.exports = class Indexer extends AssetManager {
                 signature: null,
                 params: null
             }
+            //arbitrum 0x0 values??
+            if (evmTx.value == "0x0") evmTx.value = 0
+            if (evmTx.gas == "0x0") evmTx.gas = 0
+            if (evmTx.gas_price == "0x0") evmTx.gas_price = 0
+            if (evmTx.receipt_cumulative_gas_used == "0x0") evmTx.receipt_cumulative_gas_used = 0
+            if (evmTx.receipt_gas_used == "0x0") evmTx.receipt_gas_used = 0
+
             if (decodedInput) {
                 evmTx.decoded = (decodedInput.decodeStatus == 'success');
                 evmTx.method_id = methodID;
@@ -9050,7 +9617,7 @@ module.exports = class Indexer extends AssetManager {
                         block_number: block.number,
                         block_hash: block.hash,
                         signature: eSig,
-                        events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
+                        events: (l.events) ? JSON.stringify(l.events) : null // blockchain-etl does NOT have signature, events
                     }
                     let bqEvmLog = {
                         insertId: `${tx.transactionHash}_${l.logIndex}`,
@@ -9122,12 +9689,74 @@ module.exports = class Indexer extends AssetManager {
             await this.process_evm_flush(blockTS)
         }
 
+        if (write_bt) {
+            // store into bt
+            try {
+                let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers", "traces"]
+                let currentDayMicroTS = paraTool.getCurrentDayTS() * 1000000 //last microsecond of a day - to be garbage collected 7 days after this
+                for (const tbl of tables) {
+                    let rows = null
+                    cres.data[tbl] = {}
+                    switch (tbl) {
+                        case "blocks":
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(rows_blocks[0].json),
+                                timestamp: currentDayMicroTS
+                            };
+                            break;
+                        case "transactions":
+                            let raw_transactions = [];
+                            for (const transaction of rows_transactions) {
+                                raw_transactions.push(transaction.json)
+                            }
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(raw_transactions),
+                                timestamp: currentDayMicroTS
+                            };
+                            //console.log(`transactions`, rows_transactions)
+                            break;
+                        case "logs":
+                            let raw_logs = [];
+                            for (const log of rows_logs) {
+                                raw_logs.push(log.json)
+                            }
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(raw_logs),
+                                timestamp: currentDayMicroTS
+                            };
+                            //console.log(`log`, rows_logs)
+                            break;
+                    }
+                    console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
+                }
+            } catch (e) {
+                console.log(`bt error`, e)
+                cres = false
+            }
+
+            let tbl = this.instance.table("evmchain" + chainID);
+            if (cres) {
+                try {
+                    console.log(`update bt evmchain${chainID}`, cres)
+                    await this.insertBTRows(tbl, [cres], "evmchain");
+                } catch (e) {
+                    console.log(`load err`, e);
+                }
+            }
+        }
+
+        if (!stream_bq) {
+            return
+        }
+
         // stream into blocks, transactions
         try {
-            let dataset = "evm";
+            //let dataset = "evm";
+            let dataset = "crypto_evm"
             let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
             for (const tbl of tables) {
                 let rows = null
+                let tblID = `${tbl}${chainID}`
                 switch (tbl) {
                     case "blocks":
                         rows = rows_blocks;
@@ -9144,11 +9773,11 @@ module.exports = class Indexer extends AssetManager {
                 if (rows && rows.length > 0) {
                     await bigquery
                         .dataset(dataset)
-                        .table(tbl)
+                        .table(tblID)
                         .insert(rows, {
                             raw: true
                         });
-                    console.log(`WRITE ${dataset}:${tbl} len=${rows.length}`)
+                    console.log(`WRITE ${dataset}:${tblID} len=${rows.length}`)
                 }
             }
         } catch (err) {
@@ -9165,8 +9794,10 @@ module.exports = class Indexer extends AssetManager {
             let schemaInfo = auto_evm_schema_map[schemaTableId]
             let schema = schemaInfo.schema
             let sch = schema.schema
+            let tinySchema = ethTool.getSchemaWithoutDesc(sch)
             let timePartitioning = schema.timePartitioning
             console.log(`${evmDatasetID}:${schemaTableId} `, sch)
+            console.log(`${evmDatasetID}:${schemaTableId} tinySchema`, tinySchema)
             try {
                 const [table] = await bigquery
                     .dataset(evmDatasetID)
@@ -9175,6 +9806,7 @@ module.exports = class Indexer extends AssetManager {
                         location: this.evmBQLocation,
                         timePartitioning: timePartitioning,
                     });
+
             } catch (err) {
                 let errorStr = err.toString()
                 if (!errorStr.includes('Already Exists')) {
@@ -9240,6 +9872,7 @@ module.exports = class Indexer extends AssetManager {
             }
         }
     }
+
     // create table streamingerror (tableId varchar(128), op varchar(128), streamObject mediumblob, streamingError blob, lastErrorDT date, numErrors int default 0, primary key (tableId, op) )
     async log_streaming_error(tableId, op, json_object, streamingError, chainID, blockNumber) {
         try {
@@ -9314,19 +9947,17 @@ module.exports = class Indexer extends AssetManager {
         return false;
     }
 
-    async crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi +++`, evmRPCBlockReceiptsApi)
-        if (!evmRPCBlockReceiptsApi) {
+    async crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        if (!evmRPCInternalApi) {
             return (false);
         }
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceiptsApi)
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
         if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
-        let cmd = `curl ${evmRPCBlockReceiptsApi}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+        let cmd = `curl ${evmRPCInternalApi}  -X POST -H "Content-Type: application/json" --data '{"method":"qn_getBlockWithReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
-            console.log(`crawlEvmBlockReceipts try#${i}`)
+            console.log(`crawlQNEvmBlockAndReceiptsWithRetry [${blockNumber}] try#${i}\n${cmd}`)
             try {
                 const {
                     stdout,
@@ -9336,7 +9967,96 @@ module.exports = class Indexer extends AssetManager {
                 });
                 let receiptData = JSON.parse(stdout);
                 if (receiptData.result) {
-                    console.log(blockNumber, receiptData.result.length, cmd);
+                    console.log(`qn_getBlockWithReceipts ${blockNumber} DONE`, cmd);
+                    return (receiptData.result);
+                }
+                if (receiptData.error) {
+                    console.log(`qn_getBlockWithReceipts cmd`, cmd)
+                    console.log(`qn_getBlockWithReceipts error`, receiptData.error)
+                }
+                //console.log(`crawlEvmBlockReceipts`, cmd)
+            } catch (error) {
+                this.logger.warn({
+                    "op": "qn_getBlockWithReceipts",
+                    "cmd": cmd,
+                    "err": error
+                })
+                console.log(error);
+            }
+            if (i < maxRetries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        console.log(`retryWithDelay Failed maxRetries(${maxRetries}) reached`)
+        return false;
+    }
+
+    async crawlEvmBlockTracesWithRetry(evmRPCInternal, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        if (!evmRPCInternal) {
+            return (false);
+        }
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
+
+        for (let i = 0; i < maxRetries; i++) {
+            console.log(`crawlEvmBlockTracesWithRetry try#${i}\n${cmd}`)
+            try {
+                const {
+                    stdout,
+                    stderr
+                } = await exec(cmd, {
+                    maxBuffer: 1024 * 640000
+                });
+                //console.log(`stdout`, stdout)
+                let receiptData = JSON.parse(stdout);
+                if (receiptData.result) {
+                    console.log(`crawlEvmBlockTracesWithRetry ${blockNumber} DONE`, cmd);
+                    return (receiptData.result);
+                }
+                if (receiptData.error) {
+                    console.log(`crawlEvmBlockTracesWithRetry cmd`, cmd)
+                    console.log(`crawlEvmBlockTracesWithRetry error`, receiptData.error)
+                }
+                //console.log(`crawlEvmBlockReceipts`, cmd)
+            } catch (error) {
+                this.logger.warn({
+                    "op": "crawlEvmBlockTracesWithRetry",
+                    "cmd": cmd,
+                    "err": error
+                })
+                console.log(error);
+            }
+            if (i < maxRetries - 1) {
+                await new Promise((resolve) => setTimeout(resolve, delay));
+            }
+        }
+        console.log(`crawlEvmBlockTracesWithRetry Failed maxRetries(${maxRetries}) reached`)
+        return false;
+    }
+
+    async crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
+        if (!evmRPCBlockReceiptsApi) {
+            return (false);
+        }
+        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
+        //eth does not support hex padding: 0x01047025 -> 0x1047025
+        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let cmd = `curl ${evmRPCBlockReceiptsApi}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
+
+        for (let i = 0; i < maxRetries; i++) {
+            console.log(`crawlEvmBlockReceipts try#${i}\n${cmd}`)
+            try {
+                const {
+                    stdout,
+                    stderr
+                } = await exec(cmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                let receiptData = JSON.parse(stdout);
+                if (receiptData.result) {
+                    console.log(`eth_getBlockReceipts ${blockNumber} DONE`, cmd);
                     return (receiptData.result);
                 }
                 if (receiptData.error) {
@@ -9361,17 +10081,14 @@ module.exports = class Indexer extends AssetManager {
     }
 
     async crawlEvmBlockReceipts(evmRPCBlockReceipts, blockNumber, timeoutMS = 20000, maxRetries = 10, delay = 500) {
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi +++`, evmRPCBlockReceipts)
         if (!evmRPCBlockReceipts) {
             return (false);
         }
-        console.log(`crawlEvmBlockReceipts evmRPCBlockReceiptsApi`, evmRPCBlockReceipts)
         let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
         //eth does not support hex padding: 0x01047025 -> 0x1047025
         if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
         let cmd = `curl ${evmRPCBlockReceipts}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
-        console.log(`crawlEvmBlockReceipts`, cmd)
-
+        console.log(`[${cmd}] crawlEvmBlockReceipts\n${cmd}`)
         try {
             const {
                 stdout,
@@ -9381,7 +10098,7 @@ module.exports = class Indexer extends AssetManager {
             });
             let receiptData = JSON.parse(stdout);
             if (receiptData.result) {
-                console.log(blockNumber, receiptData.result.length, cmd);
+                console.log(`eth_getBlockReceipts ${blockNumber} DONE`, cmd);
                 return (receiptData.result);
             }
             if (receiptData.error) {
@@ -9400,6 +10117,175 @@ module.exports = class Indexer extends AssetManager {
             console.log(error);
         }
         return false;
+    }
+
+    async setupEvm(chainID) {
+        let chain = await this.getChain(chainID);
+        const bigquery = this.get_big_query();
+        await this.initEvmSchemaMap()
+        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
+            return (false);
+        }
+
+        // TODO: extract this
+        const Web3 = require('web3')
+        let provider = null
+        const startConnection = () => {
+            provider = new Web3.providers.WebsocketProvider(
+                chain.WSEndpoint, {
+                    clientConfig: {
+                        keepalive: true,
+                        keepaliveInterval: -1
+                    },
+                    reconnect: {
+                        auto: true,
+                        delay: 5000,
+                        maxAttempts: 5,
+                        onTimeout: false
+                    }
+                }
+            );
+            provider.connection.addEventListener('close', () => {
+                startConnection()
+            })
+        }
+        startConnection();
+        const web3 = new Web3(provider);
+        this.web3Api = web3;
+        if (chain.evmRPCBlockReceipts != undefined) {
+            this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
+        }
+        if (chain.evmRPCInternal != undefined) {
+            this.evmRPCInternal = chain.evmRPCInternal
+        }
+        if (chain.evmRPC != undefined) {
+            this.evmRPC = chain.evmRPC
+        }
+        this.contractABIs = await this.getContractABI();
+
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        await this.assetManagerInit()
+
+    }
+
+    async index_block_evm_from_bt(chainID, blkNum) {
+        let families = ["blocks", "logs", "traces", "transactions"]
+        let startTS = new Date().getTime();
+        const evmTableChain = this.getEvmTableChain(chainID);
+        let blkBNHex = paraTool.blockNumberToHex(blkNum);
+        let [rows] = await evmTableChain.getRows({
+            start: blkBNHex,
+            end: blkBNHex,
+            cellLimit: 1,
+            family: families
+        });
+
+        if (rows.length == 1) {
+            try {
+                await this.setupEvm(chainID)
+                let row = rows[0];
+                console.log(`Using BT Rec`, row)
+                let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                console.log(`rRow`, rRow)
+                let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
+                return r
+            } catch (err) {
+                console.log(err)
+                //this.log_indexing_error(err, `index_blocks_period`);
+            }
+        }
+        return false
+    }
+
+    // not optimized
+    async crawl_block_evm(chainID, blkNum) {
+        let web3 = this.web3Api
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
+        let evmRPCInternalApi = this.evmRPCInternal
+
+        let blockNumber = blkNum;
+        let block = null;
+        let blockHash = null
+        let block_tries = 0;
+        let block_retry_max = 10
+        let block_retry_ms = 200
+        let log_retry_max = 10
+        let log_retry_ms = 2000
+        let log_timeout_ms = 5000
+
+        let stream_bq = false
+        let write_bt = true
+
+        let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let res = false
+        if (qnSupportedChainIDs.includes(chainID)) {
+            res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+        }
+        if (res && res.block != undefined && res.receipts != undefined) {
+            console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
+            block = ethTool.standardizeRPCBlock(res.block)
+            let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
+            //let evmReceipts = res.receipts
+            let evmTrace = false
+            if (evmRPCInternalApi) {
+                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                //console.log(`[${block.number}] evmTrace`, evmTrace)
+            }
+            var statusesPromise = Promise.all([
+                ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+            ])
+            let [dTxns, dReceipts] = await statusesPromise
+            console.log(`dTxns`, dTxns)
+            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+        } else {
+            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+            //console.log(`blk #${blockNumber}`, block)
+            //TODO: ethereum has withdrawals flds
+            let numTransactions = block && block.transactions ? block.transactions.length : 0;
+            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+            let rows_blocks = [];
+            let rows_transactions = [];
+            let rows_logs = [];
+            try {
+                blockHash = block.hash
+                if (numTransactions >= 0) {
+                    let isParallel = true
+                    let evmReceipts = false
+
+                    if (evmRPCBlockReceiptsApi) {
+                        evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                    } else {
+                        let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                    }
+
+                    if (!evmReceipts) evmReceipts = [];
+                    evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                    console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+                    var statusesPromise = Promise.all([
+                        ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                        ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                    ])
+                    let [dTxns, dReceipts] = await statusesPromise
+                    //console.log(`dTxns`, dTxns)
+                    let evmTrace = false
+                    if (evmRPCInternalApi) {
+                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
+                        console.log(`[${block.number}] evmTrace`, evmTrace)
+                    }
+                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+                }
+            } catch (err) {
+                console.log(err)
+            }
+        }
     }
 
     async index_block_evm(chainID, blkNum) {
@@ -9459,54 +10345,94 @@ module.exports = class Indexer extends AssetManager {
         let block_tries = 0;
         let block_retry_max = 10
         let block_retry_ms = 200
+        let log_retry_max = 10
+        let log_retry_ms = 2000
+        let log_timeout_ms = 5000
+        let stream_bq = false
+        let write_bt = true
 
-        let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
-        let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
-        block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-        //console.log(`blk #${blockNumber}`, block)
-        //TODO: ethereum has withdrawals flds
-        let numTransactions = block && block.transactions ? block.transactions.length : 0;
-        console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
-        let rows_blocks = [];
-        let rows_transactions = [];
-        let rows_logs = [];
-        try {
-            blockHash = block.hash
-            if (numTransactions > 0) {
-                let isParallel = true
-                let log_retry_max = 10
-                let log_retry_ms = 2000
-                let log_timeout_ms = 5000
-                let evmReceipts = false
-
-                if (evmRPCBlockReceiptsApi) {
-                    evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                } else {
-                    let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
-                    let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
-                    evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
-                }
-
-                if (!evmReceipts) evmReceipts = [];
-                console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
-
-                var statusesPromise = Promise.all([
-                    ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
-                    ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
-                ])
-                let [dTxns, dReceipts] = await statusesPromise
-
-                let evmTrace = false
-                if (evmRPCInternalApi) {
-                    let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
-                    let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
-                    evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
-                    //console.log(`[${block.number}] evmTrace`, evmTrace)
-                }
-                await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+        let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let res = false
+        if (qnSupportedChainIDs.includes(chainID)) {
+            res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+        }
+        if (res && res.block != undefined && res.receipts != undefined) {
+            console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
+            //block = res.block
+            /*
+            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+            */
+            block = ethTool.standardizeRPCBlock(res.block)
+            let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
+            //let evmReceipts = res.receipts
+            let evmTrace = false
+            if (evmRPCInternalApi) {
+                /*
+                let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
+                let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
+                evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx)
+                */
+                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                //console.log(`[${block.number}] evmTrace`, evmTrace)
             }
-        } catch (err) {
-            console.log(err)
+            var statusesPromise = Promise.all([
+                ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+            ])
+            let [dTxns, dReceipts] = await statusesPromise
+            console.log(`dTxns`, dTxns)
+            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+        } else {
+            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+            //console.log(`blk #${blockNumber}`, block)
+            //TODO: ethereum has withdrawals flds
+            let numTransactions = block && block.transactions ? block.transactions.length : 0;
+            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+            let rows_blocks = [];
+            let rows_transactions = [];
+            let rows_logs = [];
+            try {
+                blockHash = block.hash
+                if (numTransactions > 0) {
+                    let isParallel = true
+                    let evmReceipts = false
+
+                    if (evmRPCBlockReceiptsApi) {
+                        evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                    } else {
+                        let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                        evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                    }
+
+                    if (!evmReceipts) evmReceipts = [];
+                    evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                    console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+                    var statusesPromise = Promise.all([
+                        ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                        ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                    ])
+                    let [dTxns, dReceipts] = await statusesPromise
+                    console.log(`dTxns`, dTxns)
+                    let evmTrace = false
+                    if (evmRPCInternalApi) {
+                        /*
+                        let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
+                        let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
+                        evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
+                        */
+                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
+                        //console.log(`[${block.number}] evmTrace`, evmTrace)
+                    }
+                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+                }
+            } catch (err) {
+                console.log(err)
+            }
         }
     }
 

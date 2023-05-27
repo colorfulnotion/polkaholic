@@ -653,7 +653,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
 
     let fTxn = {
-        chainID: chainID,
+        chainID: (chainID) ? chainID : paraTool.dechexToInt(dTxn.chainId),
         transactionHash: dTxn.hash,
         substrate: null,
         status: dReceipt.status,
@@ -944,6 +944,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     let methodID = '0x';
     let decodedTxnInput = {};
     let output = txn
+    //TODO: need to handle both RPC and WS format
 
     if (!contractcreationAddress) {
         if (txInput.length >= 10) {
@@ -997,7 +998,7 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
             decodedTxnInput.params = []
         }
     }
-    output.chainID = chainID
+    output.chainID = (chainID) ? chainID : paraTool.dechexToInt(txn.chainId)
     output.decodedInput = decodedTxnInput
     output.signature = {
         r: txn.r,
@@ -1267,7 +1268,18 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
         for (const t of txn_input_stub) {
             let fld = t.name
             let val = res[fld]
-            val = JSON.parse(JSON.stringify(val))
+            if (val instanceof Function) {
+                /* do something */
+                console.log(`TODO*** res[${fld}] is function`, val)
+                val = []
+            } else if (val != undefined) {
+                try {
+                    val = JSON.parse(JSON.stringify(val))
+                } catch (e1) {
+                    console.log(`e1 res[${fld}] val!!`, res[fld])
+                    console.log(`e1+++`, e1)
+                }
+            }
             if (val != undefined) {
                 //console.log(`val!!`, val)
                 t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
@@ -1277,7 +1289,9 @@ function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDec
         //console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
         return [combinedTxnInputs, true]
     } catch (e) {
-        console.log(`decode_txn_input_etherjs err`, e)
+        console.log(`[${txn.hash}] txn_input_stub`, txn_input_stub)
+        console.log(`[${txn.hash}] res`, res)
+        console.log(`[${txn.hash}] decode_txn_input_etherjs err`, e)
         return [false, false]
     }
 }
@@ -1519,18 +1533,20 @@ function parseAbiSignature(abiStrArr) {
             */
             let secondaryID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : `${signatureID}-${topicLen}-${encodeSelector(fingerprint, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) // this is NOT Unique
             let fingerprintID = (abiType == 'function') ? `${signatureID}-${encodeSelector(signature, 10)}` : `${signatureID}-${topicLen}-${encodeSelector(signature, 10)}` //fingerprintID=sigID-topicLen-4BytesOfkeccak256(fingerprint) //fingerprintID
+            let modifiedFingerprintID = (abiType == 'function') ? signatureID : `${signatureID}-${topicLen}`
             let abiStr = JSON.stringify([e])
             output.push({
                 stateMutability: (stateMutability) ? stateMutability : null,
                 fingerprint: fingerprint,
                 fingerprintID: fingerprintID,
+                modifiedFingerprintID: modifiedFingerprintID,
                 secondaryID: secondaryID,
                 signatureID: signatureID,
                 signatureRaw: signatureRaw,
                 signature: signature,
                 name: firstCharUpperCase(e.name),
                 abi: abiStr,
-                abiType,
+                abiType: abiType,
                 topicLength: topicLen,
                 flds: flds
             })
@@ -2756,7 +2772,7 @@ function createEvmSchema(abiStruct, fingerprintID, tableId = false) {
                 tableId: tableId,
                 schema: sch,
                 timePartitioning: {
-                    type: 'HOUR',
+                    type: 'DAY',
                     field: timePartitionField
                 },
             }
@@ -2818,6 +2834,20 @@ async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
 
+function getSchemaWithoutDesc(schema) {
+    let tinySchema = []
+    for (let i = 0; i < schema.length; i++) {
+        let s = schema[i]
+        let t = {
+            mode: s.mode,
+            name: s.name,
+            type: s.type,
+        }
+        tinySchema.push(t)
+    }
+    return tinySchema
+}
+
 function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     for (let i = 0; i < evmTrace.length; i++) {
         let t = evmTrace[i];
@@ -2850,6 +2880,51 @@ function process_evm_trace(evmTrace, res, depth, stack = [], txs) {
     }
 }
 
+function standardizeRPCBlock(blk) {
+    let blockIntegerFlds = ["baseFeePerGas", "difficulty", "gasLimit", "gasUsed", "number", "size", "timestamp", "totalDifficulty"]
+    let txnIntegerFlds = ["blockNumber", "gas", "gasPrice", "nonce", "transactionIndex", "value", "type", "maxFeePerGas", "maxPriorityFeePerGas", "chainId"]
+    for (const blockFld of Object.keys(blk)) {
+        if (blockIntegerFlds.includes(blockFld)) {
+            if (blk[blockFld]) blk[blockFld] = paraTool.dechexToInt(blk[blockFld])
+        }
+    }
+    for (let i = 0; i < blk.transactions.length; i++) {
+        let txn = blk.transactions[i]
+        for (const txnFld of Object.keys(txn)) {
+            if (txnIntegerFlds.includes(txnFld)) {
+                if (txn[txnFld]) txn[txnFld] = paraTool.dechexToInt(txn[txnFld])
+            }
+        }
+        blk.transactions[i] = txn
+    }
+    return blk
+}
+
+function standardizeRPCReceiptLogs(receipts) {
+    let receiptIntegerFlds = ["blockNumber", "cumulativeGasUsed", "effectiveGasPrice", "gasUsed"]
+    let logIntegerFlds = ["blockNumber", "transactionIndex", "logIndex"]
+    for (let i = 0; i < receipts.length; i++) {
+        let receipt = receipts[i]
+        for (const receiptFld of Object.keys(receipt)) {
+            if (receiptIntegerFlds.includes(receiptFld)) {
+                if (receipt[receiptFld]) receipt[receiptFld] = paraTool.dechexToInt(receipt[receiptFld])
+            }
+        }
+        for (let i = 0; i < receipt.logs.length; i++) {
+            let log = receipt.logs[i]
+            for (const logFld of Object.keys(log)) {
+                if (logIntegerFlds.includes(logFld)) {
+                    if (log[logFld]) log[logFld] = paraTool.dechexToInt(log[logFld])
+                }
+            }
+            receipt.logs[i] = log
+        }
+        receipts[i] = receipt
+    }
+    return receipts
+}
+
+
 module.exports = {
     toHex: function(bytes) {
         return toHex(bytes);
@@ -2863,6 +2938,8 @@ module.exports = {
     crawlEvmBlock: async function(web3Api, bn) {
         return crawl_evm_block(web3Api, bn)
     },
+    standardizeRPCBlock: standardizeRPCBlock,
+    standardizeRPCReceiptLogs: standardizeRPCReceiptLogs,
     crawlEvmLogs: async function(web3Api, bn) {
         return crawl_evm_logs(web3Api, bn)
     },
@@ -3031,5 +3108,6 @@ module.exports = {
     getFingerprintIDFromTableID: getFingerprintIDFromTableID,
     computeTableIDFromFingerprintIDAndName: computeTableIDFromFingerprintIDAndName,
     computeModifiedFingerprintID: computeModifiedFingerprintID,
-    getEVMFlds: getEVMFlds
+    getEVMFlds: getEVMFlds,
+    getSchemaWithoutDesc: getSchemaWithoutDesc,
 };

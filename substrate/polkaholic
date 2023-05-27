@@ -148,12 +148,16 @@ async function main() {
             let blockchainID = chain.chainID
             //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
             let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-                paraTool.chainIDMoonbeamEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+                paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
                 paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
             ]
 
             if (evmChainIDList.includes(blockchainID)) {
-                await crawler.index_block_evm(chainID, blockNumber);
+                //await crawler.index_block_evm(chainID, blockNumber);
+                let res = await crawler.index_block_evm_from_bt(chainID, blockNumber);
+                if (!res) {
+                    await crawler.index_block_evm(chainID, blockNumber);
+                }
             } else {
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();

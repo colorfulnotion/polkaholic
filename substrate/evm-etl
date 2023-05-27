@@ -4,6 +4,8 @@ const {
     Command
 } = require('commander');
 var EVMETL = require("./evmetl");
+const paraTool = require("./paraTool");
+
 
 function myParseInt(value, dummyPrevious) {
     const parsedValue = parseInt(value, 10);
@@ -23,12 +25,12 @@ async function main() {
 
     program.command('crawlabi')
         .description(`Get ABI for contract from external API (Etherscan, ...) based on chainID`)
-        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt, 1)
+        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt, paraTool.chainIDEthereum)
         .option('-p, --project <project>', 'Project Name (e.g. wormhole)', "")
         .option('-n, --contractName <contractName>', 'Contract Name (e.g. Endpoint)', "")
         .argument('<address>', 'Contract Address')
         .action(async (address, opt) => {
-            let chainID = opt.chainID != null ? opt.chainID : 1;
+            let chainID = opt.chainID != null ? opt.chainID : paraTool.chainIDEthereum;
             let project = opt.project ? opt.project : null;
             let contractName = opt.contractName ? opt.contractName : null;
             let evmetl = new EVMETL();
@@ -38,17 +40,28 @@ async function main() {
 
     program.command('generateproject')
         .description(`Get ABI for contract from external API (Etherscan, ...) based on chainID`)
-        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt, 1)
+        .option('-c, --chainID <chainID>', 'ChainID to update balances', myParseInt, paraTool.chainIDEthereum)
         .option('-p, --project <project>', 'Project Name (e.g. wormhole)', "")
         .option('-n, --contractName <contractName>', 'Contract Name (e.g. Endpoint)', "")
         .argument('<address>', 'Contract Address')
         .action(async (address, opt) => {
-            let chainID = opt.chainID != null ? opt.chainID : 1;
+            let chainID = opt.chainID != null ? opt.chainID : paraTool.chainIDEthereum;
             let project = opt.project ? opt.project : null;
             let contractName = opt.contractName ? opt.contractName : null;
             let evmetl = new EVMETL();
             await evmetl.initEvmSchemaMap()
             await evmetl.generateProject(address, chainID, project, contractName);
+            process.exit(0);
+        });
+
+    program.command('createdatasetschema')
+        .description(`Auto generate dataset table schemas`)
+        .option('-p, --projectID <projectID>', 'projectID (e.g. substrate-etl)', "substrate-etl")
+        .argument('<datasetID>', 'datasetID (e.g. crypto_ethereum)')
+        .action(async (datasetID, opt) => {
+            let projectID = opt.projectID ? opt.projectID : null;
+            let evmetl = new EVMETL();
+            await evmetl.createDatasetSchema(datasetID, projectID);
             process.exit(0);
         });
 
@@ -128,15 +141,21 @@ async function main() {
     program.command('setupevm')
         .description("Setup or update BigQuery tables for EVM Chain. Use -u to update tbl schema")
         .usage("-c 137")
-        .option('-c, --chainID <chainID>', 'ChainID', null)
+        .option('-c, --chainID <chainID>', 'ChainID to create dataset for', myParseInt, paraTool.chainIDPolygon)
         .option('-u, --update', `update schema mode`, false)
         .action(async (opt) => {
-            var substrateetl = new SubstrateETL();
-            let chainID = opt.chainID
+            let chainID = opt.chainID != null ? opt.chainID : paraTool.chainIDPolygon;
             let isUpdate = (opt.update) ? true : false
             let isAll = (opt.all) ? true : false
             if (chainID != undefined) chainID = myParseInt(chainID)
-            await evmetl.setup_chain_evm(chainID, isUpdate);
+            let evmetl = new EVMETL();
+
+            let dotsamaEvmChains = [paraTool.chainIDAcala, paraTool.chainIDKarura, paraTool.chainIDMoonbeam, paraTool.chainIDClover, paraTool.chainIDAstar, paraTool.chainIDMoonriver, paraTool.chainIDShiden]
+            if (dotsamaEvmChains.includes(dotsamaEvmChains)) {
+                process.exit(1, "Use evm chainID to setup dataset");
+            } else {
+                await evmetl.setup_chain_evm(chainID, isUpdate);
+            }
             process.exit(0);
         })
 
@@ -218,6 +237,13 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('generateevmschema')
+        .action(async () => {
+            var evmetl = new EVMETL();
+            await evmetl.generateTableSchemaJSON();
+            process.exit(0);
+        });
+
 
     program.command('dryrun')
         .argument('<query>', `Query`)
@@ -250,6 +276,183 @@ async function main() {
         });
 
 
+    /* Regnerate One day worth of data
+
+    Step0 create blocklog rec
+    Step1 ./evm-etl cpblk -l 2023-05-12
+    Step2 ./evm-etl backfill -c 1 -l 2023-05-12
+    Step3 ./evm-etl indexchain -c 1 -l 2023-05-12
+    Step4 ./evm-etl cpevmdecoded -c 1 -l 2023-05-12
+    Step5 ./evm-etl loadevmdecoded -l 2023-05-12
+
+    */
+
+    program.command('processchainsteps')
+        .description(`process a full day of chain data`)
+        .option('-c, --chainID <chainID>', 'ChainID to cpoy', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 3600)
+            let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
+            let logDT = opt.logDT ? opt.logDT : prevDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.processChainSteps(dt, chainID);
+                    }
+                } else {
+                    await evmetl.processChainSteps(logDT, chainID);
+                }
+            }
+            process.exit(0);
+        });
+
+
+    program.command('cpblk')
+        .option('-c, --chainID <chainID>', 'ChainID to cpoy', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
+            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.cpblk(dt, chainID);
+                    }
+                } else {
+                    await evmetl.cpblk(logDT, chainID);
+                }
+            }
+            process.exit(0);
+        });
+
+    program.command('backfill')
+        .option('-c, --chainID <chainID>', 'ChainID to backfill', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
+            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.backfill(dt, chainID);
+                    }
+                } else {
+                    await evmetl.backfill(logDT, chainID);
+                }
+            }
+            process.exit(0);
+        });
+
+    program.command('indexchain')
+        .option('-c, --chainID <chainID>', 'ChainID to Index', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
+            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.index_evmchain_full(chainID, dt);
+                    }
+                } else {
+                    await evmetl.index_evmchain_full(chainID, logDT);
+                }
+            }
+            process.exit(0);
+        });
+
+    program.command('copyevmdecoded')
+        .option('-c, --chainID <chainID>', 'ChainID to Copy result into gs bucket: gs://evm_decoded/', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 3600)
+            let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
+            let logDT = opt.logDT ? opt.logDT : prevDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.cpEvmDecodedToGS(dt, chainID);
+                    }
+                } else {
+                    await evmetl.cpEvmDecodedToGS(logDT, chainID);
+                }
+            }
+            process.exit(0);
+        });
+
+    //loadevmdecoded cannot support chainID-specific update
+    program.command('loadevmdecoded')
+        //.option('-c, --chainID <chainID>', 'ChainID to load result', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 3600)
+            let logDT = opt.logDT ? opt.logDT : prevDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.loadGSEvmDecoded(dt);
+                    }
+                } else {
+                    await evmetl.loadGSEvmDecoded(logDT);
+                }
+            }
+            process.exit(0);
+        });
+
+    program.command('preloadevmschema')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.preloadEvmSchema();
+        });
+
+    program.command('updateevmschema')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.updateEvmschema();
+        });
+
+    program.command('views')
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.loadProjectViews();
+        });
+
+    program.command('blocklogbounds')
+        .option('-c, --chainID <chainID>', 'ChainID to bound', myParseInt, paraTool.chainIDEthereum)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            let chainID = opt.chainID;
+            let logDT = opt.logDT;
+            await evmetl.detectBlocklogBounds(chainID, logDT);
+        });
+
     await program.parseAsync(process.argv);
 }
 
@@ -260,4 +463,4 @@ main()
     .catch((e) => {
         console.error('ERROR', e);
         process.exit(1);
-    });
+    })
