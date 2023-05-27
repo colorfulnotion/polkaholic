@@ -2116,6 +2116,8 @@ module.exports = class Crawler extends Indexer {
                 let log_retry_max = 10
                 let log_retry_ms = 2000
                 let log_timeout_ms = 5000
+                let stream_bq = true
+                let write_bt = true
 
                 let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
                 let res = false
@@ -2131,9 +2133,7 @@ module.exports = class Crawler extends Indexer {
                     block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
                     */
                     block = ethTool.standardizeRPCBlock(res.block)
-
-
-                    let evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                    let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
                     //let evmReceipts = res.receipts
                     let evmTrace = false
                     if (evmRPCInternalApi) {
@@ -2150,7 +2150,7 @@ module.exports = class Crawler extends Indexer {
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                     ])
                     let [dTxns, dReceipts] = await statusesPromise
-                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                 } else {
                     let evmBlockFunc = web3.eth.getBlock(result.hash, true)
                     let evmBlockCtx = `web3.eth.getBlock(${result.hash}, true)`
@@ -2206,7 +2206,7 @@ module.exports = class Crawler extends Indexer {
                                 ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                             ])
                             let [dTxns, dReceipts] = await statusesPromise
-                            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+                            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                         }
                     } catch (err) {
                         console.log(`crawlEvmReceipts err`, err)
@@ -2226,7 +2226,7 @@ module.exports = class Crawler extends Indexer {
         });
         */
 
-        let lastHeaderReceivedSecAgoExitThreshold = 40
+        let lastHeaderReceivedSecAgoExitThreshold = 100
         setInterval(() => {
             if (this.getCurrentTS() - lastHeaderReceived > lastHeaderReceivedSecAgoExitThreshold) {
                 console.log(`EXIT: lastHeaderReceivedSecAgo ${this.getCurrentTS() - lastHeaderReceived}`, )
@@ -2250,11 +2250,13 @@ module.exports = class Crawler extends Indexer {
                 chain.WSEndpoint, {
                     clientConfig: {
                         keepalive: true,
-                        keepaliveInterval: -1
+                        keepaliveInterval: 60000,
+                        maxReceivedFrameSize: 10000000, // bytes - default: 1MiB, current: 2MiB
+                        maxReceivedMessageSize: 10000000, // bytes - default: 8MiB, current: 10Mib
                     },
                     reconnect: {
                         auto: true,
-                        delay: 5000,
+                        delay: 50000,
                         maxAttempts: 5,
                         onTimeout: false
                     }

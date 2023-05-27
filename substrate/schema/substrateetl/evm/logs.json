@@ -64,5 +64,17 @@
         "mode": "REQUIRED",
         "name": "block_hash",
         "type": "STRING"
+      },
+      {
+        "description": "Decoded Topics0, if available",
+        "mode": "NULLABLE",
+        "name": "signature",
+        "type": "STRING"
+      },
+      {
+        "description": "Decoded Events, if available",
+        "mode": "NULLABLE",
+        "name": "events",
+        "type": "JSON"
       }
 ]
