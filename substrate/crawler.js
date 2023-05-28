@@ -2298,7 +2298,7 @@ module.exports = class Crawler extends Indexer {
             return [null, null, null];
         } else {
             console.log("loading substrate");
-            await this.load_calls_events("substrate_dev");
+            await this.load_calls_events("substrate");
         }
 
         // Subscribe to chain updates and log the current block number on update.

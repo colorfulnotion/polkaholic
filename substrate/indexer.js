@@ -6572,12 +6572,11 @@ module.exports = class Indexer extends AssetManager {
                 }]
             };
         } else {
-            this.logger.error({
+            /*this.logger.error({
                 "op": "generate_call_rows-NOT FOUND",
-                "tableName": t.tableName,
                 "call": c,
                 "err": err
-            })
+            }) */
         }
         return null;
     }
@@ -6624,9 +6623,6 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
                 let bqEvent = {
-                    relay_chain: relayChain,
-                    para_id: paraID,
-                    id: id,
                     event_id: ev.eventID,
                     extrinsic_hash: ext.extrinsicHash,
                     extrinsic_id: ext.extrinsicID,
@@ -6646,9 +6642,6 @@ module.exports = class Indexer extends AssetManager {
                 if (isTransferType) {
                     let tInfo = this.extractTransferInfo(dEvent.decodedData)
                     let bqFullTransfer = {
-                        relay_chain: relayChain,
-                        para_id: paraID,
-                        id: id,
                         block_hash: block.hash,
                         block_number: block.number,
                         block_time: block.block_time,
@@ -6691,9 +6684,6 @@ module.exports = class Indexer extends AssetManager {
                 let cnt = 0;
                 for (const t of ext.transfers) {
                     let bqTransfer = {
-                        relay_chain: relayChain,
-                        para_id: paraID,
-                        id: id,
                         block_hash: block.hash,
                         block_number: block.number,
                         block_time: block.block_time,
@@ -6724,9 +6714,6 @@ module.exports = class Indexer extends AssetManager {
             if (ext.signer) {
                 let feeUSD = await this.computeExtrinsicFeeUSD(ext)
                 let bqExtrinsic = {
-                    relay_chain: relayChain,
-                    para_id: paraID,
-                    id: id,
                     hash: ext.extrinsicHash,
                     extrinsic_id: ext.extrinsicID,
                     block_time: block.block_time,
@@ -6796,7 +6783,7 @@ module.exports = class Indexer extends AssetManager {
                         if (t) {
                             try {
                                 await bigquery
-                                    .dataset("substrate_dev")
+                                    .dataset("substrate")
                                     .table(t.tableName)
                                     .insert(t.rows, {
                                         raw: true
@@ -6838,7 +6825,7 @@ module.exports = class Indexer extends AssetManager {
                     rows = transfers;
                     break;
                 case "tokentransfers":
-                    rows = tokentransfers;
+                    //rows = tokentransfers;
                     //console.log(`tokentransfers`, tokentransfers)
                     break;
                 case "calls":
@@ -6847,11 +6834,11 @@ module.exports = class Indexer extends AssetManager {
                     break;
             }
             if (rows && rows.length > 0) {
-                let dataset = "polkadot_enterprise"
+                let dataset = `crypto_${relayChain}`
                 try {
                     await bigquery
                         .dataset(dataset)
-                        .table(t)
+                        .table(`${t}${paraID}`)
                         .insert(rows, {
                             raw: true
                         });
@@ -6907,7 +6894,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             const bigquery = this.get_big_query();
             await bigquery
-                .dataset(relayChain)
+                .dataset(`crypto_${relayChain}`)
                 .table("xcm")
                 .insert(rows, {
                     raw: true
@@ -8152,15 +8139,15 @@ module.exports = class Indexer extends AssetManager {
 
         if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0) || (traces.length > 0)) && isTip) {
             const bigquery = this.get_big_query();
-            let tables = ["balanceupdates", "assetupdates", "traces", "tokentransfer"];
+            let tables = ["traces"];
             for (const t of tables) {
                 let rows = null;
                 switch (t) {
                     case "balanceupdates":
-                        rows = balanceupdates;
+                        //rows = balanceupdates;
                         break;
                     case "assetupdates":
-                        rows = assetupdates;
+                        //  rows = assetupdates;
                         break;
                     case "traces":
                         rows = traces;
@@ -8172,8 +8159,8 @@ module.exports = class Indexer extends AssetManager {
                 if (rows && rows.length > 0) {
                     try {
                         await bigquery
-                            .dataset("polkadot_enterprise")
-                            .table(t)
+                            .dataset(`crypto_${relayChain}`)
+                            .table(`${t}${paraID}`)
                             .insert(rows, {
                                 raw: true
                             });
@@ -8934,6 +8921,10 @@ module.exports = class Indexer extends AssetManager {
         if (chainID == 2058 && blockNumber < 78173) {
             return 1677087384 + 12 * blockNumber;
         }
+        if (chainID == 22110 && blockNumber == 2) {
+            return 1649774298;
+        }
+
         return (false);
     }
 
@@ -9050,7 +9041,7 @@ module.exports = class Indexer extends AssetManager {
 
         let evmDataset = this.evmDatasetID
         let schemaQuery = `SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`
-        let tablesRecs = await this.execute_bqJob(schemaQuery, paraTool.BQUSMulti);
+        let tablesRecs = await this.execute_bqJob(schemaQuery);
 
         let evmSchemaMap = {}
         let evmFingerprintMap = {}
@@ -10462,8 +10453,10 @@ module.exports = class Indexer extends AssetManager {
             let fees = blockStats && blockStats.fees ? blockStats.fees : 0
             let feedTS = Math.floor(Date.now() / 1000)
             let indexTS = Math.floor(blockTS / 3600) * 3600;
-            if (typeof blockTS === "undefined") {
+            if (typeof blockTS === "undefined" || blockTS === false) {
                 blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
+            } else {
+                console.log("***!*$!*$*!*$*@#", blockTS);
             }
             if (!parentHash) {
                 console.log(`missing parentHash! bn=${blockNumber}`, r.block, r.block.header);

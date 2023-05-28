@@ -1452,9 +1452,6 @@ module.exports = {
     debugVerbose: 3,
     debugTracing: 4,
 
-    BQUSCentral1: "us-central1",
-    BQUSMulti: "us",
-
     // Kusama parachains
     chainIDStatemine: 21000,
     chainIDEncointer: 21001,

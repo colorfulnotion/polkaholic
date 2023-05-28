@@ -77,6 +77,7 @@ module.exports = class SubstrateETL extends AssetManager {
     // all bigquery tables are date-partitioned except 2 for now: chains and specversions
     partitioned_table(tbl) {
         switch (tbl) {
+            case "traces":
             case "balances":
                 return "ts";
             case "evmtxs":
@@ -93,7 +94,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     // sets up system tables (independent of paraID) and paraID specific tables
-    async setup_chain_substrate(chainID = null, isUpdate = false, execute = false) {
+    async setup_chain_substrate(chainID = null, isUpdate = false, execute = true) {
         let projectID = `${this.project}`
         //setup "system" tables across all paraIDs
         let opType = (isUpdate) ? 'update' : 'mk'
@@ -117,7 +118,8 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers", "calls"] //MK - TODO: remove "evmtxs", "evmtransfers". Add "calls"
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers", "calls", "traces"] // remove evmtx, evmtransfers
+        tbls = ["calls", "traces"] // remove evmtx, evmtransfers
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
         let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
@@ -132,6 +134,12 @@ module.exports = class SubstrateETL extends AssetManager {
                 let fld = this.partitioned_table(tbl);
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq ${opType}  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}${paraID}`
+
+                if (tbl == "calls") {
+                    cmd = `bq query --max_rows=3 --format=sparse --destination_table '${bqDataset}.${tbl}${paraID}' --project_id=${projectID} --time_partitioning_field ${fld} --replace --location=us --use_legacy_sql=false 'select * from \`polkadot_enterprise_US.${tbl}\` where relay_chain = "${relayChain}" and para_id=${paraID}'`;
+                } else {
+                    cmd = `bq query --max_rows=3 --format=sparse --destination_table '${bqDataset}.${tbl}${paraID}' --project_id=${projectID} --time_partitioning_field ${fld} --replace --location=us --use_legacy_sql=false 'select * from \`polkadot_enterprise_US.${tbl}\` where relay_chain = "${relayChain}" and para_id="${paraID}"'`;
+                }
                 if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
                     cmd = null;
                 }
@@ -550,57 +558,77 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async audit_fix(chainID = null, monthDT = null) {
-        let w = [];
-        if (chainID >= 0) {
-            w.push(`chainID = '${chainID}'`);
+
+    async detectChainIssues(chainID = null) {
+        let relayChain = paraTool.getRelayChainByChainID(chainID);
+        let paraID = paraTool.getParaIDfromChainID(chainID);
+        let sql = `with blocks as (SELECT
+ number, block_time, LAG(number) OVER (ORDER BY number) prev
+FROM
+  substrate-etl.crypto_${relayChain}.blocks${paraID}
+  order by number
+) select block_time,  number-1 as endblock, prev+1 as startblock, number - (prev+1) as diff from blocks where number != prev + 1 order by number desc, block_time limit 250`
+        let recs = await this.execute_bqJob(sql);
+        let sql0 = `delete from  chainissues where chainID = '${chainID}' and skip = 0`
+        this.batchedSQL.push(sql0);
+        await this.update_batchedSQL()
+
+        for (const gap of recs) {
+            let startBN = gap.startblock;
+            let endBN = gap.endblock;
+            let sql2 = `insert into chainissues (chainID, startBlock, endBlock, addDT, lastUpdateDT, currentBlock) values ('${chainID}', '${startBN}', '${endBN}', Now(), Now(), '${startBN}' ) on duplicate key update lastUpdateDT = values(lastUpdateDT)`;
+            this.batchedSQL.push(sql2);
+            await this.update_batchedSQL()
         }
-        if (monthDT) {
-            w.push(`monthDT = '${monthDT}'`);
-        }
-        let wstr = (w.length > 0) ? ` and ${w.join(" and ")}` : "";
-        // 1. find problematic periods with a small number of records (
-        let sql = `select CONVERT(auditFailures using utf8) as failures, chainID, monthDT from blocklogstats where audited in ( 'Failure' ) ${wstr} order by chainID, monthDT`
-        console.log(sql);
+    }
+
+    async audit_fix(chainID = null) {
+        const Crawler = require("./crawler");
+        let crawler = new Crawler();
+        let chain = await this.getChain(chainID);
+        const tableChain = this.getTableChain(chainID);
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
+        let sql = `select startBlock, currentBlock, endBlock from chainissues where chainID = '${chainID}' and currentBlock <= endBlock order by endBlock asc limit 1`;
         let recs = await this.poolREADONLY.query(sql);
-        if (recs.length == 0) return (false);
-        for (const f of recs) {
-            let failures = JSON.parse(f.failures)
-            if (failures.gaps && failures.gaps.length > 0) {
-                for (const gap of failures.gaps) {
-                    let startBN = gap[0];
-                    let endBN = gap[1];
-                    // attempted > 100 == don't try again, its been audited (missing timestamps, has decoding errors etc.)
-                    let sql = `update block${f.chainID} set crawlBlock = 1, attempted = 0 where blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < 100;`
-                    if (endBN - startBN < 5000) { // 50 blocks * 6-12bps = 5-10mins
-                        console.log("EXECUTING: ", sql);
-                        this.batchedSQL.push(sql);
-                        await this.update_batchedSQL()
-                    } else {
-                        console.log("RECOMMENDING: ", sql);
-                    }
-                }
+        if (recs.length == 0) return;
+        let r = recs[0];
+        console.log(r);
+        for (let blockNumber = r.currentBlock; blockNumber <= r.endBlock; blockNumber++) {
+            let rowId = paraTool.blockNumberToHex(blockNumber);
+            await tableChain.row(rowId).delete();
+            let t2 = {
+                chainID,
+                blockNumber,
+                crawlBlockEVM: 1,
+                crawlReceiptsEVM: 1,
+                crawlTraceEVM: 1
             }
-
-            if (failures.errors && failures.errors.length > 0) {
-                const tableChain = this.getTableChain(chainID);
-                for (const bn of failures.errors) {
-                    let paraID = paraTool.getParaIDfromChainID(f.chainID);
-                    let relayChain = paraTool.getRelayChainByChainID(f.chainID);
-                    // redo in runs of 3
-                    for (let n = bn - 1; n <= bn + 1; n++) {
-                        let rowId = paraTool.blockNumberToHex(n);
-                        //tableChain.row(rowId).delete();
-                        let sql = `update block${f.chainID} set crawlBlock=1, attempted = 0 where blockNumber = '${n}' and attempted < 100;`;
-                        console.log("DELETED:", rowId, " recrawling", sql, `./polkaholic indexblock ${f.chainID} ${n}`);
-                        this.batchedSQL.push(sql);
-                        await this.update_batchedSQL()
-                    }
-                    console.log("");
-                }
-            }
+            let x = await crawler.crawl_block_trace(chain, t2);
+            let blockHash = x.blockHash;
+            await crawler.index_block(chain, blockNumber, blockHash);
+            sql = `update chainissues set currentBlock = '${blockNumber+1}' where chainID = '${chainID}' and startBlock = '${r.startBlock}' and endBlock = '${r.endBlock}'`
+            console.log(sql);
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL()
         }
 
+        await this.mark_chain_reload(chainID, r.startBlock)
+        await this.mark_chain_reload(chainID, r.startBlock + 1)
+        await this.mark_chain_reload(chainID, r.endBlock - 1)
+        await this.mark_chain_reload(chainID, r.endBlock)
+    }
+
+    async mark_chain_reload(chainID, blockNumber) {
+        let recs = await this.poolREADONLY.query(`select unix_timestamp(blockDT) indexTS from block${chainID} where blockNumber = '${blockNumber}'`);
+        if (recs.length == 1) {
+            let [logDT, _] = paraTool.ts_to_logDT_hr(recs[0].indexTS);
+            let sql0 = `update blocklog set loaded = 0, attempted = 0 where chainID = '${chainID}' and logDT = '${logDT}'`
+            console.log(sql0);
+            this.batchedSQL.push(sql0);
+            await this.update_batchedSQL()
+        }
     }
 
     async audit_blocks(chainID = null, monthDT = null, fix = true) {
@@ -627,7 +655,7 @@ module.exports = class SubstrateETL extends AssetManager {
             let bqDataset = this.get_relayChain_dataset(relayChain);
             let sqlQuery = `SELECT number, \`hash\` as block_hash, parent_hash FROM \`substrate-etl.${bqDataset}.blocks${paraID}\` WHERE Date(block_time) >= '${startDT}' and Date(block_time) <= '${endDT}' and number >= ${startBN} and number <= ${endBN} order by number;`
             console.log(sqlQuery);
-            let rows = await this.execute_bqJob(sqlQuery, paraTool.BQUSMulti);
+            let rows = await this.execute_bqJob(sqlQuery);
             let blocks = {};
             let prevHash = null;
             let prevBN = null
@@ -872,7 +900,7 @@ module.exports = class SubstrateETL extends AssetManager {
             // do a confirmatory query to compute numAddresses and mark that we're done by updating lastUpdateAddressBalancesEndDT
             let sql = `select count(distinct address_pubkey) as numAddresses from substrate-etl.${bqDataset}.balances${paraID} where date(ts) = '${logDT}'`;
 
-            let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+            let rows = await this.execute_bqJob(sql);
             let row = rows.length > 0 ? rows[0] : null;
             let [min_numAddresses, max_numAddresses] = await this.getMinMaxNumAddresses(chainID, logDT);
             if (!(row && (row["numAddresses"] >= min_numAddresses) && (row["numAddresses"] <= max_numAddresses))) {
@@ -1707,7 +1735,7 @@ Example of contractInfoOf:
                     sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
   where section = 'contracts' and method = 'CodeStored')
   select events.*, signer_pub_key from events left join substrate-etl.${bqDataset}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
-                    let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+                    let rows = await this.execute_bqJob(sql);
                     for (const r of rows) {
                         let data = JSON.parse(r.data);
                         let codeHash = data[0];
@@ -1728,7 +1756,7 @@ Example of contractInfoOf:
                     sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
   where section = 'contracts' and method = 'Instantiated')
   select events.*, signer_pub_key from events left join substrate-etl.${bqDataset}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
-                    let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+                    let rows = await this.execute_bqJob(sql);
                     for (const r of rows) {
                         let data = JSON.parse(r.data);
                         let address_ss58 = data[0];
@@ -1752,7 +1780,7 @@ Example of contractInfoOf:
                 {
                     // NOTE that this is not complete becuase of utility batch , etc. so we should use contracts.called events, but for some reason this was not systematic, grr.
                     sql = `select extrinsic_id, \`hash\` as extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, params, signer_pub_key from substrate-etl.contracts.contractsextrinsics${id} where section = 'contracts' and method = 'call'`
-                    let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+                    let rows = await this.execute_bqJob(sql);
                     let out = []
                     for (const r of rows) {
                         let extrinsic_id = r.extrinsic_id;
@@ -2295,7 +2323,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                     }
                     console.log(bsql, `Expecting range ${bn0} through ${bn1} with ${nrecs}`)
                     let found = {}
-                    let rows = await this.execute_bqJob(bsql, paraTool.BQUSMulti);
+                    let rows = await this.execute_bqJob(bsql);
                     for (let bn = bn0; bn <= bn1; bn++) {
                         found[bn] = false;
                     }
@@ -2485,7 +2513,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             let r = {}
             for (const k of Object.keys(sqla)) {
                 let sql = sqla[k];
-                let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+                let rows = await this.execute_bqJob(sql);
                 let keys = [];
                 let vals = [];
                 let data = [];
@@ -3073,7 +3101,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let vals = [];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
-            let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+            let rows = await this.execute_bqJob(sql);
             let row = rows.length > 0 ? rows[0] : null;
             if (row) {
                 for (const a of Object.keys(row)) {
@@ -3878,7 +3906,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             try {
-                let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+                let rows = await this.execute_bqJob(sql);
                 console.log(sql, rows.length, " rows");
 
                 for (const row of rows) {
@@ -4773,7 +4801,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         let vals = [];
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
-            let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+            let rows = await this.execute_bqJob(sql);
             let row = rows.length > 0 ? rows[0] : null;
             if (row) {
                 for (const a of Object.keys(row)) {
@@ -4827,7 +4855,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
             try {
-                let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+                let rows = await this.execute_bqJob(sql);
                 console.log(sql, rows.length, " rows");
 
                 for (const row of rows) {
@@ -5115,7 +5143,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             .dataset(datasetId)
                             .createTable(tableId, {
                                 schema: sch,
-                                location: 'us-central1',
+                                location: 'US',
                                 description: table_description,
                                 timePartitioning: {
                                     type: 'HOUR',
@@ -5275,7 +5303,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             .dataset(datasetId)
                             .createTable(tableId, {
                                 schema: sch,
-                                location: 'us-central1',
+                                location: 'US',
                                 description: table_description,
                                 timePartitioning: {
                                     type: 'HOUR',
@@ -5295,10 +5323,10 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     async setupCallEvents() {
         const bigquery = this.get_big_query();
         // read the set of call + event tables
-        const datasetId = `substrate_dev`; // `${id}` could be better, but we can drop the whole dataset quickly this way
+        const datasetId = `substrate`; // `${id}` could be better, but we can drop the whole dataset quickly this way
         let tables = {};
         let substrateSchemaQuery = `SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%' or table_name like 'evt_%' or table_name like 'storage_%'`
-        let tablesRecs = await this.execute_bqJob(substrateSchemaQuery, paraTool.BQUSMulti);
+        let tablesRecs = await this.execute_bqJob(substrateSchemaQuery);
         let ntables = 0;
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
@@ -5336,8 +5364,8 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
     }
 
     async enrich_swaps() {
-        let sql = `select * from substrate-etl.polkadot_enterprise.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
-        let rows = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+        let sql = `select * from substrate-etl.crypto_polkadot.calls where call_section in ("omnipool", "aggregatedDex", "amm", "dexGeneral", "dex", "swaps", "zenlinkProtocol", "ammRoute", "router", "pablo", "stableAsset", "xyk", "curveAmm") and ( call_method in ("buy", "sell") or call_method like 'swap%')   and block_time > date_sub(CURRENT_TIMESTAMP(), interval 1440 minute)`
+        let rows = await this.execute_bqJob(sql);
         for (const r of rows) {
             let call_args = r.call_args;
             let call_args_def = r.call_args_def;

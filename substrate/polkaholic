@@ -139,9 +139,9 @@ async function main() {
         .description(`Index Block`)
         .usage("22007 195623")
         .argument('<chainID>', 'ChainID', myParseInt)
-        .argument('<blockNumber>', 'BlockNumber')
-        .action(async (chainID, blockNumber) => {
-            blockNumber = paraTool.dechexToInt(blockNumber);
+        .argument('<blockNumber>', 'Block Number')
+        .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
+        .action(async (chainID, blockNumber, opt) => {
             let crawler = new Crawler();
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
@@ -162,23 +162,21 @@ async function main() {
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();
                 await crawler.setupChainAndAPI(chainID);
-                let blockHash = await crawler.getBlockHashFinalized(chainID, blockNumber)
-                let t2 = null
-                if (!blockHash || true) {
-                    t2 = {
+                blockNumber = parseInt(blockNumber, 10);
+                let endBlock = opt.endBlock ? opt.endBlock : blockNumber;
+                for (let bn = blockNumber; bn <= endBlock; bn++) {
+                    let t2 = {
                         chainID,
-                        blockNumber,
+                        blockNumber: bn,
                         crawlBlockEVM: 1,
                         crawlReceiptsEVM: 1,
                         crawlTraceEVM: 1
-                    };
-                }
-                if (t2) {
+                    }
                     let x = await crawler.crawl_block_trace(chain, t2)
-                    blockHash = x.blockHash;
-                    console.log("blockHash: ", blockHash);
+                    let blockHash = x.blockHash;
+                    console.log("blockHash: ", blockHash, blockNumber, x);
+                    await crawler.index_block(chain, bn, blockHash);
                 }
-                await crawler.index_block(chain, blockNumber, blockHash);
             }
             process.exit(0);
         })
@@ -308,9 +306,8 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                //console.log(`./substrate-etl trace -r ${c.relayChain} -p ${c.paraID}`);
-                console.log(`bq update --project_id=substrate-etl  ${c.relayChain}.balances${c.paraID} schema/substrateetl/balances.json`)
-                //console.log(`bq rm -f substrate-etl:${c.relayChain}.traces${c.paraID}`)
+                //console.log(`./substrate-etl audit_fix -m -c ${c.chainID}`);
+                console.log(`./substrate-etl setupsubstrate -c ${c.chainID}`);
             });
             process.exit(0);
         })

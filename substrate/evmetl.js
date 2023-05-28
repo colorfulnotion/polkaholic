@@ -454,7 +454,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         //let knownSchemas = await this.poolREADONLY.query(localSQL);
         let evmDataset = `evm_dev`
         let query = `select table_id as tableId, modified_fingerprint_id as modifiedFingerprintID, abi_type as abiType, table_schema as tableSchema FROM substrate-etl.${evmDataset}.evmschema order by tableId`
-        let tablesRecs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+        let tablesRecs = await this.execute_bqJob(query);
         let tinySchemaMap = {}
         let newTableIds = []
         let newTableSchemas = []
@@ -521,7 +521,7 @@ module.exports = class EVMETL extends PolkaholicDB {
 
         let evmDataset = this.evmDatasetID
         let query = `SELECT table_name, column_name, data_type, ordinal_position, if (table_name like "call_%", "call", "evt") as tbl_type FROM substrate-etl.${evmDataset}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%' order by table_name, ordinal_position`
-        let tablesRecs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+        let tablesRecs = await this.execute_bqJob(query);
         let callExtraCol = ["chain_id", "evm_chain_id", "contract_address", "call_success", "call_tx_hash", "call_tx_index", "call_trace_address", "call_block_time", "call_block_number"]
         let eventExtraCol = ["chain_id", "evm_chain_id", "contract_address", "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"]
 
@@ -996,7 +996,7 @@ module.exports = class EVMETL extends PolkaholicDB {
         let hits = {};
         if (abiType == "function") {
             let query = `SELECT * FROM \`substrate-etl.evm.transactions\` as transactions where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
+            let recs = await this.execute_bqJob(query);
             for (const r of recs) {
                 if (r.to_address) {
                     let a = r.to_address.toLowerCase();
@@ -1012,7 +1012,7 @@ module.exports = class EVMETL extends PolkaholicDB {
             }
         } else if (abiType == "event") {
             let query = `SELECT * FROM \`substrate-etl.evm.logs\` as logs  where block_timestamp >= date_sub(current_timestamp(), interval 30 day) and chain_id = 1 order by block_timestamp desc limit 100000`;
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
+            let recs = await this.execute_bqJob(query);
             console.log(recs.length, abiType);
             for (const r of recs) {
                 if (r.address) {
@@ -1452,7 +1452,7 @@ mysql> desc projectcontractabi;
         if (true) {
             let query = `SELECT signature, count(*) numTransactions FROM \`substrate-etl.evm.transactions\` as transactions where transactions.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)   group by signature order by numTransactions desc;`
             console.log(sql);
-            let recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
+            let recs = await this.execute_bqJob(query);
             for (const r of recs) {
                 let sql0 = `update contractabi set numTransactions = '${r.numTransactions}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1461,7 +1461,7 @@ mysql> desc projectcontractabi;
             }
             return (true);
             query = `SELECT signature, count(*) numLogs FROM \`substrate-etl.evm.logs\` as logs  where logs.chain_id = ${chainID} and block_timestamp >= date_sub(current_timestamp(), interval 24 hour)  group by signature order by count(*) desc;`;
-            recs = await this.execute_bqJob(query, paraTool.BQUSCentral1); //todo: change evm data location
+            recs = await this.execute_bqJob(query);
             for (const r of recs) {
                 let sql0 = `update contractabi set numLogs = '${r.numLogs}' where signature = '${r.signature}'`
                 console.log(sql0);
@@ -1569,10 +1569,9 @@ mysql> desc projectcontractabi;
     }
 
     async crawlABIs(chainID = null, renew = false) {
-        //evm table is still in us-centra1
         let w = chainID ? ` and chainID = ${chainID}` : ""
         let query = `select to_address, min(chain_id) as chainID,  count(*) numTransactions7d from substrate-etl.evm.transactions where block_timestamp > date_sub(CURRENT_TIMESTAMP(), interval 7 day) and length(input) > 2 and length(method_id) >= 10 group by to_address order by numTransactions7d desc limit 100000`;
-        let recs = renew ? await this.execute_bqJob(query, paraTool.BQUSCentral1) : [];
+        let recs = renew ? await this.execute_bqJob(query) : [];
         let out = [];
         let vals = ["chainID", "numTransactions7d", "status", "createDT"];
         let replace = ["numTransactions7d", "chainID"];
@@ -1618,7 +1617,7 @@ mysql> desc projectcontractabi;
         console.log(`loaded evm`, loadedTableIDs)
         */
         let schemaQuery = `SELECT table_name, column_name, data_type FROM substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS  where table_name like 'call_%'  or table_name like 'evt_%'`
-        let tablesRecs = await this.execute_bqJob(schemaQuery, paraTool.BQUSMulti);
+        let tablesRecs = await this.execute_bqJob(schemaQuery);
         for (const t of tablesRecs) {
             if (tables[t.table_name] == undefined) {
                 tables[t.table_name] = {};
@@ -1729,7 +1728,7 @@ mysql> desc projectcontractabi;
         // Now, for the last 7 days with contractaddress-methodID combinations, find the contractAddresses using those methodIDs, computing log likelihood across all contract types
         let sql = `select to_address, ${methods.join(",")} from \`substrate-etl.evm.transactions\` group by to_address  order by count(*) desc limit 100000`
         console.log("CATEGORIZER", sql);
-        let recs = await this.execute_bqJob(sql, paraTool.BQUSCentral1);
+        let recs = await this.execute_bqJob(sql);
         for (const d of recs) {
             if (d.to_address) {
                 let address = d.to_address.toLowerCase();
@@ -1765,14 +1764,8 @@ mysql> desc projectcontractabi;
         if (datasetId) {
             let query = `SELECT table_name, column_name, ordinal_position, data_type, is_nullable, is_partitioning_column FROM ${projectId}.${datasetId}.INFORMATION_SCHEMA.COLUMNS;`
             console.log("READING0", query);
-            /*
-            const options = {
-                query: query,
-                location: 'US'
-            };
-            */
             const bigquery = this.get_big_query();
-            let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+            let recs = await this.execute_bqJob(query);
             for (const r of recs) {
                 let sa = r.table_name.split("_");
                 let contractName = "";
@@ -1852,7 +1845,7 @@ mysql> desc projectcontractabi;
             */
             const bigquery = this.get_big_query();
             try {
-                let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+                let recs = await this.execute_bqJob(query);
                 for (const r of recs) {
                     let sa = r.routine_name.split("_");
                     let contractName = "";
@@ -3098,7 +3091,7 @@ mysql> desc projectcontractabi;
         let query = `select table_name, view_definition from  \`blockchain-etl-internal.${datasetId}.INFORMATION_SCHEMA.VIEWS\``;
         console.log(query);
         const bigquery = this.get_big_query();
-        let recs = await this.execute_bqJob(query, paraTool.BQUSMulti);
+        let recs = await this.execute_bqJob(query);
         for (const r of recs) {
             let sa = r.table_name.split("_");
             let abiType = "";
