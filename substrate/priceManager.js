@@ -830,7 +830,7 @@ from assetRouter join asset on assetRouter.chainID = asset.chainID and assetRout
     async update_coingecko_token_price_usd(chainID = 1, renew = false) {
         if (renew) {
             let sql = `SELECT  address,  COUNT(*) numLogs FROM  \`substrate-etl.evm.logs\` WHERE block_timestamp >= DATE_SUB(CURRENT_TIMESTAMP(), INTERVAL 30 day) AND chain_id = 1 and signature in ('Transfer(index_topic_1 address from, index_topic_2 address to, uint256 value)', 'Transfer(index_topic_1 address from, index_topic_2 address to, index_topic_3 uint256 tokenId)', 'Approval(index_topic_1 address owner, index_topic_2 address spender, uint256 value)') group by address ORDER BY  numLogs desc  LIMIT 20000`
-            let recs = await this.execute_bqJob(sql, paraTool.BQUSMulti);
+            let recs = await this.execute_bqJob(sql);
             let cnt = 0;
             for (const r of recs) {
                 let address = r.address;

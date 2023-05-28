@@ -362,7 +362,7 @@ module.exports = class XCMCleaner extends Query {
         const bigqueryClient = this.get_big_query();
         const options = {
             query: sqlQuery,
-            location: paraTool.BQUSMulti,
+            location: "US"
         };
 
         try {

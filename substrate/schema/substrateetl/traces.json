@@ -203,5 +203,17 @@
     "mode": "NULLABLE",
     "name": "price_usd",
     "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_hash",
+    "type": "STRING",
+    "description": "Hash of extrinsic data -- because of account reaping, may not be unique"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_id",
+    "type": "STRING",
+    "description": "Extrinsic ID of extrinsic"
   }
 ]

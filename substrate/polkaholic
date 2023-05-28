@@ -306,7 +306,8 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                console.log(`./substrate-etl audit_fix -m -c ${c.chainID}`);
+                //console.log(`./substrate-etl audit_fix -m -c ${c.chainID}`);
+                console.log(`./substrate-etl setupsubstrate -c ${c.chainID}`);
             });
             process.exit(0);
         })
