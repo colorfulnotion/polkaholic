@@ -1712,11 +1712,27 @@ from chain where chainID = '${chainID}' limit 1`);
             blockNumber: r.blockNumber,
             blockTS: paraTool.dechexToInt(r.blockTS),
             block: rpcBlk,
+            transactions: rpcTxns,
             evmReceipts: rpcReceipts,
             traces: false
         }
         //process.exit(0)
         return f
+    }
+
+    validate_evm_row(row){
+        let rRow = this.build_evm_block_from_row(row)
+        if (!rRow.block){
+            return [false, false]
+        }
+        let knownTxType = [0, 2]
+        for (const rpcTxn of rRow.transactions){
+            if (!knownTxType.includes(rpcTxn["type"])){
+                return [false, false]
+            }
+        }
+        //TODO: check trace
+        return [true, rRow]
     }
 
     build_block_from_row(row) {

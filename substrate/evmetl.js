@@ -2674,7 +2674,8 @@ mysql> desc projectcontractabi;
         let rowLen = rows.length
         let expectedLen = endBN - startBN + 1
         let missedBNs = []
-        if (rowLen != expectedLen) {
+        let rRows = []
+        if (true) {
             let expectedRangeBNs = [];
             let observedBNs = []
             for (let i = startBN; i <= endBN; i++) {
@@ -2682,16 +2683,22 @@ mysql> desc projectcontractabi;
             }
             for (let j = 0; j < rows.length; j++) {
                 let blockNum = paraTool.dechexToInt(rows[j].id)
-                observedBNs.push(blockNum);
+                let [isValid, rRow] = this.validate_evm_row(rows[j])
+                if (isValid){
+                    //console.log(`${rows[j].id} ${blockNum} is Valid`)
+                    observedBNs.push(blockNum);
+                    rRows.push(rRow)
+                }
             }
             // await this.audit_chain(chain, startBN, endBN)
             // can we do a more robost audit_chain here?
+            //console.log(`observedBNs`, observedBNs)
             missedBNs = expectedRangeBNs.filter(function(num) {
                 return observedBNs.indexOf(num) === -1;
             });
         }
         console.log(`${startBN}(${start}), ${endBN}(${end}) expectedLen=${endBN - startBN+1} MISSING BNs`, missedBNs)
-        return [rows, missedBNs]
+        return [rows, rRows, missedBNs]
     }
 
     async load_evm_etl(chainID, logDT) {
@@ -2776,6 +2783,10 @@ mysql> desc projectcontractabi;
         //TODO: how to make this hourly?
         let recs = await this.poolREADONLY.query(sql);
         let currPeriod = recs[0];
+        if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
+            console.log(`[${logDT}] chainID=${chainID} missing startBN, endBN`)
+            process.exit(1)
+        }
         let evmindexLogs = []
         let batches = []
         let errCnt = 0
@@ -2811,21 +2822,19 @@ mysql> desc projectcontractabi;
             }
             let b = batches[i]
             console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1}`)
-            let [rows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
+            let [rows, rRows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
 
             //TODO: if missing, we need to get the missing blocks
             if (missedBNs.length > 0) {
                 for (const missedBN of missedBNs) {
                     await crawler.crawl_block_evm(chainID, missedBN);
                 }
-                [rows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
+                [rows, rRows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
             }
             //process.exit(0)
-            for (let i = 0; i < rows.length; i++) {
+            for (let i = 0; i < rRows.length; i++) {
                 try {
-                    let row = rows[i];
-                    //console.log(`row`, row)
-                    let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                    let rRow = rRows[i]
                     //console.log(`rRow`, rRow)
                     let r = await crawler.index_evm_chain_block_row(rRow, false);
                 } catch (err) {

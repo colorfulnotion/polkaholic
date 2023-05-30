@@ -10221,16 +10221,18 @@ module.exports = class Indexer extends AssetManager {
             cellLimit: 1,
             family: families
         });
-
+        //console.log(`blkBNHex=${blkBNHex}`, `rows`, rows)
         if (rows.length == 1) {
             try {
                 await this.setupEvm(chainID)
                 let row = rows[0];
-                console.log(`Using BT Rec`, row)
-                let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
-                console.log(`rRow`, rRow)
-                let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
-                return r
+                //let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                let [isValid, rRow] = this.validate_evm_row(row)
+                console.log(`cached rRow`, rRow)
+                if (isValid){
+                    let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
+                    return r
+                }
             } catch (err) {
                 console.log(err)
                 //this.log_indexing_error(err, `index_blocks_period`);
