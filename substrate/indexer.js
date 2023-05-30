@@ -9453,7 +9453,7 @@ module.exports = class Indexer extends AssetManager {
 
         let block = JSON.parse(JSON.stringify(evmlBlock))
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
-        //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
+        console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
         let evm_chain_id = chainID
         let evm_blk_num = block.number
         let blockTS = block.timestamp

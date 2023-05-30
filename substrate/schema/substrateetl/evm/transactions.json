@@ -156,18 +156,6 @@
 	"type": "FLOAT"
     },
     {
-	"description": "Identifier of the extrinsic",
-	"mode": "NULLABLE",
-	"name": "extrinsic_id",
-	"type": "STRING"
-    },
-    {
-	"description": "Blake2b Hash of the extrinsic",
-	"mode": "NULLABLE",
-	"name": "extrinsic_hash",
-	"type": "STRING"
-    },
-    {
 	"description": "The 4 byte hash of function signature",
 	"mode": "NULLABLE",
 	"name": "decoded",
