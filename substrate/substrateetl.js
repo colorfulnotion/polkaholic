@@ -4165,7 +4165,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             params: i && i.params ? i.params : null
                         }
                         if (txType == 2) {
-
                             //1559 (as gWei)
                             evmtx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
                             evmtx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)

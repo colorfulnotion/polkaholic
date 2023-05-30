@@ -8480,7 +8480,9 @@ module.exports = class Indexer extends AssetManager {
         let rootDir = '/tmp'
         let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
         let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
-        //console.log(`!!! block`, block)
+        let gWei = 10 ** 9
+        let ether = 10 ** 18
+        console.log(`!!! [#${block.number}] block`, block)
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8508,7 +8510,6 @@ module.exports = class Indexer extends AssetManager {
         }
         //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
-
         for (let i = 0; i < evmFullBlock.transactions.length; i++) {
             let rawTx = block.transactions[i];
             let tx = evmFullBlock.transactions[i];
@@ -8525,6 +8526,7 @@ module.exports = class Indexer extends AssetManager {
             if (tx.to && tx.input.length >= 10) {
                 methodID = tx.input.substr(0, 10)
             }
+            let txType = (tx.txType != undefined) ? tx.txType : -1
             let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
@@ -8545,11 +8547,36 @@ module.exports = class Indexer extends AssetManager {
                 block_timestamp: block.timestamp,
                 block_number: tx.blockNumber,
                 block_hash: tx.blockHash,
+                max_fee_per_gas: null,
+                max_priority_fee_per_gas: null,
+                transaction_type: txType,
+                receipt_effective_gas_price: null,
+
+                // polkaholic new fields
+                fee: tx.fee,
+                txn_saving: null,
+                burned_fee: tx.burnedFee,
+
                 decoded: false,
                 method_id: methodID,
                 signature: null,
                 params: null
             }
+
+            if (txType == 2) {
+                //1559 (as gWei)
+                evmTx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
+                evmTx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
+                evmTx.txn_saving = (tx.txn_saving != undefined) ? paraTool.floatToInt(tx.txn_saving * ether) : 0
+            }
+            // use the value directly after reindexing
+            if (tx.cumulativeGasUsed) {
+                evmTx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
+            }
+            if (tx.effectiveGasPrice) {
+                evmTx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
+            }
+
             //arbitrum 0x0 values??
             if (evmTx.value == "0x0") evmTx.value = 0
             if (evmTx.gas == "0x0") evmTx.gas = 0
@@ -9432,6 +9459,7 @@ module.exports = class Indexer extends AssetManager {
         let blockTS = block.timestamp
         let blockMicroTS = blockTS * 1000000
         let blockHash = block.hash
+
         let cres = {
             key: paraTool.blockNumberToHex(evm_blk_num),
             data: {
@@ -9446,6 +9474,8 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
+        let gWei = 10 ** 9
+        let ether = 10 ** 18
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -9491,6 +9521,7 @@ module.exports = class Indexer extends AssetManager {
             if (tx.to && tx.input.length >= 10) {
                 methodID = tx.input.substr(0, 10)
             }
+            let txType = (tx.txType != undefined) ? tx.txType : -1
             let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
@@ -9511,11 +9542,34 @@ module.exports = class Indexer extends AssetManager {
                 block_timestamp: block.timestamp,
                 block_number: tx.blockNumber,
                 block_hash: tx.blockHash,
+                max_fee_per_gas: null,
+                max_priority_fee_per_gas: null,
+                transaction_type: txType,
+                receipt_effective_gas_price: null,
+                // polkaholic new fields
+                fee: tx.fee,
+                txn_saving: null,
+                burned_fee: tx.burnedFee,
                 decoded: false,
                 method_id: methodID,
                 signature: null,
                 params: null
             }
+
+            if (txType == 2) {
+                //1559 (as gWei)
+                evmTx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
+                evmTx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
+                evmTx.txn_saving = (tx.txn_saving != undefined) ? paraTool.floatToInt(tx.txn_saving * ether) : 0
+            }
+            // use the value directly after reindexing
+            if (tx.cumulativeGasUsed) {
+                evmTx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
+            }
+            if (tx.effectiveGasPrice) {
+                evmTx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
+            }
+
             //arbitrum 0x0 values??
             if (evmTx.value == "0x0") evmTx.value = 0
             if (evmTx.gas == "0x0") evmTx.gas = 0
@@ -9584,7 +9638,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            //console.log(`bq+`, bqEvmTransaction)
+            console.log(`bq+`, bqEvmTransaction.json)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
