@@ -8491,7 +8491,7 @@ module.exports = class Indexer extends AssetManager {
                 number: block.number,
                 hash: block.hash,
                 parent_hash: block.parentHash,
-                nonce: (block.nonce != undefined)? block.nonce: '0x0000000000000000', //64bits
+                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
                 sha3_uncles: block.sha3Uncles,
                 logs_bloom: block.logsBloom,
                 transactions_root: block.transactionsRoot,
@@ -9482,7 +9482,7 @@ module.exports = class Indexer extends AssetManager {
                 number: block.number,
                 hash: block.hash,
                 parent_hash: block.parentHash,
-                nonce: (block.nonce != undefined)? block.nonce: '0x0000000000000000', //64bits
+                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
                 sha3_uncles: block.sha3Uncles,
                 logs_bloom: block.logsBloom,
                 transactions_root: block.transactionsRoot,
@@ -10226,7 +10226,7 @@ module.exports = class Indexer extends AssetManager {
                 //let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
                 let [isValid, rRow] = this.validate_evm_row(row)
                 console.log(`cached rRow`, rRow)
-                if (isValid){
+                if (isValid) {
                     let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
                     return r
                 }

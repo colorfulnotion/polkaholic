@@ -1720,21 +1720,21 @@ from chain where chainID = '${chainID}' limit 1`);
         return f
     }
 
-    validate_evm_row(row){
+    validate_evm_row(row) {
         let rRow = this.build_evm_block_from_row(row)
-        if (!rRow.block){
+        if (!rRow.block) {
             return [false, false]
         }
         let knownTxType = [0, 2]
         let rpcTxns = rRow.transactions
-        for (const rpcTxn of rpcTxns){
-            if (!knownTxType.includes(rpcTxn["type"])){
+        for (const rpcTxn of rpcTxns) {
+            if (!knownTxType.includes(rpcTxn["type"])) {
                 console.log(`Missing txType`)
                 return [false, false]
             }
         }
-        if (Array.isArray(rpcTxns) && rpcTxns.length > 0){
-            if (!rRow.evmReceipts){
+        if (Array.isArray(rpcTxns) && rpcTxns.length > 0) {
+            if (!rRow.evmReceipts) {
                 console.log(`Missing evmReceipts`)
                 return [false, false]
             }

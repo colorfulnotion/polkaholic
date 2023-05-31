@@ -1986,7 +1986,7 @@ mysql> desc projectcontractabi;
         } else {
             let completedEvmStep = STEP2_backfill // by default, start at step3
             let step1Chains = [paraTool.chainIDEthereum, paraTool.chainIDPolygon]
-            if (step1Chains.includes(chainID)){
+            if (step1Chains.includes(chainID)) {
                 completedEvmStep = STEP0_createRec
             }
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
@@ -2694,7 +2694,7 @@ mysql> desc projectcontractabi;
             for (let j = 0; j < rows.length; j++) {
                 let blockNum = paraTool.dechexToInt(rows[j].id)
                 let [isValid, rRow] = this.validate_evm_row(rows[j])
-                if (isValid){
+                if (isValid) {
                     //console.log(`${rows[j].id} ${blockNum} is Valid`)
                     observedBNs.push(blockNum);
                     rRows.push(rRow)
@@ -2748,9 +2748,9 @@ mysql> desc projectcontractabi;
         let jobInfo = await this.getChainStep(currDT, chainID)
         let completedEvmStep = jobInfo.evmStep
         console.log(`[chainID=${chainID}, DT=${logDT}, force=${force}] index_evmchain_external`, jobInfo)
-        if (!force && completedEvmStep >= STEP3_indexEvmChainFull){
+        if (!force && completedEvmStep >= STEP3_indexEvmChainFull) {
             console.log(`[chainID=${chainID}, DT=${logDT}, force=${force}] already completed`)
-        }else{
+        } else {
             await this.index_evmchain_full(chainID, logDT)
         }
     }
@@ -2793,7 +2793,7 @@ mysql> desc projectcontractabi;
         //TODO: how to make this hourly?
         let recs = await this.poolREADONLY.query(sql);
         let currPeriod = recs[0];
-        if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
+        if (currPeriod.startBN == undefined || currPeriod.endBN == undefined) {
             console.log(`[${logDT}] chainID=${chainID} missing startBN, endBN`)
             process.exit(1)
         }
@@ -3076,7 +3076,7 @@ mysql> desc projectcontractabi;
     "params": ["latest", false],
     "id": 1
   }' "${chain.RPCBackfill}"`
-	console.log(cmd);
+        console.log(cmd);
         const {
             stdout,
             stderr
@@ -3086,7 +3086,7 @@ mysql> desc projectcontractabi;
         let res = JSON.parse(stdout);
         if (res.result && res.result.number) {
             let bn = paraTool.dechexToInt(res.result.number, 10);
-	    return bn;
+            return bn;
         }
         return null;
     }
@@ -3094,12 +3094,12 @@ mysql> desc projectcontractabi;
 
     async detectBlocklogBounds(chainID, logDT, startBN = 1, endBN = null) {
         let chain = await this.getChain(chainID);
-	console.log(chain);
+        console.log(chain);
         let m = startBN;
 
-	if ( endBN == null ) {
-	    endBN = await this.getLastBlock(chain, chainID);
-	}
+        if (endBN == null) {
+            endBN = await this.getLastBlock(chain, chainID);
+        }
         let n = endBN;
         if (m > n) return (false);
 
@@ -3146,7 +3146,14 @@ mysql> desc projectcontractabi;
         console.log(sql);
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-	return { chainID, logDT, startTS, endTS, startBN, endBN }
+        return {
+            chainID,
+            logDT,
+            startTS,
+            endTS,
+            startBN,
+            endBN
+        }
     }
 
 

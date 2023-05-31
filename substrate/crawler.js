@@ -2155,7 +2155,7 @@ module.exports = class Crawler extends Indexer {
                 } else {
                     let resultBN = result.number
                     let delayedEvmChainIDs = [paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM]
-                    if (delayedEvmChainIDs.includes(chainID)){
+                    if (delayedEvmChainIDs.includes(chainID)) {
                         resultBN = result.number - 10
                     }
                     let evmBlockFunc = web3.eth.getBlock(resultBN, true)
