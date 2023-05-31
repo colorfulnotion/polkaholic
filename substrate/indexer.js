@@ -8482,7 +8482,6 @@ module.exports = class Indexer extends AssetManager {
         let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
         let gWei = 10 ** 9
         let ether = 10 ** 18
-        console.log(`!!! [#${block.number}] block`, block)
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8513,8 +8512,6 @@ module.exports = class Indexer extends AssetManager {
         for (let i = 0; i < evmFullBlock.transactions.length; i++) {
             let rawTx = block.transactions[i];
             let tx = evmFullBlock.transactions[i];
-            //console.log(`rawTx`, rawTx)
-            //console.log(`tx`, tx)
             let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
             let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
             let txhash = tx.transactionHash
@@ -9453,7 +9450,7 @@ module.exports = class Indexer extends AssetManager {
 
         let block = JSON.parse(JSON.stringify(evmlBlock))
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
-        console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
+        //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
         let evm_chain_id = chainID
         let evm_blk_num = block.number
         let blockTS = block.timestamp
@@ -9638,7 +9635,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            console.log(`bq+`, bqEvmTransaction.json)
+            //console.log(`bq+`, bqEvmTransaction.json)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
