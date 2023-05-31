@@ -2711,7 +2711,7 @@ mysql> desc projectcontractabi;
         return [rows, rRows, missedBNs]
     }
 
-    async load_evm_etl(chainID, logDT) {
+    async loadEvmETL(chainID, logDT) {
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
         let rootDir = '/tmp'
         let localDir = `/tmp/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
@@ -2728,7 +2728,10 @@ mysql> desc projectcontractabi;
                 let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${dataset}.${tbl}${chainID}$${logYYYYMMDD}' ${fn} schema/substrateetl/evm/${tbl}.json`;
                 try {
                     console.log(cmd);
-                    //await exec(cmd);
+                    let res = await exec(cmd, {
+                        maxBuffer: 1024 * 64000
+                    });
+                    console.log(`res`, res)
                 } catch (err) {
                     console.log(`err`, err);
                 }
@@ -2768,13 +2771,13 @@ mysql> desc projectcontractabi;
         }
         let step3c_successful = await this.cpEvmETLToGS(logDT, chainID, false);
         if (!step3c_successful) {
-            console.log(`Step3c cpEvmDecodedToGS failed`)
+            console.log(`Step3c cpEvmETLToGS failed`)
             process.exit(1)
         }
 
-        let step3d_successful = await this.load_evm_etl(chainID, logDT);
+        let step3d_successful = await this.loadEvmETL(chainID, logDT);
         if (!step3d_successful) {
-            console.log(`Step3d load_evm_etl failed`)
+            console.log(`Step3d loadEvmETL failed`)
             process.exit(1)
         }
         let completedEvmStep = STEP3_indexEvmChainFull
@@ -3049,7 +3052,7 @@ mysql> desc projectcontractabi;
         let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
     "jsonrpc": "2.0",
     "method": "eth_getBlockByNumber",
-    "params": ["${hexBlocknumber}", true],
+    "params": ["${hexBlocknumber}", false],
     "id": 1
   }' "${chain.RPCBackfill}"`
         const {
@@ -3064,10 +3067,39 @@ mysql> desc projectcontractabi;
         }
         return null;
     }
-    async detectBlocklogBounds(chainID, logDT, startBN = 29983413, endBN = 30508689) {
-        let chain = await this.getChain(chainID);
 
+    async getLastBlock(chain) {
+        // do
+        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
+    "jsonrpc": "2.0",
+    "method": "eth_getBlockByNumber",
+    "params": ["latest", false],
+    "id": 1
+  }' "${chain.RPCBackfill}"`
+	console.log(cmd);
+        const {
+            stdout,
+            stderr
+        } = await exec(cmd, {
+            maxBuffer: 1024 * 64000
+        });
+        let res = JSON.parse(stdout);
+        if (res.result && res.result.number) {
+            let bn = paraTool.dechexToInt(res.result.number, 10);
+	    return bn;
+        }
+        return null;
+    }
+
+
+    async detectBlocklogBounds(chainID, logDT, startBN = 1, endBN = null) {
+        let chain = await this.getChain(chainID);
+	console.log(chain);
         let m = startBN;
+
+	if ( endBN == null ) {
+	    endBN = await this.getLastBlock(chain, chainID);
+	}
         let n = endBN;
         if (m > n) return (false);
 
@@ -3114,7 +3146,7 @@ mysql> desc projectcontractabi;
         console.log(sql);
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-        process.exit(0);
+	return { chainID, logDT, startTS, endTS, startBN, endBN }
     }
 
 

@@ -451,9 +451,12 @@ async function main() {
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .action(async (opt) => {
             var evmetl = new EVMETL();
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 60)
             let chainID = opt.chainID;
-            let logDT = opt.logDT;
+            let logDT = opt.logDT ? opt.logDT : prevDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
             await evmetl.detectBlocklogBounds(chainID, logDT);
+            process.exit(0);
         });
 
     await program.parseAsync(process.argv);
