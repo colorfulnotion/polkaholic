@@ -455,7 +455,16 @@ async function main() {
             let chainID = opt.chainID;
             let logDT = opt.logDT ? opt.logDT : prevDT;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
-            await evmetl.detectBlocklogBounds(chainID, logDT);
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.detectBlocklogBounds(chainID, dt);
+                    }
+                } else {
+                    await evmetl.detectBlocklogBounds(chainID, logDT);
+                }
+            }
             process.exit(0);
         });
 

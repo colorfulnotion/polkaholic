@@ -3048,35 +3048,23 @@ mysql> desc projectcontractabi;
 
     async get_blockTS(chain, bn) {
         let hexBlocknumber = "0x" + parseInt(bn, 10).toString(16);
-        // do
-        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
-    "jsonrpc": "2.0",
-    "method": "eth_getBlockByNumber",
-    "params": ["${hexBlocknumber}", false],
-    "id": 1
-  }' "${chain.RPCBackfill}"`
-        const {
-            stdout,
-            stderr
-        } = await exec(cmd, {
-            maxBuffer: 1024 * 64000
-        });
+        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{ "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["${hexBlocknumber}", false],"id": 1}' "${chain.evmRPC}"`
+        //console.log(cmd);
+        const { stdout, stderr } = await exec(cmd, { maxBuffer: 1024 * 64000 });
         let res = JSON.parse(stdout);
+        //console.log(`res`, res.result)
         if (res.result && res.result.timestamp) {
             return paraTool.dechexToInt(res.result.timestamp);
+        } else {
+            console.log(`No timestamp for block ${bn}`, res);
+            return null;
         }
-        return null;
     }
 
     async getLastBlock(chain) {
         // do
-        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
-    "jsonrpc": "2.0",
-    "method": "eth_getBlockByNumber",
-    "params": ["latest", false],
-    "id": 1
-  }' "${chain.RPCBackfill}"`
-        console.log(cmd);
+        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{ "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false], "id": 1}' "${chain.evmRPC}"`
+        //console.log(cmd);
         const {
             stdout,
             stderr
@@ -3087,12 +3075,87 @@ mysql> desc projectcontractabi;
         if (res.result && res.result.number) {
             let bn = paraTool.dechexToInt(res.result.number, 10);
             return bn;
+        } else {
+            console.log(`No timestamp for latest block ${bn}`, res);
+            return null;
         }
         return null;
     }
 
 
     async detectBlocklogBounds(chainID, logDT, startBN = 1, endBN = null) {
+        let chain = await this.getChain(chainID);
+        console.log(chain);
+        let m = startBN;
+
+        if (endBN == null) {
+            endBN = await this.getLastBlock(chain, chainID);
+        }
+        let n = endBN;
+        if (m > n) return (false);
+
+        let startTS = paraTool.logDT_hr_to_ts(logDT, 0);
+        let endTS = startTS + 86400 - 1;
+        let startBNTS = false
+
+        while (m <= n) {
+            var k = (n + m) >> 1;
+            let blockTS = await this.get_blockTS(chain, k);
+            var cmp = startTS - blockTS;
+            console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
+            if (cmp > 0) {
+                m = k + 1;
+            } else {
+                n = k - 1;
+            }
+            startBNTS = blockTS
+        }
+        startBN = m;
+        console.log(`m=${startBN}, startBNTS=${startBNTS}, startTS=${startTS}`)
+        if (startBNTS < startTS){
+            startBN++
+        }
+        m = startBN;
+        n = endBN;
+        let endBNTS = false
+        while (m <= n) {
+            var k = (n + m) >> 1;
+            let blockTS = await this.get_blockTS(chain, k);
+            var cmp = endTS - blockTS;
+            console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
+            if (cmp > 0) {
+                m = k + 1;
+            } else {
+                n = k - 1;
+            }
+            endBNTS = blockTS
+        }
+        endBN = m;
+        console.log(`m=${endBN}, endBNTS=${endBNTS}, endTS=${endTS}`)
+        if (endBNTS >= (endTS+1)){
+            endBN--
+        }
+        console.log(`[chainID=${chainID}, DT=${logDT}] (${startBN}, ${endBN})`)
+        if (endBN - startBN < 100){
+            console.log(`Invalid bound`)
+            process.exit(`1`)
+        }
+        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${startBN}', '${endBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
+        console.log(sql);
+        this.batchedSQL.push(sql);
+        await this.update_batchedSQL();
+        return {
+            chainID,
+            logDT,
+            startTS,
+            endTS,
+            startBN,
+            endBN
+        }
+    }
+
+
+    async detectBlocklogBoundsOLD(chainID, logDT, startBN = 1, endBN = null) {
         let chain = await this.getChain(chainID);
         console.log(chain);
         let m = startBN;
@@ -3156,6 +3219,36 @@ mysql> desc projectcontractabi;
         }
     }
 
+    async binarySearch(chain, startBN, endBN, targetTS, firstMatch) {
+        if (startBN > endBN) {
+            console.log(`startBN (${startBN}) > endBN (${endBN}), returning null`);
+            return null;
+        }
+
+        let midBN = startBN + Math.floor((endBN - startBN) / 2);
+        let midTS = await this.get_blockTS(chain, midBN);
+
+        if (midTS === null) {
+            console.log(`No timestamp for block ${midBN}, checking block ${midBN + 1}`);
+            midTS = await this.get_blockTS(chain, midBN + 1);
+        }
+
+        if (midTS < targetTS) {
+            return await this.binarySearch(chain, midBN + 1, endBN, targetTS, firstMatch);
+        } else if (midTS > targetTS) {
+            return await this.binarySearch(chain, startBN, midBN - 1, targetTS, firstMatch);
+        } else {
+            let potentialMatch = midBN;
+            if (firstMatch) {
+                let earlierBlock = await this.binarySearch(chain, startBN, midBN - 1, targetTS, firstMatch);
+                potentialMatch = (earlierBlock !== null) ? earlierBlock : midBN;
+            } else {
+                let laterBlock = await this.binarySearch(chain, midBN + 1, endBN, targetTS, firstMatch);
+                potentialMatch = (laterBlock !== null) ? laterBlock : midBN;
+            }
+            return potentialMatch;
+        }
+    }
 
     async load_project_views(datasetId = null, projectId = 'blockchain-etl-internal') {
         let query = `select table_name, view_definition from  \`blockchain-etl-internal.${datasetId}.INFORMATION_SCHEMA.VIEWS\``;
