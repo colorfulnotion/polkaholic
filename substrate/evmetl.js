@@ -2850,7 +2850,6 @@ mysql> desc projectcontractabi;
         TODO: write via memory map
         let evmindexLog = `('${chainID}','${tableID}', '${logDT}', '${numRecords}', NOW())`
         let indexlogvals = ["numRecords", "lastUpdateDT"];
-        */
         if (evmindexLogs.length > 0) {
             await this.upsertSQL({
                 "table": "evmlog",
@@ -2860,6 +2859,7 @@ mysql> desc projectcontractabi;
                 "replace": indexlogvals
             });
         }
+        */
         if (errCnt == 0) {
             return true
         } else {

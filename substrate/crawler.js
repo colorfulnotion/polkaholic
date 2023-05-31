@@ -2119,7 +2119,8 @@ module.exports = class Crawler extends Indexer {
                 let stream_bq = true
                 let write_bt = true
 
-                let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+                //let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+                let qnSupportedChainIDs = []
                 let res = false
                 if (qnSupportedChainIDs.includes(chainID)) {
                     res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
