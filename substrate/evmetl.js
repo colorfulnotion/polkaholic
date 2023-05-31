@@ -1972,13 +1972,17 @@ mysql> desc projectcontractabi;
         let jobInfo = {
             chainID: chainID,
             logDT: currDT,
+            startBN: null,
+            endBN: null,
             evmStep: 0,
-            evmStepDT: null
+            evmStepDT: null,
         }
         if (recs.length > 0) {
             let rec = recs[0]
             jobInfo.evmStep = rec.evmStep
             jobInfo.evmStepDT = `${rec.evmStepDT}`
+            jobInfo.startBN = rec.startBN
+            jobInfo.endBN = rec.endBN
         } else {
             let completedEvmStep = STEP2_backfill // by default, start at step3
             let step1Chains = [paraTool.chainIDEthereum, paraTool.chainIDPolygon]
@@ -2740,9 +2744,9 @@ mysql> desc projectcontractabi;
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
         let jobInfo = await this.getChainStep(currDT, chainID)
         let completedEvmStep = jobInfo.evmStep
-        console.log(`index_evmchain_external`, jobInfo)
+        console.log(`[chainID=${chainID}, DT=${logDT}, force=${force}] index_evmchain_external`, jobInfo)
         if (!force && completedEvmStep >= STEP3_indexEvmChainFull){
-            console.log(`[${currDT} chain#${chainID}] already completed`)
+            console.log(`[chainID=${chainID}, DT=${logDT}, force=${force}] already completed`)
         }else{
             await this.index_evmchain_full(chainID, logDT)
         }
@@ -2781,6 +2785,15 @@ mysql> desc projectcontractabi;
 
 
     async index_evmchain_only(chainID, logDT) {
+        let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
+        console.log(`index_evmchain sql`, sql)
+        //TODO: how to make this hourly?
+        let recs = await this.poolREADONLY.query(sql);
+        let currPeriod = recs[0];
+        if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
+            console.log(`[${logDT}] chainID=${chainID} missing startBN, endBN`)
+            process.exit(1)
+        }
         let crawler = new Crawler();
         crawler.setDebugLevel(paraTool.debugTracing)
         let chain = await crawler.getChain(chainID);
@@ -2796,15 +2809,6 @@ mysql> desc projectcontractabi;
             process.exit(1)
         }
         let jmp = 50;
-        let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
-        console.log(`index_evmchain sql`, sql)
-        //TODO: how to make this hourly?
-        let recs = await this.poolREADONLY.query(sql);
-        let currPeriod = recs[0];
-        if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
-            console.log(`[${logDT}] chainID=${chainID} missing startBN, endBN`)
-            process.exit(1)
-        }
         let evmindexLogs = []
         let batches = []
         let errCnt = 0
