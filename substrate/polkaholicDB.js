@@ -1726,8 +1726,16 @@ from chain where chainID = '${chainID}' limit 1`);
             return [false, false]
         }
         let knownTxType = [0, 2]
-        for (const rpcTxn of rRow.transactions){
+        let rpcTxns = rRow.transactions
+        for (const rpcTxn of rpcTxns){
             if (!knownTxType.includes(rpcTxn["type"])){
+                console.log(`Missing txType`)
+                return [false, false]
+            }
+        }
+        if (Array.isArray(rpcTxns) && rpcTxns.length > 0){
+            if (!rRow.evmReceipts){
+                console.log(`Missing evmReceipts`)
                 return [false, false]
             }
         }

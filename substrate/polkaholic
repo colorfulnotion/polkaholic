@@ -140,12 +140,14 @@ async function main() {
         .usage("22007 195623")
         .argument('<chainID>', 'ChainID', myParseInt)
         .argument('<blockNumber>', 'Block Number', myParseInt)
+        .option('-f, --force', `Force crawl`, false)
         .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
         .action(async (chainID, blockNumber, opt) => {
             let crawler = new Crawler();
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
             let blockchainID = chain.chainID
+            let force = opt.force;
             //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
             let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
                 paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
@@ -153,7 +155,7 @@ async function main() {
             ]
 
             if (evmChainIDList.includes(blockchainID)) {
-                let res = await crawler.index_block_evm_from_bt(chainID, blockNumber);
+                let res = await crawler.index_block_evm_from_bt(chainID, blockNumber, force);
                 if (!res) {
                     await crawler.index_block_evm(chainID, blockNumber);
                 }
@@ -215,6 +217,7 @@ async function main() {
         .usage("2011")
         .argument('<chainIDs>', 'ChainIDs (comma-separated)', myParseInt)
         .option('-s, --sql <targetSQL>', 'Target SQL', null)
+
         .action(async (chainIDs, opt) => {
             console.log(`indexblocks opt`, opt)
             let manager = new Manager()

@@ -8492,7 +8492,7 @@ module.exports = class Indexer extends AssetManager {
                 number: block.number,
                 hash: block.hash,
                 parent_hash: block.parentHash,
-                nonce: block.nonce,
+                nonce: (block.nonce != undefined)? block.nonce: '0x0000000000000000', //64bits
                 sha3_uncles: block.sha3Uncles,
                 logs_bloom: block.logsBloom,
                 transactions_root: block.transactionsRoot,
@@ -9485,7 +9485,7 @@ module.exports = class Indexer extends AssetManager {
                 number: block.number,
                 hash: block.hash,
                 parent_hash: block.parentHash,
-                nonce: block.nonce,
+                nonce: (block.nonce != undefined)? block.nonce: '0x0000000000000000', //64bits
                 sha3_uncles: block.sha3Uncles,
                 logs_bloom: block.logsBloom,
                 transactions_root: block.transactionsRoot,
@@ -10210,7 +10210,7 @@ module.exports = class Indexer extends AssetManager {
 
     }
 
-    async index_block_evm_from_bt(chainID, blkNum) {
+    async index_block_evm_from_bt(chainID, blkNum, force = false) {
         let families = ["blocks", "logs", "traces", "transactions"]
         let startTS = new Date().getTime();
         const evmTableChain = this.getEvmTableChain(chainID);
@@ -10222,7 +10222,7 @@ module.exports = class Indexer extends AssetManager {
             family: families
         });
         //console.log(`blkBNHex=${blkBNHex}`, `rows`, rows)
-        if (rows.length == 1) {
+        if (rows.length == 1 && force) {
             try {
                 await this.setupEvm(chainID)
                 let row = rows[0];
@@ -10254,7 +10254,7 @@ module.exports = class Indexer extends AssetManager {
         let blockHash = null
         let block_tries = 0;
         let block_retry_max = 10
-        let block_retry_ms = 200
+        let block_retry_ms = 1000
         let log_retry_max = 10
         let log_retry_ms = 2000
         let log_timeout_ms = 5000
@@ -10297,7 +10297,8 @@ module.exports = class Indexer extends AssetManager {
             let rows_logs = [];
             try {
                 blockHash = block.hash
-                if (numTransactions >= 0) {
+                console.log(`!!! [#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+                if (numTransactions >= 0 && block.number != undefined) {
                     let isParallel = true
                     let evmReceipts = false
 
@@ -10434,7 +10435,7 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`blk #${blockNumber}`, block)
             //TODO: ethereum has withdrawals flds
             let numTransactions = block && block.transactions ? block.transactions.length : 0;
-            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions} HERE`)
             let rows_blocks = [];
             let rows_transactions = [];
             let rows_logs = [];
@@ -10447,9 +10448,13 @@ module.exports = class Indexer extends AssetManager {
                     if (evmRPCBlockReceiptsApi) {
                         evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
                     } else {
+                        /*
                         let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
                         let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
                         evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                        */
+                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        console.log(`evmReceipts`, evmReceipts)
                     }
 
                     if (!evmReceipts) evmReceipts = [];
