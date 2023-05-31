@@ -148,9 +148,8 @@ async function main() {
             let chain = await crawler.getChain(chainID);
             let blockchainID = chain.chainID
             let force = opt.force;
-            //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
             let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-                paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+                paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
                 paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
             ]
 

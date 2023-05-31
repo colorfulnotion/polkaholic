@@ -2154,7 +2154,7 @@ module.exports = class Crawler extends Indexer {
                     await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                 } else {
                     let resultBN = result.number
-                    let delayedEvmChainIDs = [paraTool.chainIDAstarEVM]
+                    let delayedEvmChainIDs = [paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM]
                     if (delayedEvmChainIDs.includes(chainID)){
                         resultBN = result.number - 10
                     }
@@ -2294,7 +2294,7 @@ module.exports = class Crawler extends Indexer {
             this.readyToCrawlParachains = true;
         }
         let evmChainList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
             paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
         ]
         if (evmChainList.includes(chainID)) {

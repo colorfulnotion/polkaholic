@@ -1528,11 +1528,13 @@ mysql> desc projectcontractabi;
                 console.log(`ERROR: chain's id not specified`)
                 process.exit(1, "ERROR: chain's id not specified")
             }
-            //let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to evm_dev for dev
-            let bqDataset = `crypto_${id}`
             let cmds = []
+            /*
+            let bqDataset = `crypto_${id}`
             let dataSetCmd = `bq --location=${this.evmBQLocation} mk --dataset --description="Dataset for ${bqDataset}" ${projectID}:${bqDataset}`
             cmds.push(dataSetCmd)
+            */
+            let bqDataset = `crypto_evm`
             for (const tbl of tbls) {
                 let fld = null;
                 switch (tbl) {
@@ -1549,9 +1551,9 @@ mysql> desc projectcontractabi;
                         break;
                 }
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
+                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}${chainID}`
+                //let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
                 cmds.push(cmd)
-
             }
             for (const cmd of cmds) {
                 console.log(cmd);
@@ -2766,9 +2768,8 @@ mysql> desc projectcontractabi;
         crawler.setDebugLevel(paraTool.debugTracing)
         let chain = await crawler.getChain(chainID);
         let blockchainID = chain.chainID
-        //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
         let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
             paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
         ]
         if (evmChainIDList.includes(blockchainID)) {

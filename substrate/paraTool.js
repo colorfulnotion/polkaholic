@@ -1561,6 +1561,7 @@ module.exports = {
     chainIDPolygon: 137,
     chainIDZksync: 324,
     chainIDAstarEVM: 592,
+    chainIDShidenEVM: 336,
     chainIDMoonbeamEVM: 1284,
     chainIDMoonriverEVM: 1285,
     chainIDArbitrum: 42161,
