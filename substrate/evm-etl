@@ -360,19 +360,21 @@ async function main() {
         .option('-c, --chainID <chainID>', 'ChainID to Index', myParseInt, paraTool.chainIDEthereum)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-f, --force', `Force even it's already processed`, false)
         .action(async (opt) => {
             var evmetl = new EVMETL();
             let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
             let logDT = opt.logDT ? opt.logDT : "2023-04-01";
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            let force = opt.force;
             if (logDT) {
                 if (endDT) {
                     let logDTRange = evmetl.getLogDTRange(logDT, endDT)
                     for (const dt of logDTRange) {
-                        await evmetl.index_evmchain_full(chainID, dt);
+                        await evmetl.index_evmchain_external(chainID, dt);
                     }
                 } else {
-                    await evmetl.index_evmchain_full(chainID, logDT);
+                    await evmetl.index_evmchain_external(chainID, logDT);
                 }
             }
             process.exit(0);

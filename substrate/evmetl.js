@@ -1980,7 +1980,11 @@ mysql> desc projectcontractabi;
             jobInfo.evmStep = rec.evmStep
             jobInfo.evmStepDT = `${rec.evmStepDT}`
         } else {
-            let completedEvmStep = STEP0_createRec
+            let completedEvmStep = STEP2_backfill // by default, start at step3
+            let step1Chains = [paraTool.chainIDEthereum, paraTool.chainIDPolygon]
+            if (step1Chains.includes(chainID)){
+                completedEvmStep = STEP0_createRec
+            }
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             console.log(`[chainID=${chainID} logDT=${currDT}] Add new tasks\n`, updateSQL)
             this.batchedSQL.push(updateSQL);
@@ -2729,6 +2733,19 @@ mysql> desc projectcontractabi;
             console.log(`err`, e);
         }
         return true
+    }
+
+
+    async index_evmchain_external(chainID, logDT, force = false) {
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+        let jobInfo = await this.getChainStep(currDT, chainID)
+        let completedEvmStep = jobInfo.evmStep
+        console.log(`index_evmchain_external`, jobInfo)
+        if (!force && completedEvmStep >= STEP3_indexEvmChainFull){
+            console.log(`[${currDT} chain#${chainID}] already completed`)
+        }else{
+            await this.index_evmchain_full(chainID, logDT)
+        }
     }
 
     async index_evmchain_full(chainID, logDT) {
