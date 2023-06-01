@@ -356,23 +356,26 @@ async function main() {
             process.exit(0);
         });
 
-    program.command('indexchain')
+    program.command('indexevmchain')
         .option('-c, --chainID <chainID>', 'ChainID to Index', myParseInt, paraTool.chainIDEthereum)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-f, --force', `Force even it's already processed`, false)
         .action(async (opt) => {
             var evmetl = new EVMETL();
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 1800)
             let chainID = opt.chainID ? opt.chainID : paraTool.chainIDEthereum;
-            let logDT = opt.logDT ? opt.logDT : "2023-04-01";
+            let logDT = opt.logDT ? opt.logDT : prevDT;
             let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            let force = opt.force;
             if (logDT) {
                 if (endDT) {
-                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT, force)
                     for (const dt of logDTRange) {
-                        await evmetl.index_evmchain_full(chainID, dt);
+                        await evmetl.index_evmchain_external(chainID, dt, force);
                     }
                 } else {
-                    await evmetl.index_evmchain_full(chainID, logDT);
+                    await evmetl.index_evmchain_external(chainID, logDT, force);
                 }
             }
             process.exit(0);
@@ -448,9 +451,21 @@ async function main() {
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .action(async (opt) => {
             var evmetl = new EVMETL();
+            let [prevDT, _c] = paraTool.ts_to_logDT_hr(evmetl.getCurrentTS() - 86400 - 60)
             let chainID = opt.chainID;
-            let logDT = opt.logDT;
-            await evmetl.detectBlocklogBounds(chainID, logDT);
+            let logDT = opt.logDT ? opt.logDT : prevDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            if (logDT) {
+                if (endDT) {
+                    let logDTRange = evmetl.getLogDTRange(logDT, endDT)
+                    for (const dt of logDTRange) {
+                        await evmetl.detectBlocklogBounds(chainID, dt);
+                    }
+                } else {
+                    await evmetl.detectBlocklogBounds(chainID, logDT);
+                }
+            }
+            process.exit(0);
         });
 
     await program.parseAsync(process.argv);

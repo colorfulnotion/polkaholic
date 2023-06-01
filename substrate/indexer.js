@@ -8480,7 +8480,8 @@ module.exports = class Indexer extends AssetManager {
         let rootDir = '/tmp'
         let evmDecodedBasePath = `${rootDir}/evm_decoded/${logYYYY_MM_DD}/${chainID}/`
         let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
-        //console.log(`!!! block`, block)
+        let gWei = 10 ** 9
+        let ether = 10 ** 18
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8490,7 +8491,7 @@ module.exports = class Indexer extends AssetManager {
                 number: block.number,
                 hash: block.hash,
                 parent_hash: block.parentHash,
-                nonce: block.nonce,
+                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
                 sha3_uncles: block.sha3Uncles,
                 logs_bloom: block.logsBloom,
                 transactions_root: block.transactionsRoot,
@@ -8508,12 +8509,9 @@ module.exports = class Indexer extends AssetManager {
         }
         //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
-
         for (let i = 0; i < evmFullBlock.transactions.length; i++) {
             let rawTx = block.transactions[i];
             let tx = evmFullBlock.transactions[i];
-            //console.log(`rawTx`, rawTx)
-            //console.log(`tx`, tx)
             let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
             let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
             let txhash = tx.transactionHash
@@ -8525,6 +8523,7 @@ module.exports = class Indexer extends AssetManager {
             if (tx.to && tx.input.length >= 10) {
                 methodID = tx.input.substr(0, 10)
             }
+            let txType = (tx.txType != undefined) ? tx.txType : -1
             let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
@@ -8545,11 +8544,36 @@ module.exports = class Indexer extends AssetManager {
                 block_timestamp: block.timestamp,
                 block_number: tx.blockNumber,
                 block_hash: tx.blockHash,
+                max_fee_per_gas: null,
+                max_priority_fee_per_gas: null,
+                transaction_type: txType,
+                receipt_effective_gas_price: null,
+
+                // polkaholic new fields
+                fee: tx.fee,
+                txn_saving: null,
+                burned_fee: tx.burnedFee,
+
                 decoded: false,
                 method_id: methodID,
                 signature: null,
                 params: null
             }
+
+            if (txType == 2) {
+                //1559 (as gWei)
+                evmTx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
+                evmTx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
+                evmTx.txn_saving = (tx.txn_saving != undefined) ? paraTool.floatToInt(tx.txn_saving * ether) : 0
+            }
+            // use the value directly after reindexing
+            if (tx.cumulativeGasUsed) {
+                evmTx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
+            }
+            if (tx.effectiveGasPrice) {
+                evmTx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
+            }
+
             //arbitrum 0x0 values??
             if (evmTx.value == "0x0") evmTx.value = 0
             if (evmTx.gas == "0x0") evmTx.gas = 0
@@ -8735,7 +8759,7 @@ module.exports = class Indexer extends AssetManager {
                     let recs = []
                     for (const row of rows) {
                         let rec = row.json
-                        console.log(`${tbl} rec`, rec)
+                        console.log(`${tbl} recLen=${rec.length}`)
                         recs.push(rec)
                     }
                     let replace = false
@@ -9432,6 +9456,7 @@ module.exports = class Indexer extends AssetManager {
         let blockTS = block.timestamp
         let blockMicroTS = blockTS * 1000000
         let blockHash = block.hash
+
         let cres = {
             key: paraTool.blockNumberToHex(evm_blk_num),
             data: {
@@ -9446,6 +9471,8 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
+        let gWei = 10 ** 9
+        let ether = 10 ** 18
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -9455,7 +9482,7 @@ module.exports = class Indexer extends AssetManager {
                 number: block.number,
                 hash: block.hash,
                 parent_hash: block.parentHash,
-                nonce: block.nonce,
+                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
                 sha3_uncles: block.sha3Uncles,
                 logs_bloom: block.logsBloom,
                 transactions_root: block.transactionsRoot,
@@ -9491,6 +9518,7 @@ module.exports = class Indexer extends AssetManager {
             if (tx.to && tx.input.length >= 10) {
                 methodID = tx.input.substr(0, 10)
             }
+            let txType = (tx.txType != undefined) ? tx.txType : -1
             let evmTx = {
                 chain_id: chainID,
                 id: chain.id,
@@ -9511,11 +9539,34 @@ module.exports = class Indexer extends AssetManager {
                 block_timestamp: block.timestamp,
                 block_number: tx.blockNumber,
                 block_hash: tx.blockHash,
+                max_fee_per_gas: null,
+                max_priority_fee_per_gas: null,
+                transaction_type: txType,
+                receipt_effective_gas_price: null,
+                // polkaholic new fields
+                fee: tx.fee,
+                txn_saving: null,
+                burned_fee: tx.burnedFee,
                 decoded: false,
                 method_id: methodID,
                 signature: null,
                 params: null
             }
+
+            if (txType == 2) {
+                //1559 (as gWei)
+                evmTx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
+                evmTx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
+                evmTx.txn_saving = (tx.txn_saving != undefined) ? paraTool.floatToInt(tx.txn_saving * ether) : 0
+            }
+            // use the value directly after reindexing
+            if (tx.cumulativeGasUsed) {
+                evmTx.receipt_cumulative_gas_used = tx.cumulativeGasUsed
+            }
+            if (tx.effectiveGasPrice) {
+                evmTx.receipt_effective_gas_price = paraTool.floatToInt(tx.effectiveGasPrice * gWei)
+            }
+
             //arbitrum 0x0 values??
             if (evmTx.value == "0x0") evmTx.value = 0
             if (evmTx.gas == "0x0") evmTx.gas = 0
@@ -9584,7 +9635,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            //console.log(`bq+`, bqEvmTransaction)
+            //console.log(`bq+`, bqEvmTransaction.json)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
@@ -10156,7 +10207,7 @@ module.exports = class Indexer extends AssetManager {
 
     }
 
-    async index_block_evm_from_bt(chainID, blkNum) {
+    async index_block_evm_from_bt(chainID, blkNum, force = false) {
         let families = ["blocks", "logs", "traces", "transactions"]
         let startTS = new Date().getTime();
         const evmTableChain = this.getEvmTableChain(chainID);
@@ -10167,16 +10218,18 @@ module.exports = class Indexer extends AssetManager {
             cellLimit: 1,
             family: families
         });
-
-        if (rows.length == 1) {
+        //console.log(`blkBNHex=${blkBNHex}`, `rows`, rows)
+        if (rows.length == 1 && force) {
             try {
                 await this.setupEvm(chainID)
                 let row = rows[0];
-                console.log(`Using BT Rec`, row)
-                let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
-                console.log(`rRow`, rRow)
-                let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
-                return r
+                //let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                let [isValid, rRow] = this.validate_evm_row(row)
+                console.log(`cached rRow`, rRow)
+                if (isValid) {
+                    let r = await this.index_evm_chain_block_row(rRow, false, "stream_evm");
+                    return r
+                }
             } catch (err) {
                 console.log(err)
                 //this.log_indexing_error(err, `index_blocks_period`);
@@ -10198,7 +10251,7 @@ module.exports = class Indexer extends AssetManager {
         let blockHash = null
         let block_tries = 0;
         let block_retry_max = 10
-        let block_retry_ms = 200
+        let block_retry_ms = 1000
         let log_retry_max = 10
         let log_retry_ms = 2000
         let log_timeout_ms = 5000
@@ -10206,7 +10259,8 @@ module.exports = class Indexer extends AssetManager {
         let stream_bq = false
         let write_bt = true
 
-        let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        //let qnSupportedChainIDs = [paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let qnSupportedChainIDs = []
         let res = false
         if (qnSupportedChainIDs.includes(chainID)) {
             res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
@@ -10241,7 +10295,8 @@ module.exports = class Indexer extends AssetManager {
             let rows_logs = [];
             try {
                 blockHash = block.hash
-                if (numTransactions >= 0) {
+                //console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+                if (numTransactions >= 0 && block.number != undefined) {
                     let isParallel = true
                     let evmReceipts = false
 
@@ -10338,7 +10393,8 @@ module.exports = class Indexer extends AssetManager {
         let stream_bq = false
         let write_bt = true
 
-        let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        //let qnSupportedChainIDs = [paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+        let qnSupportedChainIDs = []
         let res = false
         if (qnSupportedChainIDs.includes(chainID)) {
             res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
@@ -10378,7 +10434,7 @@ module.exports = class Indexer extends AssetManager {
             //console.log(`blk #${blockNumber}`, block)
             //TODO: ethereum has withdrawals flds
             let numTransactions = block && block.transactions ? block.transactions.length : 0;
-            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions} HERE`)
             let rows_blocks = [];
             let rows_transactions = [];
             let rows_logs = [];
@@ -10391,9 +10447,13 @@ module.exports = class Indexer extends AssetManager {
                     if (evmRPCBlockReceiptsApi) {
                         evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
                     } else {
+                        /*
                         let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
                         let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
                         evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                        */
+                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel)
+                        console.log(`evmReceipts`, evmReceipts)
                     }
 
                     if (!evmReceipts) evmReceipts = [];

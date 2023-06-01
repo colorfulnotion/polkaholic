@@ -2119,7 +2119,8 @@ module.exports = class Crawler extends Indexer {
                 let stream_bq = true
                 let write_bt = true
 
-                let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+                //let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+                let qnSupportedChainIDs = []
                 let res = false
                 if (qnSupportedChainIDs.includes(chainID)) {
                     res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
@@ -2152,8 +2153,13 @@ module.exports = class Crawler extends Indexer {
                     let [dTxns, dReceipts] = await statusesPromise
                     await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
                 } else {
-                    let evmBlockFunc = web3.eth.getBlock(result.hash, true)
-                    let evmBlockCtx = `web3.eth.getBlock(${result.hash}, true)`
+                    let resultBN = result.number
+                    let delayedEvmChainIDs = [paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM]
+                    if (delayedEvmChainIDs.includes(chainID)) {
+                        resultBN = result.number - 10
+                    }
+                    let evmBlockFunc = web3.eth.getBlock(resultBN, true)
+                    let evmBlockCtx = `web3.eth.getBlock(${resultBN}, true)`
 
                     block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
                     /*
@@ -2193,12 +2199,10 @@ module.exports = class Crawler extends Indexer {
                             console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                             let evmTrace = false
                             if (evmRPCInternalApi) {
-                                /*
                                 let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
                                 let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
                                 evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
-                                */
-                                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
+                                //evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
                                 //console.log(`[${block.number}] evmTrace`, evmTrace)
                             }
                             var statusesPromise = Promise.all([
@@ -2290,7 +2294,7 @@ module.exports = class Crawler extends Indexer {
             this.readyToCrawlParachains = true;
         }
         let evmChainList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
             paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
         ]
         if (evmChainList.includes(chainID)) {

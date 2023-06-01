@@ -1562,7 +1562,7 @@ from chain where chainID = '${chainID}' limit 1`);
         if (rowData["blocks"]) {
             let columnFamily = rowData["blocks"];
             let blkhashes = Object.keys(columnFamily)
-            console.log(`blkhashes`, blkhashes)
+            //console.log(`blkhashes`, blkhashes)
             //TODO: remove the incorret finalizedhash here
             if (blkhashes.length == 1) {
                 r.blockHash = blkhashes[0];
@@ -1712,11 +1712,35 @@ from chain where chainID = '${chainID}' limit 1`);
             blockNumber: r.blockNumber,
             blockTS: paraTool.dechexToInt(r.blockTS),
             block: rpcBlk,
+            transactions: rpcTxns,
             evmReceipts: rpcReceipts,
             traces: false
         }
         //process.exit(0)
         return f
+    }
+
+    validate_evm_row(row) {
+        let rRow = this.build_evm_block_from_row(row)
+        if (!rRow.block) {
+            return [false, false]
+        }
+        let knownTxType = [0, 2]
+        let rpcTxns = rRow.transactions
+        for (const rpcTxn of rpcTxns) {
+            if (!knownTxType.includes(rpcTxn["type"])) {
+                console.log(`Missing txType`)
+                return [false, false]
+            }
+        }
+        if (Array.isArray(rpcTxns) && rpcTxns.length > 0) {
+            if (!rRow.evmReceipts) {
+                console.log(`Missing evmReceipts`)
+                return [false, false]
+            }
+        }
+        //TODO: check trace
+        return [true, rRow]
     }
 
     build_block_from_row(row) {

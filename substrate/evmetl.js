@@ -1528,11 +1528,13 @@ mysql> desc projectcontractabi;
                 console.log(`ERROR: chain's id not specified`)
                 process.exit(1, "ERROR: chain's id not specified")
             }
-            //let bqDataset = (this.isProd) ? `${relayChain}` : `${relayChain}_dev` //MK write to evm_dev for dev
-            let bqDataset = `crypto_${id}`
             let cmds = []
+            /*
+            let bqDataset = `crypto_${id}`
             let dataSetCmd = `bq --location=${this.evmBQLocation} mk --dataset --description="Dataset for ${bqDataset}" ${projectID}:${bqDataset}`
             cmds.push(dataSetCmd)
+            */
+            let bqDataset = `crypto_evm`
             for (const tbl of tbls) {
                 let fld = null;
                 switch (tbl) {
@@ -1549,9 +1551,9 @@ mysql> desc projectcontractabi;
                         break;
                 }
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
-                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
+                let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}${chainID}`
+                //let cmd = `bq ${opType} --project_id=${projectID}  --schema=schema/substrateetl/evm/${tbl}.json ${p} --table ${bqDataset}.${tbl}`
                 cmds.push(cmd)
-
             }
             for (const cmd of cmds) {
                 console.log(cmd);
@@ -1970,15 +1972,23 @@ mysql> desc projectcontractabi;
         let jobInfo = {
             chainID: chainID,
             logDT: currDT,
+            startBN: null,
+            endBN: null,
             evmStep: 0,
-            evmStepDT: null
+            evmStepDT: null,
         }
         if (recs.length > 0) {
             let rec = recs[0]
             jobInfo.evmStep = rec.evmStep
-            jobInfo.evmStepDT = `${rec.evmStepDT}`
+            jobInfo.evmStepDT = (rec.evmStepDT!= undefined)? `${rec.evmStepDT}`: null
+            jobInfo.startBN = rec.startBN
+            jobInfo.endBN = rec.endBN
         } else {
-            let completedEvmStep = STEP0_createRec
+            let completedEvmStep = STEP2_backfill // by default, start at step3
+            let step1Chains = [paraTool.chainIDEthereum, paraTool.chainIDPolygon]
+            if (step1Chains.includes(chainID)) {
+                completedEvmStep = STEP0_createRec
+            }
             let updateSQL = `insert into blocklog (chainID, logDT, evmStep, evmStepDT) values ('${chainID}', '${currDT}', '${completedEvmStep}', NOW()) on duplicate key update evmStep = values(evmStep), evmStepDT = values(evmStepDT)`;
             console.log(`[chainID=${chainID} logDT=${currDT}] Add new tasks\n`, updateSQL)
             this.batchedSQL.push(updateSQL);
@@ -2674,7 +2684,8 @@ mysql> desc projectcontractabi;
         let rowLen = rows.length
         let expectedLen = endBN - startBN + 1
         let missedBNs = []
-        if (rowLen != expectedLen) {
+        let rRows = []
+        if (true) {
             let expectedRangeBNs = [];
             let observedBNs = []
             for (let i = startBN; i <= endBN; i++) {
@@ -2682,19 +2693,25 @@ mysql> desc projectcontractabi;
             }
             for (let j = 0; j < rows.length; j++) {
                 let blockNum = paraTool.dechexToInt(rows[j].id)
-                observedBNs.push(blockNum);
+                let [isValid, rRow] = this.validate_evm_row(rows[j])
+                if (isValid) {
+                    //console.log(`${rows[j].id} ${blockNum} is Valid`)
+                    observedBNs.push(blockNum);
+                    rRows.push(rRow)
+                }
             }
             // await this.audit_chain(chain, startBN, endBN)
             // can we do a more robost audit_chain here?
+            //console.log(`observedBNs`, observedBNs)
             missedBNs = expectedRangeBNs.filter(function(num) {
                 return observedBNs.indexOf(num) === -1;
             });
         }
         console.log(`${startBN}(${start}), ${endBN}(${end}) expectedLen=${endBN - startBN+1} MISSING BNs`, missedBNs)
-        return [rows, missedBNs]
+        return [rows, rRows, missedBNs]
     }
 
-    async load_evm_etl(chainID, logDT) {
+    async loadEvmETL(chainID, logDT) {
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
         let rootDir = '/tmp'
         let localDir = `/tmp/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
@@ -2711,7 +2728,10 @@ mysql> desc projectcontractabi;
                 let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${dataset}.${tbl}${chainID}$${logYYYYMMDD}' ${fn} schema/substrateetl/evm/${tbl}.json`;
                 try {
                     console.log(cmd);
-                    //await exec(cmd);
+                    let res = await exec(cmd, {
+                        maxBuffer: 1024 * 64000
+                    });
+                    console.log(`res`, res)
                 } catch (err) {
                     console.log(`err`, err);
                 }
@@ -2720,6 +2740,19 @@ mysql> desc projectcontractabi;
             console.log(`err`, e);
         }
         return true
+    }
+
+
+    async index_evmchain_external(chainID, logDT, force = false) {
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+        let jobInfo = await this.getChainStep(currDT, chainID)
+        let completedEvmStep = jobInfo.evmStep
+        console.log(`[chainID=${chainID}, DT=${logDT}, force=${force}] index_evmchain_external`, jobInfo)
+        if (!force && completedEvmStep >= STEP3_indexEvmChainFull) {
+            console.log(`[chainID=${chainID}, DT=${logDT}, force=${force}] already completed`)
+        } else {
+            await this.index_evmchain_full(chainID, logDT)
+        }
     }
 
     async index_evmchain_full(chainID, logDT) {
@@ -2738,13 +2771,13 @@ mysql> desc projectcontractabi;
         }
         let step3c_successful = await this.cpEvmETLToGS(logDT, chainID, false);
         if (!step3c_successful) {
-            console.log(`Step3c cpEvmDecodedToGS failed`)
+            console.log(`Step3c cpEvmETLToGS failed`)
             process.exit(1)
         }
 
-        let step3d_successful = await this.load_evm_etl(chainID, logDT);
+        let step3d_successful = await this.loadEvmETL(chainID, logDT);
         if (!step3d_successful) {
-            console.log(`Step3d load_evm_etl failed`)
+            console.log(`Step3d loadEvmETL failed`)
             process.exit(1)
         }
         let completedEvmStep = STEP3_indexEvmChainFull
@@ -2755,13 +2788,27 @@ mysql> desc projectcontractabi;
 
 
     async index_evmchain_only(chainID, logDT) {
+        let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
+        console.log(`index_evmchain sql`, sql)
+        //TODO: how to make this hourly?
+        let recs = await this.poolREADONLY.query(sql);
+        let currPeriod = recs[0];
+        if (currPeriod.startBN == undefined || currPeriod.endBN == undefined) {
+            console.log(`[${logDT}] chainID=${chainID} missing startBN, endBN`)
+            await this.detectBlocklogBounds(chainID, logDT)
+            recs = recs = await this.poolREADONLY.query(sql);
+            currPeriod = recs[0];
+            if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
+                console.log(`Unable to generate bound`)
+                process.exit(1)
+            }
+        }
         let crawler = new Crawler();
         crawler.setDebugLevel(paraTool.debugTracing)
         let chain = await crawler.getChain(chainID);
         let blockchainID = chain.chainID
-        //let evmChainIDList = [1, 10, 56, 137, 42161, 43114]
         let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM,
+            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
             paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
         ]
         if (evmChainIDList.includes(blockchainID)) {
@@ -2771,11 +2818,6 @@ mysql> desc projectcontractabi;
             process.exit(1)
         }
         let jmp = 50;
-        let sql = `select startBN, endBN from blocklog where chainID = "${chainID}" and logDT = "${logDT}"`
-        console.log(`index_evmchain sql`, sql)
-        //TODO: how to make this hourly?
-        let recs = await this.poolREADONLY.query(sql);
-        let currPeriod = recs[0];
         let evmindexLogs = []
         let batches = []
         let errCnt = 0
@@ -2811,21 +2853,19 @@ mysql> desc projectcontractabi;
             }
             let b = batches[i]
             console.log(`batch#${i} ${b.startBN}(${b.start}), ${b.endBN}(${b.end}) expectedLen=${b.endBN - b.startBN+1}`)
-            let [rows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
+            let [rows, rRows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
 
             //TODO: if missing, we need to get the missing blocks
             if (missedBNs.length > 0) {
                 for (const missedBN of missedBNs) {
                     await crawler.crawl_block_evm(chainID, missedBN);
                 }
-                [rows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
+                [rows, rRows, missedBNs] = await this.fetch_evmchain_rows(chainID, b.startBN, b.endBN)
             }
             //process.exit(0)
-            for (let i = 0; i < rows.length; i++) {
+            for (let i = 0; i < rRows.length; i++) {
                 try {
-                    let row = rows[i];
-                    //console.log(`row`, row)
-                    let rRow = this.build_evm_block_from_row(row) // build "rRow" here so we pass in the same struct as fetch_block_row
+                    let rRow = rRows[i]
                     //console.log(`rRow`, rRow)
                     let r = await crawler.index_evm_chain_block_row(rRow, false);
                 } catch (err) {
@@ -2841,7 +2881,6 @@ mysql> desc projectcontractabi;
         TODO: write via memory map
         let evmindexLog = `('${chainID}','${tableID}', '${logDT}', '${numRecords}', NOW())`
         let indexlogvals = ["numRecords", "lastUpdateDT"];
-        */
         if (evmindexLogs.length > 0) {
             await this.upsertSQL({
                 "table": "evmlog",
@@ -2851,6 +2890,7 @@ mysql> desc projectcontractabi;
                 "replace": indexlogvals
             });
         }
+        */
         if (errCnt == 0) {
             return true
         } else {
@@ -3014,13 +3054,23 @@ mysql> desc projectcontractabi;
 
     async get_blockTS(chain, bn) {
         let hexBlocknumber = "0x" + parseInt(bn, 10).toString(16);
+        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{ "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["${hexBlocknumber}", false],"id": 1}' "${chain.evmRPC}"`
+        //console.log(cmd);
+        const { stdout, stderr } = await exec(cmd, { maxBuffer: 1024 * 64000 });
+        let res = JSON.parse(stdout);
+        //console.log(`res`, res.result)
+        if (res.result && res.result.timestamp) {
+            return paraTool.dechexToInt(res.result.timestamp);
+        } else {
+            console.log(`No timestamp for block ${bn}`, res);
+            return null;
+        }
+    }
+
+    async getLastBlock(chain) {
         // do
-        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{
-    "jsonrpc": "2.0",
-    "method": "eth_getBlockByNumber",
-    "params": ["${hexBlocknumber}", true],
-    "id": 1
-  }' "${chain.RPCBackfill}"`
+        let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{ "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["latest", false], "id": 1}' "${chain.evmRPC}"`
+        //console.log(cmd);
         const {
             stdout,
             stderr
@@ -3028,40 +3078,64 @@ mysql> desc projectcontractabi;
             maxBuffer: 1024 * 64000
         });
         let res = JSON.parse(stdout);
-        if (res.result && res.result.timestamp) {
-            return paraTool.dechexToInt(res.result.timestamp);
+        if (res.result && res.result.number) {
+            let bn = paraTool.dechexToInt(res.result.number, 10);
+            return bn;
+        } else {
+            console.log(`No timestamp for latest block ${bn}`, res);
+            return null;
         }
         return null;
     }
-    async detectBlocklogBounds(chainID, logDT, startBN = 29983413, endBN = 30508689) {
-        let chain = await this.getChain(chainID);
 
+
+    async detectBlocklogBounds(chainID, logDT, startBN = 1, endBN = null) {
+        let chain = await this.getChain(chainID);
+        console.log(chain);
         let m = startBN;
+
+        if (endBN == null) {
+            endBN = await this.getLastBlock(chain, chainID);
+        }
         let n = endBN;
         if (m > n) return (false);
 
         let startTS = paraTool.logDT_hr_to_ts(logDT, 0);
         let endTS = startTS + 86400 - 1;
+        let startBNTS = false
 
+        let tsMap = {}
         while (m <= n) {
             var k = (n + m) >> 1;
             let blockTS = await this.get_blockTS(chain, k);
+            tsMap[k] = blockTS
             var cmp = startTS - blockTS;
             console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
             if (cmp > 0) {
                 m = k + 1;
-            } else if (cmp < 0) {
-                n = k - 1;
-            } else {
+                startBNTS = blockTS
+            } else if (cmp == 0){
                 m = k;
                 n = k;
+                startBNTS = blockTS
                 break;
+            } else {
+                n = k - 1;
+                startBNTS = blockTS
             }
+            //startBNTS = blockTS
         }
-        startBN = n;
-
+        startBN = m;
+        if (tsMap[m] != undefined){
+            startBNTS = tsMap[m]
+        }
+        console.log(`m=${startBN}, startBNTS=${startBNTS}, startTS=${startTS}`)
+        if (startBNTS < startTS){
+            startBN++
+        }
         m = startBN;
         n = endBN;
+        let endBNTS = false
         while (m <= n) {
             var k = (n + m) >> 1;
             let blockTS = await this.get_blockTS(chain, k);
@@ -3069,23 +3143,73 @@ mysql> desc projectcontractabi;
             console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
             if (cmp > 0) {
                 m = k + 1;
-            } else if (cmp < 0) {
-                n = k - 1;
-            } else {
+                startBNTS = blockTS
+            }else if (cmp == 0){
                 m = k;
                 n = k;
+                endBNTS = blockTS
                 break;
+            } else {
+                n = k - 1;
+                endBNTS = blockTS
             }
+            //endBNTS = blockTS
         }
-        endBN = n;
-
+        endBN = m;
+        console.log(`m=${endBN}, endBNTS=${endBNTS}, endTS=${endTS}`)
+        if (endBNTS >= (endTS+1)){
+            endBN--
+        }
+        console.log(`[chainID=${chainID}, DT=${logDT}] (${startBN}, ${endBN})`)
+        if (endBN - startBN < 100){
+            console.log(`Invalid bound`)
+            //process.exit(`1`)
+            return false
+        }
         let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${startBN}', '${endBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
         console.log(sql);
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-        process.exit(0);
+        return {
+            chainID,
+            logDT,
+            startTS,
+            endTS,
+            startBN,
+            endBN
+        }
     }
 
+    async binarySearch(chain, startBN, endBN, targetTS, firstMatch) {
+        if (startBN > endBN) {
+            console.log(`startBN (${startBN}) > endBN (${endBN}), returning null`);
+            return null;
+        }
+
+        let midBN = startBN + Math.floor((endBN - startBN) / 2);
+        let midTS = await this.get_blockTS(chain, midBN);
+
+        if (midTS === null) {
+            console.log(`No timestamp for block ${midBN}, checking block ${midBN + 1}`);
+            midTS = await this.get_blockTS(chain, midBN + 1);
+        }
+
+        if (midTS < targetTS) {
+            return await this.binarySearch(chain, midBN + 1, endBN, targetTS, firstMatch);
+        } else if (midTS > targetTS) {
+            return await this.binarySearch(chain, startBN, midBN - 1, targetTS, firstMatch);
+        } else {
+            let potentialMatch = midBN;
+            if (firstMatch) {
+                let earlierBlock = await this.binarySearch(chain, startBN, midBN - 1, targetTS, firstMatch);
+                potentialMatch = (earlierBlock !== null) ? earlierBlock : midBN;
+            } else {
+                let laterBlock = await this.binarySearch(chain, midBN + 1, endBN, targetTS, firstMatch);
+                potentialMatch = (laterBlock !== null) ? laterBlock : midBN;
+            }
+            return potentialMatch;
+        }
+    }
 
     async load_project_views(datasetId = null, projectId = 'blockchain-etl-internal') {
         let query = `select table_name, view_definition from  \`blockchain-etl-internal.${datasetId}.INFORMATION_SCHEMA.VIEWS\``;

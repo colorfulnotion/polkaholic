@@ -770,7 +770,7 @@ FROM
     }
 
     async pick_chainbalancecrawler(specific_chainID = null) {
-        let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : "";
+        let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : " and chainID in ( select chainID from chain where relayChain in ('polkadot','kusama') )";
         let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS, startTS, logDT from chainbalancecrawler as c where hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 5 MINUTE) ${w} order by lastDT DESC limit 1`;
         console.log("pick_chainbalancecrawler", sql);
         let chains = await this.pool.query(sql);
@@ -803,7 +803,7 @@ FROM
                 others[`${o.chainID}-${o.logTS}`] = true;
             }
             // now out of candidate jobs choose the first one that hasn't been picked
-            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where ( updateAddressBalanceStatus = "Ready" or (updateAddressBalanceStatus = 'Ignore' and logDT = date(date_sub(Now(), interval 1 day))) ) and
+            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where chainID in (select chainID from chain where relayChain in ('polkadot','kusama')) and  ( updateAddressBalanceStatus = "Ready" or (updateAddressBalanceStatus = 'Ignore' and logDT = date(date_sub(Now(), interval 1 day))) ) and
  ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE )
  or lastUpdateAddressBalancesStartDT is Null  ) and blocklog.logDT >= '${balanceStartDT}' ${w} order by ${orderby}`;
             let jobs = await this.pool.query(sql);
@@ -4165,7 +4165,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                             params: i && i.params ? i.params : null
                         }
                         if (txType == 2) {
-
                             //1559 (as gWei)
                             evmtx.max_fee_per_gas = paraTool.floatToInt(tx.maxFeePerGas * gWei)
                             evmtx.max_priority_fee_per_gas = paraTool.floatToInt(tx.maxPriorityFeePerGas * gWei)
