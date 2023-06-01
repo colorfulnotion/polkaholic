@@ -1980,7 +1980,7 @@ mysql> desc projectcontractabi;
         if (recs.length > 0) {
             let rec = recs[0]
             jobInfo.evmStep = rec.evmStep
-            jobInfo.evmStepDT = `${rec.evmStepDT}`
+            jobInfo.evmStepDT = (rec.evmStepDT!= undefined)? `${rec.evmStepDT}`: null
             jobInfo.startBN = rec.startBN
             jobInfo.endBN = rec.endBN
         } else {
@@ -2795,7 +2795,13 @@ mysql> desc projectcontractabi;
         let currPeriod = recs[0];
         if (currPeriod.startBN == undefined || currPeriod.endBN == undefined) {
             console.log(`[${logDT}] chainID=${chainID} missing startBN, endBN`)
-            process.exit(1)
+            await this.detectBlocklogBounds(chainID, logDT)
+            recs = recs = await this.poolREADONLY.query(sql);
+            currPeriod = recs[0];
+            if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
+                console.log(`Unable to generate bound`)
+                process.exit(1)
+            }
         }
         let crawler = new Crawler();
         crawler.setDebugLevel(paraTool.debugTracing)
@@ -3098,19 +3104,31 @@ mysql> desc projectcontractabi;
         let endTS = startTS + 86400 - 1;
         let startBNTS = false
 
+        let tsMap = {}
         while (m <= n) {
             var k = (n + m) >> 1;
             let blockTS = await this.get_blockTS(chain, k);
+            tsMap[k] = blockTS
             var cmp = startTS - blockTS;
             console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
             if (cmp > 0) {
                 m = k + 1;
+                startBNTS = blockTS
+            } else if (cmp == 0){
+                m = k;
+                n = k;
+                startBNTS = blockTS
+                break;
             } else {
                 n = k - 1;
+                startBNTS = blockTS
             }
-            startBNTS = blockTS
+            //startBNTS = blockTS
         }
         startBN = m;
+        if (tsMap[m] != undefined){
+            startBNTS = tsMap[m]
+        }
         console.log(`m=${startBN}, startBNTS=${startBNTS}, startTS=${startTS}`)
         if (startBNTS < startTS){
             startBN++
@@ -3125,10 +3143,17 @@ mysql> desc projectcontractabi;
             console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
             if (cmp > 0) {
                 m = k + 1;
+                startBNTS = blockTS
+            }else if (cmp == 0){
+                m = k;
+                n = k;
+                endBNTS = blockTS
+                break;
             } else {
                 n = k - 1;
+                endBNTS = blockTS
             }
-            endBNTS = blockTS
+            //endBNTS = blockTS
         }
         endBN = m;
         console.log(`m=${endBN}, endBNTS=${endBNTS}, endTS=${endTS}`)
@@ -3138,73 +3163,9 @@ mysql> desc projectcontractabi;
         console.log(`[chainID=${chainID}, DT=${logDT}] (${startBN}, ${endBN})`)
         if (endBN - startBN < 100){
             console.log(`Invalid bound`)
-            process.exit(`1`)
+            //process.exit(`1`)
+            return false
         }
-        let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${startBN}', '${endBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
-        console.log(sql);
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-        return {
-            chainID,
-            logDT,
-            startTS,
-            endTS,
-            startBN,
-            endBN
-        }
-    }
-
-
-    async detectBlocklogBoundsOLD(chainID, logDT, startBN = 1, endBN = null) {
-        let chain = await this.getChain(chainID);
-        console.log(chain);
-        let m = startBN;
-
-        if (endBN == null) {
-            endBN = await this.getLastBlock(chain, chainID);
-        }
-        let n = endBN;
-        if (m > n) return (false);
-
-        let startTS = paraTool.logDT_hr_to_ts(logDT, 0);
-        let endTS = startTS + 86400 - 1;
-
-        while (m <= n) {
-            var k = (n + m) >> 1;
-            let blockTS = await this.get_blockTS(chain, k);
-            var cmp = startTS - blockTS;
-            console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
-            if (cmp > 0) {
-                m = k + 1;
-            } else if (cmp < 0) {
-                n = k - 1;
-            } else {
-                m = k;
-                n = k;
-                break;
-            }
-        }
-        startBN = n;
-
-        m = startBN;
-        n = endBN;
-        while (m <= n) {
-            var k = (n + m) >> 1;
-            let blockTS = await this.get_blockTS(chain, k);
-            var cmp = endTS - blockTS;
-            console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
-            if (cmp > 0) {
-                m = k + 1;
-            } else if (cmp < 0) {
-                n = k - 1;
-            } else {
-                m = k;
-                n = k;
-                break;
-            }
-        }
-        endBN = n;
-
         let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${startBN}', '${endBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
         console.log(sql);
         this.batchedSQL.push(sql);

@@ -1562,7 +1562,7 @@ from chain where chainID = '${chainID}' limit 1`);
         if (rowData["blocks"]) {
             let columnFamily = rowData["blocks"];
             let blkhashes = Object.keys(columnFamily)
-            console.log(`blkhashes`, blkhashes)
+            //console.log(`blkhashes`, blkhashes)
             //TODO: remove the incorret finalizedhash here
             if (blkhashes.length == 1) {
                 r.blockHash = blkhashes[0];
@@ -1667,7 +1667,7 @@ from chain where chainID = '${chainID}' limit 1`);
         for (let i = 0; i < r.transactions.length; i++) {
             let btTxn = r.transactions[i]
             let transactionHash = btTxn.hash
-            console.log(`btTxn`, btTxn)
+            //console.log(`btTxn`, btTxn)
             let rpcTxn = {}
             let rpcReceipt = {}
             // convert transaction

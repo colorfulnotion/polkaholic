@@ -8759,7 +8759,7 @@ module.exports = class Indexer extends AssetManager {
                     let recs = []
                     for (const row of rows) {
                         let rec = row.json
-                        console.log(`${tbl} rec`, rec)
+                        console.log(`${tbl} recLen=${rec.length}`)
                         recs.push(rec)
                     }
                     let replace = false
@@ -10295,7 +10295,7 @@ module.exports = class Indexer extends AssetManager {
             let rows_logs = [];
             try {
                 blockHash = block.hash
-                console.log(`!!! [#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
+                //console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
                 if (numTransactions >= 0 && block.number != undefined) {
                     let isParallel = true
                     let evmReceipts = false
