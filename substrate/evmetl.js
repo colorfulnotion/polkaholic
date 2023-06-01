@@ -3091,11 +3091,13 @@ mysql> desc projectcontractabi;
 
     async detectBlocklogBounds(chainID, logDT, startBN = 1, endBN = null) {
         let chain = await this.getChain(chainID);
-        console.log(chain);
+        //console.log(chain);
         let m = startBN;
+        let numCalls = 0
 
         if (endBN == null) {
             endBN = await this.getLastBlock(chain, chainID);
+            numCalls++
         }
         let n = endBN;
         if (m > n) return (false);
@@ -3105,65 +3107,97 @@ mysql> desc projectcontractabi;
         let startBNTS = false
 
         let tsMap = {}
+
         while (m <= n) {
             var k = (n + m) >> 1;
             let blockTS = await this.get_blockTS(chain, k);
+            numCalls++
             tsMap[k] = blockTS
             var cmp = startTS - blockTS;
-            console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
+            //console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
             if (cmp > 0) {
                 m = k + 1;
-                startBNTS = blockTS
             } else if (cmp == 0){
                 m = k;
                 n = k;
-                startBNTS = blockTS
                 break;
             } else {
                 n = k - 1;
-                startBNTS = blockTS
             }
-            //startBNTS = blockTS
         }
         startBN = m;
         if (tsMap[m] != undefined){
             startBNTS = tsMap[m]
         }
-        console.log(`m=${startBN}, startBNTS=${startBNTS}, startTS=${startTS}`)
-        if (startBNTS < startTS){
+        if (startBNTS == startTS){
+            let currBN = m
+            let prevBN = currBN -1
+            let currBlkTS = startBNTS
+            let prevBlkTS = await this.get_blockTS(chain, prevBN);
+            numCalls++
+            while ((currBlkTS == prevBlkTS) && prevBlkTS != null){
+                currBN = prevBN
+                currBlkTS = prevBlkTS
+                prevBN--
+                currBlkTS = await this.get_blockTS(chain, prevBN);
+                numCalls++
+                //console.log(`-- currBN=${currBN}, currBlkTS=${currBlkTS}, prevBN=${prevBN}, prevBlkTS=${prevBlkTS} [Initial=${startBN}]`)
+            }
+            startBN = currBN
+            startBNTS = currBlkTS
+        } else if (startBNTS < startTS){
             startBN++
         }
+        //console.log(`m=${m}, final=${startBN} startBNTS=${startBNTS}, startTS=${startTS}`)
         m = startBN;
         n = endBN;
         let endBNTS = false
         while (m <= n) {
             var k = (n + m) >> 1;
             let blockTS = await this.get_blockTS(chain, k);
+            numCalls++
             var cmp = endTS - blockTS;
-            console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
+            tsMap[k] = blockTS
+            //console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
             if (cmp > 0) {
                 m = k + 1;
-                startBNTS = blockTS
             }else if (cmp == 0){
                 m = k;
                 n = k;
-                endBNTS = blockTS
                 break;
             } else {
                 n = k - 1;
-                endBNTS = blockTS
             }
-            //endBNTS = blockTS
         }
         endBN = m;
-        console.log(`m=${endBN}, endBNTS=${endBNTS}, endTS=${endTS}`)
-        if (endBNTS >= (endTS+1)){
+        if (tsMap[m] != undefined){
+            endBNTS = tsMap[m]
+        }
+
+        if (endBNTS == endTS){
+            let currBN = m
+            let nextBN = currBN+1
+            let currBlkTS = endTS
+            let nextBlkTS = await this.get_blockTS(chain, nextBN);
+            numCalls++
+            while ((currBlkTS == nextBlkTS) && nextBlkTS != null){
+                currBN = nextBN
+                currBlkTS = nextBlkTS
+                nextBN++
+                currBlkTS = await this.get_blockTS(chain, nextBN);
+                numCalls++
+                //console.log(`++ currBN=${currBN}, currBlkTS=${currBlkTS}, nextBN=${nextBN}, nextBlkTS=${nextBlkTS} [Initial=${endBN}] `)
+            }
+            //console.log(`currBN=${currBN}, currBlkTS=${currBlkTS}, nextBN=${nextBN}, nextBlkTS=${nextBlkTS}`)
+            endBN = currBN
+            endBNTS = currBlkTS
+        } else if (endBNTS >= (endTS+1)){
             endBN--
         }
-        console.log(`[chainID=${chainID}, DT=${logDT}] (${startBN}, ${endBN})`)
+        //console.log(`m=${m}, final=${endBN}, endBNTS=${endBNTS}, endTS=${endTS}`)
+        console.log(`[calls=${numCalls}] [chainID=${chainID}, DT=${logDT}] (${startBN}, ${endBN})`)
         if (endBN - startBN < 100){
             console.log(`Invalid bound`)
-            //process.exit(`1`)
             return false
         }
         let sql = `insert into blocklog (chainID, logDT, startBN, endBN) values ('${chainID}', '${logDT}', '${startBN}', '${endBN}') on duplicate key update startBN = values(startBN), endBN = values(endBN)`;
