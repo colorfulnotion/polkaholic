@@ -172,6 +172,7 @@ async function main() {
                         crawlReceiptsEVM: 1,
                         crawlTraceEVM: 1
                     }
+                    console.log(`crawl_block_trace`, t2)
                     let x = await crawler.crawl_block_trace(chain, t2)
                     let blockHash = x.blockHash;
                     console.log("blockHash: ", blockHash, blockNumber, x);
