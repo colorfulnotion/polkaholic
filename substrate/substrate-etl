@@ -298,12 +298,11 @@ async function main() {
     program.command('exchange')
         .description('Dump exchange users')
         .usage("TBD")
-        .option('-l, --logDT <logDT>', 'Date', null)
-        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .option('-f, --force', `Force even if not ready`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
-            await substrateetl.publishExchangeAddress()
+            //await substrateetl.ingestWalletAttribution();
+            await substrateetl.publishExchangeAddress('knownpubs')
             process.exit(0);
         });
 
