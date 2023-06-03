@@ -1746,6 +1746,9 @@ module.exports = {
     blockNumberToHex: function(blockNumber) {
         return "0x" + blockNumber.toString(16).padStart(8, '0');
     },
+    blockNumberToHexEVM: function(blockNumber) {
+        return "0x" + blockNumber.toString(16);
+    },
     decode58: function(base58Str) {
         return u8aToHex(bs58.decode(base58Str));
     },

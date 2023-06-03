@@ -1,0 +1,187 @@
+{
+	"openapi": "3.0.3",
+	"info": {
+		"title": "Polkaholic-ChainIDE Ink verification",
+		"description": "Polkaholic-ChainIDE Ink verification",
+		"version": "0.0.1"
+	},
+	"components": {
+		"schemas": {
+			"def-0": {
+				"type": "object",
+				"properties": {
+					"type": {
+						"type": "string"
+					},
+					"name": {
+						"type": "string"
+					},
+					"url": {
+						"type": "string"
+					},
+					"size": {
+						"type": "number"
+					},
+					"utf8": {
+						"type": "boolean"
+					},
+					"ents": {
+						"type": "array",
+						"items": {
+							"$ref": "#/components/schemas/def-0"
+						}
+					}
+				},
+				"title": "dirEntry"
+			}
+		}
+	},
+	"paths": {
+		"/verify/{network}/{codeHash}": {
+			"post": {
+				"description": "Verifies a source code package",
+				"requestBody": {
+					"content": {
+						"multipart/form-data": {
+							"schema": {
+								"type": "object",
+								"properties": {
+								
+									"signature": {
+									    "format": "string",
+									    "type": "string",
+									    "description": "Verifiers signature of the code hash of the WASM byte code"
+									},
+								    "package": {
+										"format": "binary",
+										"type": "file",
+										"description": "The compressed archive expected by the\n[Verifier Image](https://github.com/web3labs/ink-verifier/blob/main/README.md)\n            "
+									}
+								},
+								"required": ["package", "signature"]
+							}
+						}
+					},
+					"required": true
+				},
+				"parameters": [{
+					"schema": {
+						"type": "string",
+						"default": "shibuya"
+					},
+					"in": "path",
+					"name": "network",
+					"required": true,
+					"description": "The network name: shibuya, astar, shiden, pendulum, amplitude, rococo"
+				}, {
+					"schema": {
+						"type": "string"
+					},
+					"in": "path",
+					"name": "codeHash",
+					"required": true,
+					"description": "The BLAKE2-256 hash of the wasm byte code"
+				}],
+				"responses": {
+					"201": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"location": {
+											"type": "string"
+										}
+									}
+								}
+							}
+						}
+					},
+					"4XX": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"code": {
+											"type": "string"
+										},
+										"message": {
+											"type": "string"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		},
+		"/info/{network}/{codeHash}": {
+			"get": {
+				"description": "Get information on verification status of an uploaded source code.",
+				"parameters": [{
+					"schema": {
+						"type": "string",
+						"default": "rococoContracts"
+					},
+					"in": "path",
+					"name": "network",
+					"required": true,
+					"description": "The network name to resolve the node endpoint by\n      [@polkadot/apps-config](https://github.com/polkadot-js/apps/tree/master/packages/apps-config/src/endpoints).\n      "
+				}, {
+					"schema": {
+						"type": "string"
+					},
+					"in": "path",
+					"name": "codeHash",
+					"required": true,
+					"description": "The on-chain content-addressable code hash for the contract source code"
+				}],
+				"responses": {
+					"200": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"status": {
+											"enum": ["unverified", "metadata", "verified", "processing", "staging", "error"]
+										},
+										"timestamp": {
+											"type": "string"
+										}
+									}
+								}
+							}
+						}
+					},
+					"4XX": {
+						"description": "Default Response",
+						"content": {
+							"application/json": {
+								"schema": {
+									"type": "object",
+									"properties": {
+										"code": {
+											"type": "string"
+										},
+										"message": {
+											"type": "string"
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+			}
+		}
+	},
+	"servers": [{
+		"url": "https://api.polkaholic.io/"
+	}]
+}

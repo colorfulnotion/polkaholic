@@ -9928,9 +9928,8 @@ module.exports = class Indexer extends AssetManager {
             return (false);
         }
         console.log(`crawlEvmBlockTraces crawlEvmBlockTraces`, evmRPCInternal)
-        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
-        //eth does not support hex padding: 0x01047025 -> 0x1047025
-        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let hexBlocknumber = paraTool.blockNumberToHexEVM(blockNumber);
+
         let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
         //console.log(`crawlEvmBlockReceipts`, cmd)
         try {
@@ -10033,9 +10032,8 @@ module.exports = class Indexer extends AssetManager {
         if (!evmRPCInternal) {
             return (false);
         }
-        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
-        //eth does not support hex padding: 0x01047025 -> 0x1047025
-        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let hexBlocknumber = paraTool.blockNumberToHexEVM(blockNumber);
+
         let cmd = `curl ${evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
@@ -10078,9 +10076,7 @@ module.exports = class Indexer extends AssetManager {
         if (!evmRPCBlockReceiptsApi) {
             return (false);
         }
-        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
-        //eth does not support hex padding: 0x01047025 -> 0x1047025
-        if (hexBlocknumber.substr(0, 3) == "0x0") hexBlocknumber = hexBlocknumber.replace("0x0", "0x")
+        let hexBlocknumber = paraTool.blockNumberToHexEVM(blockNumber);
         let cmd = `curl ${evmRPCBlockReceiptsApi}  -X POST -H "Content-Type: application/json" --data '{"method":"eth_getBlockReceipts","params":["${hexBlocknumber}"],"id":1,"jsonrpc":"2.0"}'`
 
         for (let i = 0; i < maxRetries; i++) {
@@ -10330,7 +10326,17 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async index_block_evm(chainID, blkNum, stream_bq = false) {
+    async get_evmchain_workload(chainID = 1, limit = 5000) {
+        let sql = `select blockNumber from block${chainID} where crawlBlock = 1 order by rand() limit ${limit}`;
+        let blocks = await this.poolREADONLY.query(sql);
+        let out = [];
+        for (const b of blocks) {
+            out.push(parseInt(b.blockNumber, 10));
+        }
+        return out;
+    }
+
+    async index_block_evm(chainID, blkNums, stream_bq = false) {
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
         await this.initEvmSchemaMap()
@@ -10381,106 +10387,112 @@ module.exports = class Indexer extends AssetManager {
         let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
         let evmRPCInternalApi = this.evmRPCInternal
 
-        let blockNumber = blkNum;
-        let block = null;
-        let blockHash = null
-        let block_tries = 0;
-        let block_retry_max = 10
-        let block_retry_ms = 200
-        let log_retry_max = 10
-        let log_retry_ms = 2000
-        let log_timeout_ms = 5000
-        //let stream_bq = false
-        let write_bt = true
+        for (const blockNumber of blkNums) {
+            let block = null;
+            let blockHash = null
+            let block_tries = 0;
+            let block_retry_max = 10
+            let block_retry_ms = 200
+            let log_retry_max = 10
+            let log_retry_ms = 2000
+            let log_timeout_ms = 5000
+            //let stream_bq = false
+            let write_bt = true
 
-        //let qnSupportedChainIDs = [paraTool.chainIDOptimism, paraTool.chainIDPolygon]
-        let qnSupportedChainIDs = []
-        let res = false
-        if (qnSupportedChainIDs.includes(chainID)) {
-            res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
-        }
-        if (res && res.block != undefined && res.receipts != undefined) {
-            console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
-            //block = res.block
-            /*
-            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
-            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
-            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-            */
-            block = ethTool.standardizeRPCBlock(res.block)
-            let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
-            //let evmReceipts = res.receipts
-            let evmTrace = false
-            if (evmRPCInternalApi) {
+            //let qnSupportedChainIDs = [paraTool.chainIDOptimism, paraTool.chainIDPolygon]
+            let qnSupportedChainIDs = []
+            let res = false
+            if (qnSupportedChainIDs.includes(chainID)) {
+                res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
+            }
+            if (res && res.block != undefined && res.receipts != undefined) {
+                console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
+                //block = res.block
                 /*
-                let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
-                let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
-                evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx)
+                  let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+                  let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+                  block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
                 */
-                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                //console.log(`[${block.number}] evmTrace`, evmTrace)
-            }
-            var statusesPromise = Promise.all([
-                ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
-                ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
-            ])
-            let [dTxns, dReceipts] = await statusesPromise
-            console.log(`dTxns`, dTxns)
-            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
-        } else {
-            let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
-            let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
-            block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-            //console.log(`blk #${blockNumber}`, block)
-            //TODO: ethereum has withdrawals flds
-            let numTransactions = block && block.transactions ? block.transactions.length : 0;
-            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions} HERE`)
-            let rows_blocks = [];
-            let rows_transactions = [];
-            let rows_logs = [];
-            try {
-                blockHash = block.hash
-                if (numTransactions > 0) {
-                    let isParallel = true
-                    let evmReceipts = false
-
-                    if (evmRPCBlockReceiptsApi) {
-                        evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                    } else {
-                        /*
-                        let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
-                        let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
-                        evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
-                        */
-                        evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel)
-                        console.log(`evmReceipts`, evmReceipts)
-                    }
-
-                    if (!evmReceipts) evmReceipts = [];
-                    evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
-                    console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
-                    var statusesPromise = Promise.all([
-                        ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
-                        ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
-                    ])
-                    let [dTxns, dReceipts] = await statusesPromise
-                    console.log(`dTxns`, dTxns)
-                    let evmTrace = false
-                    if (evmRPCInternalApi) {
-                        /*
-                        let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
-                        let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
-                        evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
-                        */
-                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
-                        //console.log(`[${block.number}] evmTrace`, evmTrace)
-                    }
-                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+                block = ethTool.standardizeRPCBlock(res.block)
+                let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
+                //let evmReceipts = res.receipts
+                let evmTrace = false
+                if (evmRPCInternalApi) {
+                    /*
+                      let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
+                      let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
+                      evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx)
+                    */
+                    evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                    //console.log(`[${block.number}] evmTrace`, evmTrace)
                 }
-            } catch (err) {
-                console.log(err)
+                var statusesPromise = Promise.all([
+                    ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                    ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                ])
+                let [dTxns, dReceipts] = await statusesPromise
+                //console.log(`dTxns`, dTxns)
+                await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+            } else {
+                let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
+                let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
+                block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
+                //console.log(`blk #${blockNumber}`, block)
+                //TODO: ethereum has withdrawals flds
+                let numTransactions = block && block.transactions ? block.transactions.length : 0;
+                console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions} HERE`)
+                let rows_blocks = [];
+                let rows_transactions = [];
+                let rows_logs = [];
+                try {
+                    blockHash = block.hash
+                    if (numTransactions > 0) {
+                        let isParallel = true
+                        let evmReceipts = false
+
+                        if (evmRPCBlockReceiptsApi) {
+                            evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
+                        } else {
+                            /*
+                              let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
+                              let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
+                              evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
+                            */
+                            evmReceipts = await ethTool.crawlEvmReceipts(web3, block, isParallel)
+                            console.log(`evmReceipts`, evmReceipts)
+                        }
+
+                        if (!evmReceipts) evmReceipts = [];
+                        evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
+                        console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
+                        var statusesPromise = Promise.all([
+                            ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                        ])
+                        let [dTxns, dReceipts] = await statusesPromise
+                        console.log(`dTxns`, dTxns)
+                        let evmTrace = false
+                        if (evmRPCInternalApi) {
+                            /*
+                              let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
+                              let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
+                              evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
+                            */
+                            evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
+                            //console.log(`[${block.number}] evmTrace`, evmTrace)
+                        }
+                        await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+                    }
+                } catch (err) {
+                    console.log(err)
+                }
             }
+            let sql = `insert into block${chainID} (blockNumber, blockDT, crawlBlock) values ('${blockNumber}', from_unixtime(${block.timestamp}),  0) on duplicate key update blockDT = values(blockDT), crawlBlock = values(crawlBlock)`
+            console.log(sql, block)
+            this.batchedSQL.push(sql)
+            await this.update_batchedSQL()
         }
+
     }
 
     // fetches a SINGLE row r (of block, events + trace) with fetch_block_row and indexes the row with index_chain_block_row

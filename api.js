@@ -21,8 +21,8 @@ const paraTool = require('./substrate/paraTool');
 const uiTool = require('./substrate/uiTool');
 const port = 3001
 const Query = require("./substrate/query");
-
 const cookieParser = require("cookie-parser");
+const multer = require('multer');
 
 var debugLevel = paraTool.debugTracing
 var query = new Query(debugLevel);
@@ -384,6 +384,53 @@ app.get('/wasmcontracts/:chainID_or_chainName', async (req, res) => {
         } else {
             res.sendStatus(404);
         }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+// Get information on verification status of any codeHash, whether uploaded or not
+app.get('/info/:network/:codeHash?', async (req, res) => {
+    try {
+        let network = req.params["network"]
+        let codeHash = req.params["codeHash"] ? req.params["codeHash"] : null;
+        let info = await query.getChainWASMCodeInfo(network, codeHash);
+        if (info) {
+            res.write(JSON.stringify(info));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
+const upload = multer({
+    dest: '/tmp/'
+});
+
+// Receives VERIFIED source code package with authentication mechanism from IDE -- see WASM-verifier.md
+app.post('/verify/:network/:codeHash', upload.single('package'), async (req, res) => {
+    try {
+        let packageFile = req.file; // File object
+        let signature = req.body.signature; // Signature value
+        let network = req.params["network"]
+        let codeHash = req.params["codeHash"]
+        let result = await query.postChainWASMContractVerification(network, codeHash, packageFile, signature);
+        if (result) {
+            res.write(JSON.stringify(result));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(400);
+        }
+
     } catch (err) {
         return res.status(400).json({
             error: err.toString()
