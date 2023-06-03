@@ -10330,7 +10330,7 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    async index_block_evm(chainID, blkNum) {
+    async index_block_evm(chainID, blkNum, stream_bq = false) {
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
         await this.initEvmSchemaMap()
@@ -10390,7 +10390,7 @@ module.exports = class Indexer extends AssetManager {
         let log_retry_max = 10
         let log_retry_ms = 2000
         let log_timeout_ms = 5000
-        let stream_bq = false
+        //let stream_bq = false
         let write_bt = true
 
         //let qnSupportedChainIDs = [paraTool.chainIDOptimism, paraTool.chainIDPolygon]
