@@ -182,7 +182,7 @@ module.exports = class EVMETL extends PolkaholicDB {
     */
 
     async generateProject(address, chainID = 1, project, contractName) {
-
+        await this.initEvmSchemaMapLocal()
         let chain = await this.getChain(chainID);
         //console.log(`chain`, chain)
         let evm_chain_name = (chain && chain.id && chain.isEVM) ? chain.id : false
@@ -501,6 +501,31 @@ module.exports = class EVMETL extends PolkaholicDB {
         }
         console.log(tinySchemaMap, tinySchemaMap)
         process.exit(0)
+    }
+
+    async initEvmSchemaMapLocal() {
+        let callExtraCol = ["chain_id", "evm_chain_id", "contract_address", "call_success", "call_tx_hash", "call_tx_index", "call_trace_address", "call_block_time", "call_block_number"]
+        let eventExtraCol = ["chain_id", "evm_chain_id", "contract_address", "evt_tx_hash", "evt_index", "evt_block_time", "evt_block_number"]
+        let evmSchemaMapRecs = await this.poolREADONLY.query(`select tableId, modifiedFingerprintID, CONVERT(tableSchema using utf8) tableSchema, abiType from evmschema`);
+        let evmFingerprintMap = {}
+        for (const r of evmSchemaMapRecs) {
+            let fingerprintID = r.modifiedFingerprintID
+            let abiType = r.abiType
+            let cols = JSON.parse(r.tableSchema)
+            let devFlds = []
+            for (const col of cols){
+                devFlds.push(col.name)
+            }
+            if (abiType == 'function'){
+                devFlds = devFlds.slice(callExtraCol.length)
+            }else if (abiType == 'event'){
+                devFlds = devFlds.slice(eventExtraCol.length)
+            }
+            evmFingerprintMap[fingerprintID] = {}
+            evmFingerprintMap[fingerprintID].flds = devFlds
+            evmFingerprintMap[fingerprintID].tableId = evmSchemaMapRecs.tableId
+        }
+        this.evmFingerprintMap = evmFingerprintMap
     }
 
     async initEvmSchemaMap() {
@@ -2043,7 +2068,7 @@ mysql> desc projectcontractabi;
         Output: cbt evmchain${chainID}
 
     const STEP3_indexEvmChainFull = 3
-        function: index_evmchain_full(chainID, dt): (3a: index_evmchain_only -> 3b: cpEvmDecodedToGS -> 3c: cpEvmETLToGS)
+        function: index_evmchain_full(chainID, dt): (3a: index_evmchain_only -> 3b: cpEvmDecodedToGS -> 3c: cpEvmETLToGS -> 3d: loadEvmETL)
         Source: cbt evmchain${chainID}
         LocalTmp: /tmp/evm_decoded/YYYY/MM/DD/chainID/tableId*
 
@@ -2067,7 +2092,7 @@ mysql> desc projectcontractabi;
                 break;
             case 2:
                 //Next step: index_evmchain_full (index_evmchain_only + cpEvmDecodedToGS + cpEvmETLToGS)
-                console.log(`[chainID=${chainID}, logDT=${dt}] NextStep=3, index_evmchain_only->cpEvmDecodedToGS->cpEvmETLToGS`)
+                console.log(`[chainID=${chainID}, logDT=${dt}] NextStep=3, index_evmchain_only->cpEvmDecodedToGS->cpEvmETLToGS ->loadEvmETL`)
                 await this.index_evmchain_full(chainID, dt);
                 break;
             case 3:

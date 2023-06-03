@@ -356,6 +356,8 @@ module.exports = class Crawler extends Indexer {
             if (crawlTrace && chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
                 trace = await this.crawlTrace(chain, blockHash, 60000 * (t.attempted + 1));
                 console.log("crawl_block_trace trace", trace.length);
+            }else{
+                console.log(`[crawlTrace=${crawlTrace}] crawl_block_trace chain.RPCBackfill NOT OK`, chain.RPCBackfill);
             }
 
             // 3. store finalized state, blockHash + blockTS in mysql + block + trace BT

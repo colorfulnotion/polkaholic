@@ -201,9 +201,17 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async ingestWalletAttribution() {
+        /*
         //FROM Fearless-Util
         let url = 'https://gist.githubusercontent.com/mkchungs/2f99c4403b64e5d4c17d46abdd9869a3/raw/9550f0ab7294f44c8c6c981c2fbc4a3d84f17b06/Polkadot_Hot_Wallet_Attributions.csv'
         let recs = await this.fetchCsvAndConvertToJson(url)
+        */
+        //Merkle
+        let query = `SELECT tag_name_verbose, address as addresses, tag_type_verbose, tag_subtype_verbose, unix_seconds(updated_at) updated_at, record_type FROM \`substrate-etl.substrate.merklescience\``;
+        console.log(query);
+        const bigquery = this.get_big_query();
+        let recs = await this.execute_bqJob(query);
+
         let accounts = []
         let idx = 0
         for (const r of recs) {
@@ -273,25 +281,40 @@ module.exports = class SubstrateETL extends AssetManager {
         console.log(unknownAscii)
     }
 
-    async dump_users_tags() {
+    async dump_users_tags(tagsourceTbl = 'exchanges') {
         let paraID = 0
         let relayChain = 'polkadot'
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
-        let tblName = `full_users${paraID}`
-        let destinationTbl = `${bqDataset}.${tblName}`
-
         let bqjobs = []
-        let tagsourceTbl = 'knownpubs'
-        let targetSQL = `with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM \`${projectID}.${bqDataset}.transfers${paraID}\` group by from_pub_key, to_pub_key)
-        select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join ${projectID}.${bqDataset}.${tagsourceTbl} on knownpubs.address_pubkey = transfer.from_pub_key where ${tagsourceTbl}.account_type not in ("Scams")),
+        let sourceBqDataset = 'substrate'
+        let destinationBqDataset = 'substrate'
+        let targetSQL = false;
+        let tblName = `full_users${paraID}`
+        switch (tagsourceTbl) {
+            case 'knownpubs':
+                targetSQL = `with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM \`${projectID}.${bqDataset}.transfers${paraID}\` group by from_pub_key, to_pub_key)
+            select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join ${projectID}.${sourceBqDataset}.${tagsourceTbl} on ${tagsourceTbl}.address_pubkey = transfer.from_pub_key where ${tagsourceTbl}.account_type not in ("Scams")),
+            firstAttribution as (select user_pubkey, min(concat(ts, "_", extrinsic_id, "_", from_pub_key, "_",known_label)) attribution from transferoutgoing group by user_pubkey)
+            select user_pubkey, array_agg(distinct(known_label)) as known_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt,
+            min(split(attribution, "_")[offset(0)]) as first_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_transfer_extrinsic_id,
+            min(split(attribution, "_")[offset(2)]) as first_transfer_sender_pub_key,  min(split(attribution, "_")[offset(3)]) as first_transfer
+            from transferoutgoing inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
+                break;
+            case "exchanges":
+                targetSQL = `with transferoutgoing as (With transfer as (SELECT from_pub_key, to_pub_key, sum(amount) amount, count(*) transfer_cnt, min(extrinsic_id) as extrinsic_id, min(block_time) as ts FROM \`${projectID}.${bqDataset}.transfers${paraID}\` group by from_pub_key, to_pub_key)
+        select to_pub_key as user_pubkey, ifNull(address_label, "other") as known_label, from_pub_key, extrinsic_id, transfer_cnt, amount, ts from transfer left join ${projectID}.${sourceBqDataset}.${tagsourceTbl} on ${tagsourceTbl}.address_pubkey = transfer.from_pub_key where ${tagsourceTbl}.account_type not in ("Scams")),
         firstAttribution as (select user_pubkey, min(concat(ts, "_", extrinsic_id, "_", from_pub_key, "_",known_label)) attribution from transferoutgoing group by user_pubkey)
         select user_pubkey, array_agg(distinct(known_label)) as known_labels, sum(amount) amount, sum(transfer_cnt) transfer_cnt,
         min(split(attribution, "_")[offset(0)]) as first_transfer_ts, min(split(attribution, "_")[offset(1)]) as first_transfer_extrinsic_id,
         min(split(attribution, "_")[offset(2)]) as first_transfer_sender_pub_key,  min(split(attribution, "_")[offset(3)]) as first_transfer
         from transferoutgoing inner join firstAttribution using (user_pubkey) group by user_pubkey order by transfer_cnt desc`
+                tblName = `full_exchange_users${paraID}`
+            default:
 
+        }
+        let destinationTbl = `${destinationBqDataset}.${tblName}`
         let cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
         bqjobs.push({
             chainID: chainID,
@@ -326,17 +349,28 @@ module.exports = class SubstrateETL extends AssetManager {
         return (isProd) ? `crypto_${relayChain}` : `crypto_${relayChain}_dev`
     }
 
-    async publishExchangeAddress() {
+    async publishExchangeAddress(tbl = 'exchanges') {
         //await this.ingestSystemAddress()
         //await this.ingestWalletAttribution()
         let relayChain = 'polkadot'
-        //let tbl = `exchanges`
-        let tbl = `knownpubs`
-        let projectID = `${this.project}`
-        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd)
 
-        //let sql = `select nickname, accountName, address from account where is_exchange = 1`
-        let sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
+        let sql = false
+        switch (tbl) {
+            case "exchanges":
+                sql = `select nickname, accountName, address, accountType from account where is_exchange = 1`;
+                break;
+            case "knownpubs":
+                sql = `select nickname, accountName, address, accountType from account where accountType not in ('Unknown', 'User');`
+                break;
+            default:
+        }
+        if (!sql){
+            console.log(`tbl=${tbl} not ready`)
+            return
+        }
+        let projectID = `${this.project}`
+        //let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd)
+        let bqDataset = `substrate`
         let sqlRecs = await this.poolREADONLY.query(sql);
         let knownAccounts = [];
         let knownPubkeys = {}
@@ -359,8 +393,7 @@ module.exports = class SubstrateETL extends AssetManager {
         fs.closeSync(f);
         let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}' ${fn} schema/substrateetl/${tbl}.json`;
         console.log(cmd)
-
-        await this.dump_users_tags()
+        await this.dump_users_tags(tbl)
     }
 
     async cleanReaped(start = null, end = null) {
