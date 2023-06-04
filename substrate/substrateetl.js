@@ -364,7 +364,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 break;
             default:
         }
-        if (!sql){
+        if (!sql) {
             console.log(`tbl=${tbl} not ready`)
             return
         }

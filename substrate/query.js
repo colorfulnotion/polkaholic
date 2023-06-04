@@ -6402,6 +6402,218 @@ module.exports = class Query extends AssetManager {
         return code;
     }
 
+    network_to_chainID(network) {
+        switch (network) {
+            case "shibuya":
+                return 10001;
+            case "astar":
+                return 2006;
+            case "shiden":
+                return 22007;
+            case "pendulum":
+                return 2094;
+            case "amplitude":
+                return 22124;
+        }
+        return null;
+    }
+
+    // verify codeHash signature is on list of valid addresses
+    async verify_codeHash_signature(codeHash, signature) {
+        const ethers = require("ethers");
+        let validAddresses = ["0x58E0fB1aAB0B04Bd095AbcdF34484DA47Fe9fF77"]
+        const messageBytes = ethers.utils.toUtf8Bytes(codeHash);
+        const signerAddr = await ethers.utils.verifyMessage(messageBytes, signature);
+        //console.log('Recovered address:', signerAddr);
+        if (validAddresses.includes(signerAddr)) {
+            return (signerAddr);
+        }
+        return (null);
+    }
+
+    async verified_wasm_codeHash(chainID, codeHash, signature) {
+        let sql = `select codeHash from wasmCode where chainID = '${chainID}' and codeHash = '${codeHash}' and status = 'Verified'`;
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length > 0) {
+            return (true);
+        }
+        return (false);
+    }
+
+    async recordWASMCodeVerification(chainID, codeHash, srcURLs, size, signature, verifier, metadata = null) {
+        try {
+            let wasm = null;
+            let status = 'Verified';
+            let language = null;
+            let compiler = null;
+            let contractName = null;
+            let version = null;
+            let authors = null
+
+            if (metadata) {
+                let source = metadata.source;
+                let contract = metadata.contract;
+                if (source) {
+                    if (source.wasm) wasm = source.wasm;
+                    if (source.language) language = source.language;
+                    if (source.compiler) compiler = source.compiler;
+                    //console.log("SOURCE", language, compiler);
+                }
+                if (contract) {
+                    if (contract.name) contractName = contract.name;
+                    if (contract.version) version = contract.version;
+                    if (contract.authors) authors = contract.authors;
+                    //console.log("CONTRACT", contractName, version, authors);
+                }
+                metadata = JSON.stringify(metadata)
+            } else {
+                throw new paraTool.InvalidError("No .contract metadata found");
+            }
+            if (wasm == null) {
+                throw new paraTool.InvalidError("No WASM code found in metadata");
+            }
+            // check wasm hex bytes against codeHash
+            let actualHash = "0x" + paraTool.blake2_256_from_hex(wasm);
+            if (actualHash != codeHash) {
+                throw new paraTool.InvalidError(`Code Hash provided ${codeHash} does not match byte code hash of ${actualHash}`);
+            }
+            let keys = ["codeHash", "chainID"];
+            let vals = ["wasm", "metadata", "status", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier"];
+            await this.upsertSQL({
+                "table": "wasmCode",
+                "keys": ["codeHash", "chainID"],
+                "vals": vals,
+                "data": [`('${codeHash}', '${chainID}', ${mysql.escape(wasm)}, ${mysql.escape(metadata)}, '${status}', ${mysql.escape(language)}, ${mysql.escape(compiler)}, ${mysql.escape(contractName)}, ${mysql.escape(version)}, ${mysql.escape(authors)}, ${mysql.escape(JSON.stringify(srcURLs))}, Now(), ${mysql.escape(signature)}, ${mysql.escape(verifier)} )`],
+                "replaceIfNull": vals
+            });
+            return (true)
+        } catch (err) {
+            throw new paraTool.InvalidError(err.toString());
+        }
+        return (false);
+    }
+
+    async getChainWASMCodeInfo(network, codeHash = null) {
+        let chainID = this.network_to_chainID(network);
+        let sql = codeHash ? `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, verifyDT, signature, verifier from wasmCode where codeHash = '${codeHash}' and chainID = '${chainID}'` : `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, verifyDT, signature, verifier where chainID = '${chainID}' order by verifyDT desc limit 10`;
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length == 1) {
+            let r = recs[0];
+            r.metadata = JSON.parse(r.metadata);
+            return r;
+        }
+
+        return null;
+    }
+
+    // Receives VERIFIED source code zip file with signature of codeHash, which is checked against whitelist
+    // 0. If the network/codeHash is already verified, it doesn't do anything
+    // 1. creates local codehash-specific directory
+    // 2. copies zipfile into 1
+    // 3. unzips zipfile into 1
+    // 4. get metadata from unzipped 3, parsing metadata JSON
+    // 5. records wasmCode data
+    // 6. copies everything to CDN
+    async postChainWASMContractVerification(network, codeHash, fileData, signature) {
+        const util = require('util');
+        const exec = util.promisify(require('child_process').exec);
+        const AdmZip = require('adm-zip');
+        const fs = require('fs');
+        const path = require('path');
+        let outputDirectory = "/tmp"
+        let bucketDir = 'cdn.polkaholic.io/wasmcode';
+        let size = fileData.size;
+        let originalname = fileData.originalname;
+        let gsDirectory = "gs://" + bucketDir;
+        let zipFilePath = fileData.path;
+        let chainID = this.network_to_chainID(network);
+        if (chainID == null) {
+            throw new paraTool.InvalidError(`Invalid network ${network}`)
+        }
+
+        // 0. If the network/codeHash is already verified, it doesn't do anything
+        let verifier = await this.verify_codeHash_signature(codeHash, signature)
+        if (verifier == null) {
+            throw new paraTool.InvalidError(`Invalid signature ${signature} for ${codeHash}`)
+        }
+        console.log("VERIFIER:", verifier);
+        if (await this.verified_wasm_codeHash(chainID, codeHash)) {
+            // TODO: reenable
+            // throw new paraTool.InvalidError(`Already verified ${codeHash} for ${network}`)
+        }
+
+        // 1. creates local codehash-specific directory 
+        let targetDirectory = path.join(outputDirectory, codeHash);
+        if (!fs.existsSync(targetDirectory)) {
+            fs.mkdirSync(targetDirectory);
+        }
+
+        // 2. copies zip file into local codehash-specific directory
+        let zipFilePathOriginalName = path.join(targetDirectory, originalname);
+        //console.log(`cp ${zipFilePath} ${zipFilePathOriginalName}`);
+        fs.copyFileSync(zipFilePath, zipFilePathOriginalName);
+
+        // 3. unzips zipfile into codehash-specific directory 
+        const zip = new AdmZip(zipFilePath);
+        zip.extractAllTo(targetDirectory, true);
+        const extractedEntries = zip.getEntries();
+
+        // 4. gets metadata from unzipped file of 3, parsing metadata JSON 
+        let metadata = null;
+        let cdnURL = "https://" + path.join(bucketDir, codeHash, originalname); // zip file
+        let srcURLs = [cdnURL];
+        for (const entry of extractedEntries) {
+            if (entry.isDirectory) continue;
+            srcURLs.push("https://" + path.join(bucketDir, codeHash, entry.entryName));
+            if (entry.entryName.includes(".contract")) {
+                let fn = path.join(targetDirectory, entry.entryName);
+                //console.log("ENTRY", entry.entryName, fn);
+                // parse metadata JSON
+                try {
+                    let metadataRaw = await fs.readFileSync(fn, "utf8")
+                    metadata = JSON.parse(metadataRaw);
+                } catch (err) {
+                    throw new paraTool.InvalidError("Could not find metadata");
+                }
+            }
+            if (metadata) {
+                console.log("found metadata with srcURLs=", srcURLs);
+            }
+        }
+
+        // 5. record wasmCode data
+        try {
+            await this.recordWASMCodeVerification(chainID, codeHash, srcURLs, size, signature, verifier, metadata);
+        } catch (err) {
+            throw new paraTool.InvalidError(err.toString());
+        }
+
+        // 6. copy the entire codehash specific directroy to google storage
+        try {
+            let cmd = `gsutil -m cp -r ${targetDirectory} ${gsDirectory}`
+            const {
+                stdout,
+                stderr
+            } = await exec(cmd, {
+                maxBuffer: 1024 * 64000
+            });
+            let infoURL = `https://api.polkaholic.io/info/${network}/${codeHash}`;
+            let result = {
+                "success": true,
+                network,
+                codeHash,
+                chainID,
+                srcURLs,
+                infoURL
+            };
+            console.log(cmd, stdout, result);
+            return result;
+        } catch (err) {
+            throw new paraTool.InvalidError(err.toString());
+        }
+        return (false);
+    }
+
     async updateWASMContract(address, contractData) {
         // fetch address codeHash's metadata
         let contract = await this.getContract(address)

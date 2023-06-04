@@ -139,7 +139,6 @@ async function main() {
         .description(`Index Block`)
         .usage("22007 195623")
         .argument('<chainID>', 'ChainID', myParseInt)
-        .argument('<blockNumber>', 'Block Number', myParseInt)
         .option('-f, --force', `Force crawl`, false)
         .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
         .action(async (chainID, blockNumber, opt) => {
@@ -155,7 +154,9 @@ async function main() {
             //ONLY RUN IT ONCE
             let bq_stream = true
             if (evmChainIDList.includes(blockchainID)) {
-                await crawler.index_block_evm(chainID, blockNumber, bq_stream);
+                let blockNumbers = await crawler.get_evmchain_workload(chainID, 5000);
+                console.log(blockNumbers);
+                await crawler.index_block_evm(chainID, blockNumbers, bq_stream);
             }
             process.exit(0);
         })

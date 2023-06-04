@@ -179,7 +179,7 @@ module.exports = class Crawler extends Indexer {
                 "method": "state_traceBlock",
                 "params": [blockHash, "state", "", "Put"]
             }
-            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality")) {
+            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality") && chain.id == "composable" ) {
                 chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
                 if (chain.onfinalityConfig && chain.onfinalityConfig.length > 5) {
                     chain.RPCBackfill = chain.onfinalityConfig;
@@ -356,7 +356,7 @@ module.exports = class Crawler extends Indexer {
             if (crawlTrace && chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
                 trace = await this.crawlTrace(chain, blockHash, 60000 * (t.attempted + 1));
                 console.log("crawl_block_trace trace", trace.length);
-            }else{
+            } else {
                 console.log(`[crawlTrace=${crawlTrace}] crawl_block_trace chain.RPCBackfill NOT OK`, chain.RPCBackfill);
             }
 

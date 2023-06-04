@@ -513,12 +513,12 @@ module.exports = class EVMETL extends PolkaholicDB {
             let abiType = r.abiType
             let cols = JSON.parse(r.tableSchema)
             let devFlds = []
-            for (const col of cols){
+            for (const col of cols) {
                 devFlds.push(col.name)
             }
-            if (abiType == 'function'){
+            if (abiType == 'function') {
                 devFlds = devFlds.slice(callExtraCol.length)
-            }else if (abiType == 'event'){
+            } else if (abiType == 'event') {
                 devFlds = devFlds.slice(eventExtraCol.length)
             }
             evmFingerprintMap[fingerprintID] = {}
@@ -2005,7 +2005,7 @@ mysql> desc projectcontractabi;
         if (recs.length > 0) {
             let rec = recs[0]
             jobInfo.evmStep = rec.evmStep
-            jobInfo.evmStepDT = (rec.evmStepDT!= undefined)? `${rec.evmStepDT}`: null
+            jobInfo.evmStepDT = (rec.evmStepDT != undefined) ? `${rec.evmStepDT}` : null
             jobInfo.startBN = rec.startBN
             jobInfo.endBN = rec.endBN
         } else {
@@ -2753,7 +2753,7 @@ mysql> desc projectcontractabi;
                 let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${dataset}.${tbl}${chainID}$${logYYYYMMDD}' ${fn} schema/substrateetl/evm/${tbl}.json`;
                 try {
                     console.log(cmd);
-                    if (!dryrun){
+                    if (!dryrun) {
                         let res = await exec(cmd, {
                             maxBuffer: 1024 * 64000
                         });
@@ -2825,7 +2825,7 @@ mysql> desc projectcontractabi;
             await this.detectBlocklogBounds(chainID, logDT)
             recs = recs = await this.poolREADONLY.query(sql);
             currPeriod = recs[0];
-            if (currPeriod.startBN == undefined || currPeriod.endBN == undefined){
+            if (currPeriod.startBN == undefined || currPeriod.endBN == undefined) {
                 console.log(`Unable to generate bound`)
                 process.exit(1)
             }
@@ -3083,7 +3083,12 @@ mysql> desc projectcontractabi;
         let hexBlocknumber = "0x" + parseInt(bn, 10).toString(16);
         let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{ "jsonrpc": "2.0", "method": "eth_getBlockByNumber", "params": ["${hexBlocknumber}", false],"id": 1}' "${chain.evmRPC}"`
         //console.log(cmd);
-        const { stdout, stderr } = await exec(cmd, { maxBuffer: 1024 * 64000 });
+        const {
+            stdout,
+            stderr
+        } = await exec(cmd, {
+            maxBuffer: 1024 * 64000
+        });
         let res = JSON.parse(stdout);
         //console.log(`res`, res.result)
         if (res.result && res.result.timestamp) {
@@ -3144,7 +3149,7 @@ mysql> desc projectcontractabi;
             //console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "STARTTS", startTS);
             if (cmp > 0) {
                 m = k + 1;
-            } else if (cmp == 0){
+            } else if (cmp == 0) {
                 m = k;
                 n = k;
                 break;
@@ -3153,16 +3158,16 @@ mysql> desc projectcontractabi;
             }
         }
         startBN = m;
-        if (tsMap[m] != undefined){
+        if (tsMap[m] != undefined) {
             startBNTS = tsMap[m]
         }
-        if (startBNTS == startTS){
+        if (startBNTS == startTS) {
             let currBN = m
-            let prevBN = currBN -1
+            let prevBN = currBN - 1
             let currBlkTS = startBNTS
             let prevBlkTS = await this.get_blockTS(chain, prevBN);
             numCalls++
-            while ((currBlkTS == prevBlkTS) && prevBlkTS != null){
+            while ((currBlkTS == prevBlkTS) && prevBlkTS != null) {
                 currBN = prevBN
                 currBlkTS = prevBlkTS
                 prevBN--
@@ -3172,7 +3177,7 @@ mysql> desc projectcontractabi;
             }
             startBN = currBN
             startBNTS = currBlkTS
-        } else if (startBNTS < startTS){
+        } else if (startBNTS < startTS) {
             startBN++
         }
         //console.log(`m=${m}, final=${startBN} startBNTS=${startBNTS}, startTS=${startTS}`)
@@ -3188,7 +3193,7 @@ mysql> desc projectcontractabi;
             //console.log("chain", k, blockTS, "m", m, "n", n, "cmp", cmp, "ENDTS", endTS);
             if (cmp > 0) {
                 m = k + 1;
-            }else if (cmp == 0){
+            } else if (cmp == 0) {
                 m = k;
                 n = k;
                 break;
@@ -3197,17 +3202,17 @@ mysql> desc projectcontractabi;
             }
         }
         endBN = m;
-        if (tsMap[m] != undefined){
+        if (tsMap[m] != undefined) {
             endBNTS = tsMap[m]
         }
 
-        if (endBNTS == endTS){
+        if (endBNTS == endTS) {
             let currBN = m
-            let nextBN = currBN+1
+            let nextBN = currBN + 1
             let currBlkTS = endTS
             let nextBlkTS = await this.get_blockTS(chain, nextBN);
             numCalls++
-            while ((currBlkTS == nextBlkTS) && nextBlkTS != null){
+            while ((currBlkTS == nextBlkTS) && nextBlkTS != null) {
                 currBN = nextBN
                 currBlkTS = nextBlkTS
                 nextBN++
@@ -3218,12 +3223,12 @@ mysql> desc projectcontractabi;
             //console.log(`currBN=${currBN}, currBlkTS=${currBlkTS}, nextBN=${nextBN}, nextBlkTS=${nextBlkTS}`)
             endBN = currBN
             endBNTS = currBlkTS
-        } else if (endBNTS >= (endTS+1)){
+        } else if (endBNTS >= (endTS + 1)) {
             endBN--
         }
         //console.log(`m=${m}, final=${endBN}, endBNTS=${endBNTS}, endTS=${endTS}`)
         console.log(`[calls=${numCalls}] [chainID=${chainID}, DT=${logDT}] (${startBN}, ${endBN})`)
-        if (endBN - startBN < 100){
+        if (endBN - startBN < 100) {
             console.log(`Invalid bound`)
             return false
         }
