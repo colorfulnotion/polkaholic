@@ -663,7 +663,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         timestamp: (blockTS) ? blockTS : null, // not part of the txn
         from: dTxn.from,
         to: dTxn.to,
-        creates: dTxn.creates,
+        creates: (dTxn.creates != undefined)? dTxn.creates: null,
         transfers: dReceipt.transfers, //TODO.. also transaction actions
         swaps: dReceipt.swaps,
         value: value / ether,
@@ -2145,15 +2145,19 @@ function standardizeDecodedEvnets_old(decodedEvents) {
 
 function standardizeDecodedEvnetType(dEventVal, dEventType) {
     let decodedVal = dEventVal
-    if (dEventVal == '0x0000000000000000000000000000000000000000000000000000000000000001') {
-        console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`)
-    }
-    if (dEventType.includes('int') && dEventVal.substr(0, 2) == '0x') {
-        decodedVal = paraTool.dechexToIntStr(dEventVal)
-    } else if (dEventType.includes('bool') && typeof dEventVal === 'string') {
-        // some bool are decoded as '0x0000000000000000000000000000000000000000000000000000000000000001'
-        // console.log(`boolean dEventType, dEventVal`, dEventVal)
-        decodedVal = (decodedVal.includes('1')) ? true : false
+    try {
+        if (dEventVal == '0x0000000000000000000000000000000000000000000000000000000000000001') {
+            console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`)
+        }
+        if (dEventType.includes('int') && dEventVal.substr(0, 2) == '0x') {
+            decodedVal = paraTool.dechexToIntStr(dEventVal)
+        } else if (dEventType.includes('bool') && typeof dEventVal === 'string') {
+            // some bool are decoded as '0x0000000000000000000000000000000000000000000000000000000000000001'
+            // console.log(`boolean dEventType, dEventVal`, dEventVal)
+            decodedVal = (decodedVal.includes('1')) ? true : false
+        }
+    } catch (e){
+        console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`, e)
     }
     return decodedVal
 }
@@ -2166,7 +2170,7 @@ function standardizeDecodedEvnets(decodedEvents) {
         if (Array.isArray(dEvent.value)) {
             //console.log(`dEvent.value`, dEvent.value)
             for (let j = 0; j < dEvent.value.length; j++) {
-                console.log(`dEvent.value[${j}]`, dEvent.value[j])
+                console.log(`dEvent.value[${j}]`, dEvent.value[j], `decodedEvents`, decodedEvents)
                 dEvent.value[j] = standardizeDecodedEvnetType(dEvent.value[j], dEventType)
             }
         } else {
@@ -2192,6 +2196,10 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let eventABIStr = foundApi.abi
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
+        if (decodedRes.transactionLogIndex == undefined){
+            console.log(`decodedRes transactionLogIndex missing`, decodedRes)
+            //process.exit(0)
+        }
         let decodeStatus = decodedRes.decodeStatus
         //console.log(`decodeStatus=[${decodeStatus}] fingerprintID=${fingerprintID}`, decodedRes)
         let decodedEvents = decodedRes.events
@@ -2208,12 +2216,13 @@ function decode_log(log, contractABIs, contractABISignatures) {
     let unknown = {
         decodeStatus: 'unknown',
         address: log.address,
-        transactionLogIndex: log.transactionLogIndex,
+        transactionLogIndex: log.transactionIndex,
         logIndex: log.logIndex,
         data: log.data,
         topics: log.topics,
         fingerprintID: fingerprintID,
     }
+    console.log(`unknown log`, unknown)
     return unknown
 }
 
@@ -2596,7 +2605,7 @@ function mapABITypeToBqType(typ) {
                 return "JSON";
             */
     }
-    if (typ.includes('int') && !typ.includes('(') && !typ.includes(')')) {
+    if (typ.includes('int') && (!typ.includes('(') && !typ.includes(')')) && (!typ.includes('[') && !typ.includes(']'))) {
         //this exclude tuple type like (address from, address to, uint256 value, uint256 gas, uint256 nonce, bytes data)
         return "STRING"
     } else {
