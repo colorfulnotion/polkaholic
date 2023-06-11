@@ -8509,16 +8509,40 @@ module.exports = class Indexer extends AssetManager {
         }
         //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
+
+        let rawTxMap = {}
+        let rawDReceipts = {}
+        for (const rawTx of block.transactions){
+            rawTxMap[rawTx.hash] = rawTx
+        }
+        for (const dReceipt of dReceipts){
+            rawDReceipts[dReceipt.transactionHash] = dReceipt
+        }
+
         for (let i = 0; i < evmFullBlock.transactions.length; i++) {
-            let rawTx = block.transactions[i];
             let tx = evmFullBlock.transactions[i];
-            let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
-            let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
             let txhash = tx.transactionHash
+            let rawTx = rawTxMap[txhash]
+            //let rawTx = block.transactions[i];
+            if (rawTx != undefined){
+                if (rawTx.hash != tx.transactionHash){
+                    console.log(`rawTx Mismatch`)
+                    this.logger.error({
+                        op: "store_evm",
+                        chainID: chainID,
+                        bn: block.number,
+                        txHash: txhash
+                    })
+                }
+            }
+            //console.log(`rawTx`, rawTx)
+            //console.log(`tx`, tx)
+            let receipt = rawDReceipts[txhash] != undefined ? rawDReceipts[txhash] : null;
+            let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
             tx.raw = tx.input; // ???
             tx.decodedLogs = logs; // fuse here
-            let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
-            //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
+            //let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+            let decodedInput = tx != undefined && tx.decodedInput ? tx.decodedInput : null;
             let methodID = null
             if (tx.to && tx.input.length >= 10) {
                 methodID = tx.input.substr(0, 10)
@@ -8642,7 +8666,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            //console.log(`bq+`, bqEvmTransaction)
+            console.log(`bq+`, bqEvmTransaction)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
@@ -9501,19 +9525,47 @@ module.exports = class Indexer extends AssetManager {
 
         //console.log(`bqEvmBlock`, bqEvmBlock)
         rows_blocks.push(bqEvmBlock);
+        if (block.transactions.length != evmFullBlock.transactions.length){
+            //fuseBlockTransactionReceipt failed and it's generating inconsistent txns list!!
+            console.log(`[#${block.number} ${block.hash}] fuseBlockTransactionReceipt failed and it's generating inconsistent txns list!!`, bqEvmBlock)
+        }
+        if (block.transactions.length != dReceipts.length){
+            //fuseBlockTransactionReceipt failed and it's generating inconsistent txns list!!
+            console.log(`[#${block.number} ${block.hash}] fuseBlockTransactionReceipt failed and it's generating  receipt list!!`, bqEvmBlock)
+        }
 
+        let rawTxMap = {}
+        let rawDReceipts = {}
+        for (const rawTx of block.transactions){
+            rawTxMap[rawTx.hash] = rawTx
+        }
+        for (const dReceipt of dReceipts){
+            rawDReceipts[dReceipt.transactionHash] = dReceipt
+        }
         for (let i = 0; i < evmFullBlock.transactions.length; i++) {
-            let rawTx = block.transactions[i];
             let tx = evmFullBlock.transactions[i];
+            let txhash = tx.transactionHash
+            let rawTx = rawTxMap[txhash]
+            //let rawTx = block.transactions[i];
+            if (rawTx != undefined){
+                if (rawTx.hash != tx.transactionHash){
+                    console.log(`rawTx Mismatch`)
+                    this.logger.error({
+                        op: "stream_evm",
+                        chainID: chainID,
+                        bn: block.number,
+                        txhash: txhash
+                    })
+                }
+            }
             //console.log(`rawTx`, rawTx)
             //console.log(`tx`, tx)
-            let receipt = dReceipts[i] != undefined ? dReceipts[i] : null;
+            let receipt = rawDReceipts[txhash] != undefined ? rawDReceipts[txhash] : null;
             let logs = receipt && receipt.decodedLogs ? receipt.decodedLogs : null;
-            let txhash = tx.transactionHash
             tx.raw = tx.input; // ???
             tx.decodedLogs = logs; // fuse here
-            let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
-            //let decodedInput = tx[i] != undefined && tx[i].decodedInput ? tx[i].decodedInput : null;
+            //let decodedInput = dTxns[i] != undefined && dTxns[i].decodedInput ? dTxns[i].decodedInput : null;
+            let decodedInput = tx != undefined && tx.decodedInput ? tx.decodedInput : null;
             let methodID = null
             if (tx.to && tx.input.length >= 10) {
                 methodID = tx.input.substr(0, 10)
@@ -9635,7 +9687,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            //console.log(`bq+`, bqEvmTransaction.json)
+            console.log(`bq+`, bqEvmTransaction.json)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
@@ -10336,7 +10388,11 @@ module.exports = class Indexer extends AssetManager {
         return out;
     }
 
-    async index_block_evm(chainID, blkNums, stream_bq = false) {
+    async index_block_evm(chainID, blkNum, stream_bq = false) {
+        let blkNums = blkNum
+        if (!Array.isArray(blkNum)){
+            blkNums = [blkNum]
+        }
         let chain = await this.getChain(chainID);
         const bigquery = this.get_big_query();
         await this.initEvmSchemaMap()
