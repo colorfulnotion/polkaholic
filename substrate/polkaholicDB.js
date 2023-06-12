@@ -31,6 +31,7 @@ const mysql = require("mysql2");
 const bunyan = require('bunyan');
 const util = require('util');
 const exec = util.promisify(require('child_process').exec);
+const path = require('path');
 const fs = require('fs');
 const os = require("os");
 
@@ -2070,5 +2071,15 @@ from chain where chainID = '${chainID}' limit 1`);
                 this.WSProviderQueue[xcmInfoHash] = this.getCurrentTS();
             }
         }
+    }
+
+    async loadEventBloomFilter(){
+        let dir = `./schema/bloom/`
+        let fn = path.join(dir, `event_topic.json`)
+        var exported = JSON.parse(fs.readFileSync(fn));
+        console.log(`exported Bloom`, exported)
+        const importedFilter = BloomFilter.fromJSON(exported)
+        console.log(`0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, importedFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
+        return importedFilter
     }
 }

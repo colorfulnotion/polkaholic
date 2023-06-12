@@ -159,6 +159,14 @@ async function main() {
             process.exit(0);
         })
 
+    program.command('generateeventbloom')
+        .description("Generate Event Bloom Filters")
+        .usage("-d evm_dev")
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.generateEventBloomFilter();
+            process.exit(0);
+        })
 
     program.command('setupdataset')
         .description("Setup dataset in substrate-etl")

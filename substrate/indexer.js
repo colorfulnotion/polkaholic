@@ -11084,5 +11084,4 @@ module.exports = class Indexer extends AssetManager {
             await this.update_spec_version(chain.chainID, specVersion);
         }
     }
-
 }

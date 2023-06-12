@@ -9,6 +9,7 @@ const ethTool = require("./ethTool");
 const paraTool = require("./paraTool");
 const path = require('path');
 const Crawler = require("./crawler");
+const { BloomFilter } = require('bloom-filters');
 
 const fs = require('fs');
 const fsPromises = require('fs').promises;
@@ -3313,5 +3314,31 @@ mysql> desc projectcontractabi;
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
         }
+    }
+
+    async generateEventBloomFilter(){
+        let sql = `select hex_signature, numContracts from signatures where length(hex_signature) = 66 and numContracts >= 1 order by numContracts desc limit 50000;`
+        console.log(sql);
+        let sqlRecs = await this.poolREADONLY.query(sql);
+
+        const targetErrorRate = 0.01 // 4 % error rate
+        let bloomFilter = BloomFilter.create(sqlRecs.length, targetErrorRate)
+        for (const r of sqlRecs) {
+            if (r.hex_signature != undefined){
+                bloomFilter.add(r.hex_signature)
+            }
+        }
+        console.log(`!! bloomFilter:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, bloomFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
+        const exportedFilter = JSON.stringify(bloomFilter.saveAsJSON(), null, 2)
+        let dir = `./schema/bloom/`
+        let fn = path.join(dir, `event_topic.json`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let NL = "\r\n";
+        fs.writeSync(f, exportedFilter);
+        fs.closeSync(f);
+        console.log(`exportedFilter @ ${fn}`)
+
+        let loadedBloomFilter = await this.loadEventBloomFilter()
+        console.log(`!! loadedBloomFilter:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, loadedBloomFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
     }
 }

@@ -29,6 +29,8 @@ const {
     ethers
 } = require("ethers");
 
+//const EVM = require("evm");
+const whatsabi = require("@shazow/whatsabi")
 
 function shexdec(inp) {
     return parseInt(inp.replace("0x", ""), 16);
@@ -2841,6 +2843,49 @@ function computeModifiedFingerprintID(fingerprintID = '0x783cca1c0412dd0d695e784
 
 async function detect_contract_labels(web3Api, contractAddress, bn) {
 
+}
+
+function extractPushData(opcodes, pushNames = ['PUSH4', 'PUSH32']) {
+    // Filter the opcodes by name and map to pushData as hex
+    let blacklist = ["ffffff", "000000"];
+    let filteredOps = opcodes
+        .filter(opcode => pushNames.includes(opcode.name))
+        .map(opcode => {
+            let abiType = "function";
+            if (opcode.name === 'PUSH32'){
+                abiType = 'event';
+            }
+            let hexSignature = "0x" + opcode.pushData.toString('hex');
+            return {
+                abiType: abiType,
+                signature: hexSignature
+            }
+        })
+        .filter(item => !blacklist.some(blacklisted => item.signature.includes(blacklisted)));
+
+        let res = {func:[], events: []}
+        let byteHash = {}
+        for (const op of filteredOps){
+            if (byteHash[op.signature] == undefined){
+                byteHash[op.signature] = 1
+                if (op.abiType == "function"){
+                    res.func.push(op.signature)
+                }else if (op.abiType == "event"){
+                    res.events.push(op.signature)
+                }
+            }
+        }
+        return res
+}
+
+
+function getsigHashes(code){
+    const evm = new EVM(code);
+    let opcodes = evm.getOpcodes()
+    let res = extractPushData(opcodes)
+    let selectors = whatsabi.selectorsFromBytecode(code)
+    res.func = selectors
+    return res
 }
 
 function getSchemaWithoutDesc(schema) {
