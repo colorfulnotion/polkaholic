@@ -29,7 +29,7 @@ const {
     ethers
 } = require("ethers");
 
-//const EVM = require("evm");
+const { EVM } = require("evm");
 const whatsabi = require("@shazow/whatsabi")
 
 function shexdec(inp) {
@@ -627,7 +627,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
 
     // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
     */
-    //console.log(`dReceipt`, dReceipt)
+    console.log(`[${dReceipt.transactionHash}] dReceipt`, dReceipt)
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
@@ -653,7 +653,10 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     if (gasPrice >= baseFeePerGas) {
         baseFeePerGas = gasPrice - maxPriorityFeePerGas
     }
-
+    let contractAddress = (dReceipt.contractAddress != undefined)? dReceipt.contractAddress: null
+    if (contractAddress && dTxn.decodedInput != undefined){
+        dTxn.decodedInput.contractAddress = contractAddress
+    }
     let fTxn = {
         chainID: (chainID) ? chainID : paraTool.dechexToInt(dTxn.chainId),
         transactionHash: dTxn.hash,
@@ -665,7 +668,8 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         timestamp: (blockTS) ? blockTS : null, // not part of the txn
         from: dTxn.from,
         to: dTxn.to,
-        creates: (dTxn.creates != undefined)? dTxn.creates: null,
+        //creates: (dTxn.creates != undefined)? dTxn.creates: null,
+        creates: contractAddress,
         transfers: dReceipt.transfers, //TODO.. also transaction actions
         swaps: dReceipt.swaps,
         value: value / ether,
@@ -925,7 +929,7 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
         if (contractcreationAddress) {
             //contract creation
             decodedTxnInput.decodeStatus = 'contractCreation'
-            decodedTxnInput.contractAddress = contractcreationAddress
+            decodedTxnInput.contractAddress = null
             decodedTxnInput.methodID = methodID
             decodedTxnInput.signature = `contractCreation`
         } else {
@@ -941,14 +945,15 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
 
 function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     //etherscan is marking native case as "Trafer"
-    let contractcreationAddress = (txn.creates != undefined) ? txn.creates : false
+    //let contractcreationAddress = (txn.creates != undefined) ? txn.creates : false
+    let isTxContractCreate = (txn.to == undefined)? true: false
     let txInput = txn.input
     let methodID = '0x';
     let decodedTxnInput = {};
     let output = txn
     //TODO: need to handle both RPC and WS format
 
-    if (!contractcreationAddress) {
+    if (!isTxContractCreate) {
         if (txInput.length >= 10) {
             methodID = txInput.slice(0, 10)
         } else if (txInput >= '0x') {
@@ -986,12 +991,13 @@ function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
         }
     } else {
         //native transfer case or contract creation
-        if (contractcreationAddress) {
+        if (isTxContractCreate) {
             //contract creation
             decodedTxnInput.decodeStatus = 'contractCreation'
             decodedTxnInput.methodID = methodID
             decodedTxnInput.signature = `contractCreation`
-            decodedTxnInput.contractAddress = contractcreationAddress
+            //decodedTxnInput.contractAddress = contractcreationAddress
+            decodedTxnInput.contractAddress = null
         } else {
             //native transfer
             decodedTxnInput.decodeStatus = 'success'
@@ -1681,6 +1687,7 @@ async function processReceipts(evmReceipts, contractABIs, contractABISignatures)
 function decodeReceipt(r, contractABIs, contractABISignatures) {
     // shallow copy throws error here... not sure why?
     //let res = JSON.parse(JSON.stringify(r))
+    console.log(`decodeReceipt r`, r)
     var res = Object.assign({}, r);
     if (!res) return;
     let decodedLogs = []
@@ -1717,6 +1724,7 @@ function decodeReceipt(r, contractABIs, contractABISignatures) {
     res.transfers = transfers
     res.swaps = swaps
     //res.syncs = syncs
+    res.contractAddress = r.contractAddress
     return res
 }
 
@@ -2500,7 +2508,10 @@ function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFF
 function is_tx_contract_create(tx) {
     if (!tx) return (false);
     let isCreate = (tx.creates != null)
-    if (isCreate) return true
+    if (isCreate)  {
+        console.log(`${tx.transactionHash} -> contract created ${tx.creates}`)
+        return true
+    }
     try {
         if (tx.decodedLogs) {
             for (const l of tx.decodedLogs) {
@@ -2845,9 +2856,33 @@ async function detect_contract_labels(web3Api, contractAddress, bn) {
 
 }
 
-function extractPushData(opcodes, pushNames = ['PUSH4', 'PUSH32']) {
+//return symbol, name, decimal, totalSupply
+async function getContractByteCode(web3Api, contractAddress, bn = 'latest', RPCBackfill = null) {
+    let code = false
+    try {
+        code = web3Api.eth.getCode(contractAddress)
+    } catch (e){
+        console.log(`getContractByteCode error`, e)
+        return false
+    }
+    return code
+}
+
+async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', topicFilter = false, RPCBackfill = null) {
+    let code = await getContractByteCode(web3Api, contractAddress)
+    let res = false
+    if (code){
+        res = getsigHashes(code, topicFilter)
+        console.log(`**** contractAddress=${contractAddress}, res`, res)
+    }
+    //TODO: check if it's erc20 or erc721 / erc1155..
+    return res
+}
+
+function extractPushData(opcodes, topicFilter = false) {
     // Filter the opcodes by name and map to pushData as hex
     let blacklist = ["ffffff", "000000"];
+    let pushNames = ['PUSH4', 'PUSH32']
     let filteredOps = opcodes
         .filter(opcode => pushNames.includes(opcode.name))
         .map(opcode => {
@@ -2862,16 +2897,21 @@ function extractPushData(opcodes, pushNames = ['PUSH4', 'PUSH32']) {
             }
         })
         .filter(item => !blacklist.some(blacklisted => item.signature.includes(blacklisted)));
-
-        let res = {func:[], events: []}
+        let res = {func:[], events: [], unknownEvents: []}
         let byteHash = {}
+        if (topicFilter) res.filtered = true
         for (const op of filteredOps){
-            if (byteHash[op.signature] == undefined){
-                byteHash[op.signature] = 1
+            let hash = op.signature
+            if (byteHash[hash] == undefined){
+                byteHash[hash] = 1
                 if (op.abiType == "function"){
-                    res.func.push(op.signature)
+                    res.func.push(hash)
                 }else if (op.abiType == "event"){
-                    res.events.push(op.signature)
+                    if (topicFilter && topicFilter.has(hash)){
+                        res.events.push(hash)
+                    }else{
+                        res.unknownEvents.push(hash)
+                    }
                 }
             }
         }
@@ -2879,10 +2919,10 @@ function extractPushData(opcodes, pushNames = ['PUSH4', 'PUSH32']) {
 }
 
 
-function getsigHashes(code){
+function getsigHashes(code, topicFilter = false){
     const evm = new EVM(code);
     let opcodes = evm.getOpcodes()
-    let res = extractPushData(opcodes)
+    let res = extractPushData(opcodes, topicFilter)
     let selectors = whatsabi.selectorsFromBytecode(code)
     res.func = selectors
     return res
@@ -3008,6 +3048,12 @@ module.exports = {
     },
     getERC20TokenInfo: async function(web3Api, contractAddress, bn) {
         return getERC20TokenInfo(web3Api, contractAddress, bn)
+    },
+    getContractByteCode: async function(web3Api, contractAddress, bn) {
+        return getContractByteCode(web3Api, contractAddress, bn)
+    },
+    ProcessContractByteCode: async function(web3Api, contractAddress, bn, topicFilter) {
+        return ProcessContractByteCode(web3Api, contractAddress, bn, topicFilter)
     },
     getTokenTotalSupply: async function(web3Api, contractAddress, bn) {
         return getTokenTotalSupply(web3Api, contractAddress, bn)

@@ -3328,7 +3328,7 @@ mysql> desc projectcontractabi;
                 bloomFilter.add(r.hex_signature)
             }
         }
-        console.log(`!! bloomFilter:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, bloomFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
+        //console.log(`!! bloomFilter:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, bloomFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
         const exportedFilter = JSON.stringify(bloomFilter.saveAsJSON(), null, 2)
         let dir = `./schema/bloom/`
         let fn = path.join(dir, `event_topic.json`)
@@ -3337,8 +3337,7 @@ mysql> desc projectcontractabi;
         fs.writeSync(f, exportedFilter);
         fs.closeSync(f);
         console.log(`exportedFilter @ ${fn}`)
-
         let loadedBloomFilter = await this.loadEventBloomFilter()
-        console.log(`!! loadedBloomFilter:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, loadedBloomFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
+        //console.log(`!! loadedBloomFilter:0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef found?`, loadedBloomFilter.has('0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef'))
     }
 }

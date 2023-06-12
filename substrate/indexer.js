@@ -60,8 +60,8 @@ module.exports = class Indexer extends AssetManager {
     xcmtransfer = {};
     xcmtransferdestcandidate = {};
     xcmViolation = {};
-    incomingXcmState = {}
-
+    incomingXcmState = {};
+    topicFilters = {};
     currentSessionValidators = [];
     currentSessionIndex = -1;
 
@@ -6155,6 +6155,11 @@ module.exports = class Indexer extends AssetManager {
         let contractType = false
         // Contract Creates
         if (ethTool.isTxContractCreate(tx)) {
+            let web3Api = this.web3Api
+            let bn = tx.blockNumber
+            let contractAddress = tx.creates
+            let topicFilter = this.topicFilters
+            let res = await ethTool.ProcessContractByteCode(web3Api, contractAddress, bn, topicFilter)
             contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
             console.log("CONTRACT CREATE", contractType);
         }
@@ -10251,6 +10256,7 @@ module.exports = class Indexer extends AssetManager {
 
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
+        this.topicFilter = this.loadEventBloomFilter();
         await this.assetManagerInit()
 
     }
@@ -10442,6 +10448,7 @@ module.exports = class Indexer extends AssetManager {
 
         let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
         let evmRPCInternalApi = this.evmRPCInternal
+        this.topicFilters = await this.loadEventBloomFilter()
 
         for (const blockNumber of blkNums) {
             let block = null;
