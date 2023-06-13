@@ -10452,7 +10452,7 @@ module.exports = class Indexer extends AssetManager {
             let log_retry_max = 10
             let log_retry_ms = 2000
             let log_timeout_ms = 5000
-            //let stream_bq = false
+            let stream_bq = false //MK: comment this line to write into bigquery
             let write_bt = true
 
             //let qnSupportedChainIDs = [paraTool.chainIDOptimism, paraTool.chainIDPolygon]
