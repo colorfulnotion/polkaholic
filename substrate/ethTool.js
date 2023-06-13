@@ -1711,7 +1711,7 @@ function parseAbiSignature(abiStrArr) {
 }
 */
 
-async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, chainID) {
+async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, chainID) {
     let fBlk = evmBlk
     let blockTS = fBlk.timestamp
     let fTxns = []
@@ -1720,10 +1720,15 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
     if (dTxns.length != dReceipts.length) {
         console.log(`[${fBlk.blockNumber}][${fBlk.blockHash}] txns/receipts len mismatch: txnLen=${dTxns.length}, receiptLen=${dReceipts.length}`)
     }
+    // console.log(`dTrace!!!`, dTrace)
     // recurse through all the trace records in dTrace, and for any with value, accumulate in feedTrace
     let feedtrace = []
+    let feedcreates = []
     if (dTrace) {
         process_evm_trace(dTrace, feedtrace, 0, [0], dTxns);
+        //console.log(`*** start process_evm_trace_creates`)
+        process_evm_trace_creates(dTrace, feedcreates, 0, [], dTxns);
+        //console.log(`*** done process_evm_trace_creates`, feedcreates)
     }
     let feedtraceMap = {};
     if (feedtrace.length > 0) {
@@ -1736,12 +1741,25 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
         }
     }
 
+    let traceCreateMap = {};
+    if (feedcreates.length > 0) {
+        for (let t = 0; t < feedcreates.length; t++) {
+            let createTx = feedcreates[t];
+            if (traceCreateMap[createTx.transactionHash] == undefined) {
+                traceCreateMap[createTx.transactionHash] = [];
+            }
+            traceCreateMap[createTx.transactionHash].push(createTx.to);
+        }
+    }
+
     for (i = 0; i < dTxns.length; i += 1) {
         let dTxn = dTxns[i]
         let dReceipt = dReceipts[i]
         let dInternal = feedtraceMap[dTxn.hash] ? feedtraceMap[dTxn.hash] : []
+        let dCreates = traceCreateMap[dTxn.hash] ? traceCreateMap[dTxn.hash] : []
         let fTxn = decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID)
         if (fTxn) {
+            fTxn.createdContracts = dCreates
             fTxns.push(fTxn)
             //write connected txn
             if (fTxn.isConnectedCall) {
@@ -1755,6 +1773,12 @@ async function fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, 
             }
         }
     }
+    /*
+    if (creates.length > 0){
+        console.log(`****** creates Len=${creates.length}`, creates)
+        fBlk.creates = creates
+    }
+    */
     fBlk.transactions = fTxns
     fBlk.transactionsInternal = fTxnsInternal
     fBlk.transactionsConnected = fTxnsConnected
@@ -2629,9 +2653,13 @@ function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFF
     return txStruct
 }
 
-function is_tx_contract_create(tx) {
+function isTxContractCreate(tx) {
     if (!tx) return (false);
     let isCreate = (tx.creates != null)
+    if (tx.createdContracts.length > 0){
+        console.log(`${tx.transactionHash} -> contract created[${tx.createdContracts}], len=${tx.createdContracts.length}`)
+        return true
+    }
     if (isCreate)  {
         console.log(`${tx.transactionHash} -> contract created ${tx.creates}`)
         return true
@@ -2649,9 +2677,25 @@ function is_tx_contract_create(tx) {
             }
         }
     } catch (e) {
-        console.log(`is_tx_contract_create [${tx.transactionHash}] err`, e)
+        console.log(`isTxContractCreate [${tx.transactionHash}] err`, e)
     }
     return isCreate;
+}
+
+function getTxContractCreateAddress(tx){
+    let contractAddress = []
+    let contractMap = {}
+    let cnt = 0
+    if (tx.creates != null){
+        contractMap[tx.creates] = 1
+        cnt ++
+    }else if (tx.createdContracts.length > 0){
+        for (const createAddr of tx.createdContracts){
+            contractMap[createAddr] = 1
+            cnt++
+        }
+    }
+    return Object.keys(contractMap)
 }
 
 function is_tx_native_transfer(tx) {
@@ -2997,6 +3041,7 @@ async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', 
     let contractInfo = {
         address: contractAddress.toLowerCase(),
         bytecode: null,
+        bytecodeHash: null,
         function_sighashes: null,
         event_topics: null,
         is_erc20: false,
@@ -3007,26 +3052,28 @@ async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', 
         block_number: bn,
         block_hash: null,
     }
+
     let bytecode = await getContractByteCode(web3Api, contractAddress)
     if (bytecode){
         contractInfo.bytecode = bytecode
+        contractInfo.bytecodeHash = web3.utils.keccak256(bytecode)
         let codeHashInfo = getsigHashes(bytecode, topicFilter)
         contractInfo.function_sighashes = codeHashInfo.func
         contractInfo.event_topics = codeHashInfo.events
         //contractInfo.is_erc165 = detectERC165(codeHashInfo, bytecode)
         if (detectERC20(codeHashInfo, bytecode)){
             contractInfo.is_erc20 = true
-            console.log(`**** [ERC20] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
+            //console.log(`**** [ERC20] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
         }else if (detectERC721(codeHashInfo, bytecode)){
-            console.log(`**** [ERC721] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
+            //console.log(`**** [ERC721] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
             contractInfo.is_erc721 = true
         }else if (detectERC1155(codeHashInfo, bytecode)){
-            console.log(`**** [ERC1155] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
+            //console.log(`**** [ERC1155] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
             contractInfo.is_erc1155 = true
         }
         //console.log(`**** contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
     }
-    console.log(`+++ contractInfo`, contractInfo)
+    //console.log(`**** contractInfo`, contractInfo)
     return contractInfo
 }
 
@@ -3132,17 +3179,19 @@ function process_evm_trace_creates(evmTrace, res, depth, stack = [], txs) {
         try {
             //console.log(`T.type =${t.type}`)
             if ( t.type == "CREATE" || t.type == "CREATE2") { // REVIEW: what other types?
+                let transactionHash =  (txs[i].hash)?  (txs[i].hash): (txs[i].transactionHash) //mk check,
+                t.transactionHash = transactionHash
                 res.push(t);
                 let contractAddress = t.to;
                 let byteCode = t.input;
-                console.log(i, depth, stack, t.type, contractAddress, "byteCode:", byteCode.substring(0, 32) + "...")
+                console.log(i, depth, stack, t.type, contractAddress, `transactionHash: ${transactionHash}`)
                 // KEY TODO: take bytecode + contractAddress, call async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', topicFilter = false, RPCBackfill = null) -- or better after?
             }
             // recurse into calls
             if (t.calls != undefined) {
                 let newStack = [...stack];
                 newStack.push(i);
-                this.process_evm_trace_creates(t.calls, res, depth + 1, newStack, txs);
+                process_evm_trace_creates(t.calls, res, depth + 1, newStack, txs);
             }
         } catch (err) {
             console.log(`process_evm_trace err=${err.toString()}`)
@@ -3298,7 +3347,7 @@ module.exports = {
         return processTranssctions(txns, contractABIs, contractABISignatures)
     },
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, dTrace, chainID) {
-        return fuse_block_transaction_receipt(evmBlk, dTxns, dReceipts, dTrace, chainID)
+        return fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, chainID)
     },
     decorateTxn: function(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
         return decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID);
@@ -3307,7 +3356,10 @@ module.exports = {
         return decodeTransactionInput(txn, contractABIs, contractABISignatures)
     },
     isTxContractCreate: function(tx) {
-        return is_tx_contract_create(tx);
+        return isTxContractCreate(tx);
+    },
+    getTxContractCreateAddress: function(tx) {
+        return getTxContractCreateAddress(tx);
     },
     isTxNativeTransfer: function(tx) {
         return is_tx_native_transfer(tx);

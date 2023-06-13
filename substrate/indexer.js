@@ -6155,13 +6155,22 @@ module.exports = class Indexer extends AssetManager {
         let contractType = false
         // Contract Creates
         if (ethTool.isTxContractCreate(tx)) {
+            console.log(`getTxContractCreateAddress tx`, tx)
+            let createAddrs = ethTool.getTxContractCreateAddress(tx)
             let web3Api = this.web3Api
             let bn = tx.blockNumber
-            let contractAddress = tx.creates
             let topicFilter = this.topicFilters
-            let res = await ethTool.ProcessContractByteCode(web3Api, contractAddress, bn, topicFilter)
-            contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
-            console.log("CONTRACT CREATE", contractType);
+            for (const createAddr of createAddrs){
+                let contractAddress = createAddr
+                let contractInfo = await ethTool.ProcessContractByteCode(web3Api, contractAddress, bn, topicFilter)
+                // add timestamp/blockHash/blockNumber
+                contractInfo.block_timestamp = tx.timestamp
+                contractInfo.block_hash = tx.blockHash
+                contractInfo.blockNumber = tx.blockNumber
+                console.log(`**** contractInfo`, contractInfo)
+                contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
+                console.log("CONTRACT CREATE", contractType);
+            }
         }
 
         // Native Transfers
