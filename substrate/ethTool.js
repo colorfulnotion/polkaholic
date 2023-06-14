@@ -756,7 +756,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
 
     // max_fee_per_gas, max_priority_fee_per_gas, receipt_effective_gas_price
     */
-    console.log(`[${dReceipt.transactionHash}] dReceipt`, dReceipt)
+    //console.log(`[${dReceipt.transactionHash}] dReceipt`, dReceipt)
     let gWei = 10 ** 9
     let ether = 10 ** 18
     let value = paraTool.dechexToInt(dTxn.value)
@@ -1790,13 +1790,13 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, cha
     return fBlk
 }
 
-async function processTranssctions(txns, contractABIs, contractABISignatures) {
+async function processTransactions(txns, contractABIs, contractABISignatures) {
     let decodeTxns = []
     let txnsAsync = await txns.map(async (txn) => {
         try {
             return decodeTransaction(txn, contractABIs, contractABISignatures)
         } catch (err) {
-            console.log(`processTranssctions ${txns}`, err)
+            console.log(`processTransactions ${txns}`, err)
             return false
         }
     });
@@ -2385,7 +2385,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         topics: log.topics,
         fingerprintID: fingerprintID,
     }
-    console.log(`unknown log`, unknown)
+    //console.log(`unknown log`, unknown)
     return unknown
 }
 
@@ -3355,8 +3355,8 @@ module.exports = {
     processReceipts: async function(evmReceipts, contractABIs, contractABISignatures) {
         return processReceipts(evmReceipts, contractABIs, contractABISignatures)
     },
-    processTranssctions: async function(txns, contractABIs, contractABISignatures) {
-        return processTranssctions(txns, contractABIs, contractABISignatures)
+    processTransactions: async function(txns, contractABIs, contractABISignatures) {
+        return processTransactions(txns, contractABIs, contractABISignatures)
     },
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, dTrace, chainID) {
         return fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, chainID)

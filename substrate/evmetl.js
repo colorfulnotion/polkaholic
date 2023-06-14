@@ -2746,7 +2746,7 @@ mysql> desc projectcontractabi;
         let projectID = "substrate-etl"
         let dataset = "crypto_evm";
 
-        let tables = ["blocks", "transactions", "logs"]; // [ "contracts", "tokens", "token_transfers"]
+        let tables = ["blocks", "transactions", "logs", "contracts", "tokens", "token_transfers"]; //[ "traces"]
         try {
             for (const tbl of tables) {
                 let tblID = `${tbl}${chainID}`

@@ -61,7 +61,7 @@ module.exports = class Indexer extends AssetManager {
     xcmtransferdestcandidate = {};
     xcmViolation = {};
     incomingXcmState = {};
-    topicFilters = {};
+    topicFilters = false;
     currentSessionValidators = [];
     currentSessionIndex = -1;
 
@@ -6160,10 +6160,10 @@ module.exports = class Indexer extends AssetManager {
             console.log(`getTxContractCreateAddress ${tx.transactionHash} createAddrs=`, createAddrs)
             let web3Api = this.web3Api
             let bn = tx.blockNumber
-            let topicFilter = this.topicFilters
+            let topicFilters = await this.getTopicFilters()
             for (const createAddr of createAddrs){
                 let contractAddress = createAddr
-                let contractInfo = await ethTool.ProcessContractByteCode(web3Api, contractAddress, bn, topicFilter)
+                let contractInfo = await ethTool.ProcessContractByteCode(web3Api, contractAddress, bn, topicFilters)
                 // add timestamp/blockHash/blockNumber
                 contractInfo.block_timestamp = tx.timestamp
                 contractInfo.block_hash = tx.blockHash
@@ -7387,13 +7387,13 @@ module.exports = class Indexer extends AssetManager {
                 let processTransasctionStartTS = new Date().getTime()
                 let processReceiptStartTS = new Date().getTime()
                 var statusesPromise = Promise.all([
-                    ethTool.processTranssctions(evmBlock.transactions, contractABIs, contractABISignatures),
+                    ethTool.processTransactions(evmBlock.transactions, contractABIs, contractABISignatures),
                     ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                 ])
                 let [dTxns, dReceipts] = await statusesPromise
                 //console.log(`[${blockNumber}] dReceipts`, JSON.stringify(dReceipts))
 
-                //let dTxns = await ethTool.processTranssctions(evmBlock.transactions, contractABIs, contractABISignatures)
+                //let dTxns = await ethTool.processTransactions(evmBlock.transactions, contractABIs, contractABISignatures)
                 let processTransasctionTS = (new Date().getTime() - processTransasctionStartTS) / 1000
                 this.timeStat.processTransasctionTS += processTransasctionTS
 
@@ -8313,6 +8313,11 @@ module.exports = class Indexer extends AssetManager {
 
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
+        let evmRPCInternalApi = this.evmRPCInternal
+
+        let log_retry_max = 10
+        let log_retry_ms = 2000
+        let log_timeout_ms = 5000
 
         let autoTraces = false
         let blkNum = false
@@ -8336,14 +8341,21 @@ module.exports = class Indexer extends AssetManager {
         }
         if (r.trace) {
             traceAvailable = true
+            evmTrace = r.trace
         }
         if (r.evmReceipts) {
             receiptsAvailable = true
             evmReceipts = r.evmReceipts
         }
-        console.log(`[${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receiptss=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
+        if (!traceAvailable){
+            //MK: need to figure out btTrace -> rpcTrace translation
+            if (evmRPCInternalApi){
+                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blkNum, log_timeout_ms, log_retry_max, log_retry_ms)
+            }
+        }
+        console.log(`index_evm_chain_block_row [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}, evmRPCInternalApi=${evmRPCInternalApi}`)
         var statusesPromise = Promise.all([
-            ethTool.processTranssctions(blk.transactions, contractABIs, contractABISignatures),
+            ethTool.processTransactions(blk.transactions, contractABIs, contractABISignatures),
             ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
         ])
         let [dTxns, dReceipts] = await statusesPromise
@@ -8483,6 +8495,10 @@ module.exports = class Indexer extends AssetManager {
             keyFilename: this.BQ_SUBSTRATEETL_KEY
         })
         let chain = await this.getChain(chainID);
+        //MK need better name of this !! (1, ethereum)
+        let bq_evm_chain_id = chainID
+        let bq_evm_id = chain.id
+
         let rows_blocks = [];
         let rows_transactions = [];
         let rows_logs = [];
@@ -8494,6 +8510,13 @@ module.exports = class Indexer extends AssetManager {
         let auto_evm_schema_map = {} // tableID => rows
 
         let block = JSON.parse(JSON.stringify(evmlBlock))
+        let evm_block_number = block.number
+        let evm_block_timestamp = block.timestamp
+        let evm_block_hash = block.hash
+
+        this.buildBqEvmBlock(bq_evm_chain_id, bq_evm_id, block, rows_blocks)
+        console.log(`rows_blocks[${rows_blocks.length}]`, rows_blocks)
+
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
         //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
         let evm_chain_id = chainID
@@ -8506,33 +8529,6 @@ module.exports = class Indexer extends AssetManager {
         let evmETLLocalBasePath = `${rootDir}/evm_etl_local/${logYYYY_MM_DD}/${chainID}/`
         let gWei = 10 ** 9
         let ether = 10 ** 18
-        let bqEvmBlock = {
-            insertId: `${block.hash}`,
-            json: {
-                chain_id: chainID,
-                id: chain.id,
-                timestamp: block.timestamp,
-                number: block.number,
-                hash: block.hash,
-                parent_hash: block.parentHash,
-                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
-                sha3_uncles: block.sha3Uncles,
-                logs_bloom: block.logsBloom,
-                transactions_root: block.transactionsRoot,
-                state_root: block.stateRoot,
-                receipts_root: block.receiptsRoot,
-                miner: block.miner,
-                difficulty: paraTool.dechexToInt(block.difficulty),
-                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
-                size: block.size,
-                extra_data: block.extraData,
-                gas_limit: block.gasLimit,
-                gas_used: block.gasUsed,
-                transaction_count: block.transactions.length
-            }
-        }
-        //console.log(`bqEvmBlock`, bqEvmBlock)
-        rows_blocks.push(bqEvmBlock);
 
         let rawTxMap = {}
         let rawDReceipts = {}
@@ -8573,8 +8569,8 @@ module.exports = class Indexer extends AssetManager {
             }
             let txType = (tx.txType != undefined) ? tx.txType : -1
             let evmTx = {
-                chain_id: chainID,
-                id: chain.id,
+                chain_id: bq_evm_chain_id,
+                id: bq_evm_id,
                 hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                 nonce: tx.nonce,
                 transaction_index: tx.transactionIndex,
@@ -8589,9 +8585,9 @@ module.exports = class Indexer extends AssetManager {
                 receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
                 receipt_root: null, // irrelevant
                 receipt_status: receipt && receipt.status ? 1 : 0,
-                block_timestamp: block.timestamp,
-                block_number: tx.blockNumber,
-                block_hash: tx.blockHash,
+                block_timestamp: evm_block_timestamp,
+                block_number: evm_block_number,
+                block_hash: evm_block_hash,
                 max_fee_per_gas: null,
                 max_priority_fee_per_gas: null,
                 transaction_type: txType,
@@ -8699,17 +8695,17 @@ module.exports = class Indexer extends AssetManager {
                     let eSig = l.signature ? l.signature : null
                     let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
                     let evmLog = {
-                        chain_id: chainID,
-                        id: chain.id,
+                        chain_id: bq_evm_chain_id,
+                        id: bq_evm_id,
                         log_index: l.logIndex,
                         transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                         transaction_index: i,
                         address: l.address.toLowerCase(),
                         data: l.data,
                         topics: l.topics,
-                        block_timestamp: block.timestamp,
-                        block_number: block.number,
-                        block_hash: block.hash,
+                        block_timestamp: evm_block_timestamp,
+                        block_number: evm_block_number,
+                        block_hash: evm_block_hash,
                         signature: eSig,
                         events: (l.events) ? JSON.stringify(l.events) : null // TODO: check
                     }
@@ -8774,87 +8770,18 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
 
-            for (const t of tx.transfers){
-                let transferType = t.type
-                let tokenIDs = null
-                let tokenValues = null
-                let operator = null
-                let value = t.value
-                if (transferType != "ERC20") {
-                    continue
-                }
-                let evmTokenTransfer = {
-                    chain_id: chainID,
-                    id: chain.id,
-                    token_address: t.tokenAddress,
-                    from_address: t.from,
-                    to_address: t.to,
-                    value: value,
-                    transaction_hash: evmTx.hash,
-                    log_index: (t.logIndex != undefined) ? t.logIndex : -1,
-                    block_timestamp: evmTx.block_timestamp,
-                    block_number: evmTx.block_number,
-                    block_hash: evmTx.block_hash,
-                    //transfer_type: transferType,
-                }
-                let bqEvmTokenTransfer = {
-                    insertId: `${evmTx.hash}${t.logIndex}`,
-                    json: evmTokenTransfer
-                }
-                console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
-                //rows_token_transfers.push(bqEvmTokenTransfer);
-            }
-            // NOTE: we do not write out hashes yet (development)
+            this.buildBqTokenTransfers(bq_evm_chain_id, bq_evm_id, evm_block_timestamp, evm_block_number, evm_block_hash, tx, rows_token_transfers)
+
+            // NOTE: we do not write out hashes yet (development)??
             let contractInfos = await this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
-            this.buildBqContracts(chainID, chain.id, contractInfos, rows_contracts)
-            this.buildBqTokens(chainID, chain.id, contractInfos, rows_tokens)
-            /*
-            for (const c of contractInfos){
-                let bqContract = {
-                    insertId: `${tx.transactionHash}${c.address}`,
-                    json: {
-                        chain_id: chainID,
-                        id: chain.id,
-                        address: c.address,
-                        bytecode: c.bytecode,
-                        function_sighashes: c.function_sighashes,
-                        event_topics: c.event_topics,
-                        is_erc20: c.is_erc20,
-                        is_erc721: c.is_erc721,
-                        is_erc1155: c.is_erc1155,
-                        block_timestamp: c.block_timestamp,
-                        block_number: c.block_number,
-                        block_hash: c.block_hash
-                    }
-                }
-                console.log(`bqContract+`, bqContract)
-                rows_contracts.push(bqContract);
-                if (c.is_erc20 && c.erc20Info){
-                    let erc20Info = c.erc20Info
-                    let bqToken = {
-                        insertId: `${tx.blockNumber}${c.address}`,
-                        json: {
-                            chain_id: chainID,
-                            id: chain.id,
-                            address: c.address,
-                            symbol: erc20Info.symbol,
-                            decimals: erc20Info.decimals,
-                            totalSupply: erc20Info.totalSupply,
-                            block_timestamp: c.block_timestamp,
-                            block_number: c.block_number,
-                            block_hash: c.block_hash
-                        }
-                    }
-                    console.log(`bqToken+`, bqToken)
-                    rows_tokens.push(bqToken);
-                }
-            }
-            */
+            this.buildBqContracts(bq_evm_chain_id, bq_evm_id, contractInfos, rows_contracts)
+            this.buildBqTokens(bq_evm_chain_id, bq_evm_id, contractInfos, rows_tokens)
         }
 
-        console.log(`rows_contracts HERE`, rows_contracts)
-        console.log(`rows_tokens HERE`, rows_tokens)
-        
+        console.log(`rows_token_transfers[${rows_token_transfers.length}]`, rows_token_transfers)
+        console.log(`rows_contracts[${rows_contracts.length}]`, rows_contracts)
+        console.log(`rows_tokens[${rows_contracts.length}]`, rows_tokens)
+
         /*
         if (blockTS) {
             // crawl any token addresses, write to btRealtime
@@ -9077,13 +9004,13 @@ module.exports = class Indexer extends AssetManager {
         return r;
     }
 
-    buildBqContracts(chain_id, chain_name, contractInfos, rows_contracts = []){
+    buildBqContracts(bq_evm_chain_id, bq_evm_id, contractInfos, rows_contracts = []){
         for (const c of contractInfos){
             let bqContract = {
                 insertId: `${c.address}`,
                 json: {
-                    chain_id: chain_id,
-                    id: chain_name,
+                    chain_id: bq_evm_chain_id,
+                    id: bq_evm_id,
                     address: c.address,
                     bytecode: c.bytecode,
                     function_sighashes: c.function_sighashes,
@@ -9102,19 +9029,84 @@ module.exports = class Indexer extends AssetManager {
         return
     }
 
-    buildBqTokens(chain_id, chain_name, contractInfos, rows_tokens = []){
+    buildBqEvmBlock(bq_evm_chain_id, bq_evm_id, block, rows_blocks = []){
+        let bqEvmBlock = {
+            insertId: `${block.hash}`,
+            json: {
+                chain_id: bq_evm_chain_id,
+                id: bq_evm_id,
+                timestamp: block.timestamp,
+                number: block.number,
+                hash: block.hash,
+                parent_hash: block.parentHash,
+                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
+                sha3_uncles: block.sha3Uncles,
+                logs_bloom: block.logsBloom,
+                transactions_root: block.transactionsRoot,
+                state_root: block.stateRoot,
+                receipts_root: block.receiptsRoot,
+                miner: block.miner,
+                difficulty: paraTool.dechexToInt(block.difficulty),
+                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
+                size: block.size,
+                extra_data: block.extraData,
+                gas_limit: block.gasLimit,
+                gas_used: block.gasUsed,
+                transaction_count: block.transactions.length
+            }
+        }
+        //console.log(`bqEvmBlock`, bqEvmBlock)
+        rows_blocks.push(bqEvmBlock);
+        return
+    }
+
+    buildBqTokenTransfers(bq_evm_chain_id, bq_evm_id, evm_block_timestamp, evm_block_number, evm_block_hash, tx, rows_token_transfers = []){
+        for (const t of tx.transfers){
+            let transferType = t.type
+            let tokenIDs = null
+            let tokenValues = null
+            let operator = null
+            let value = t.value
+            if (transferType != "ERC20") {
+                continue
+            }
+            let evmTokenTransfer = {
+                chain_id: bq_evm_chain_id,
+                id: bq_evm_id,
+                token_address: t.tokenAddress,
+                from_address: t.from,
+                to_address: t.to,
+                value: value,
+                transaction_hash: tx.transactionHash,
+                log_index: (t.logIndex != undefined) ? t.logIndex : -1,
+                block_timestamp: evm_block_timestamp,
+                block_number: evm_block_number,
+                block_hash: evm_block_hash,
+                //transfer_type: transferType,
+            }
+            let bqEvmTokenTransfer = {
+                insertId: `${tx.transactionHash}${t.logIndex}`,
+                json: evmTokenTransfer
+            }
+            console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
+            rows_token_transfers.push(bqEvmTokenTransfer);
+        }
+        return
+    }
+
+    buildBqTokens(bq_evm_chain_id, bq_evm_id, contractInfos, rows_tokens = []){
         for (const c of contractInfos){
             if (c.is_erc20 && c.erc20Info){
                 let erc20Info = c.erc20Info
                 let bqToken = {
                     insertId: `${c.address}`,
                     json: {
-                        chain_id: chain_id,
-                        id: chain_name,
+                        chain_id: bq_evm_chain_id,
+                        id: bq_evm_id,
                         address: c.address,
                         symbol: erc20Info.symbol,
                         decimals: erc20Info.decimals,
-                        totalSupply: erc20Info.totalSupply,
+                        total_supply: erc20Info.totalSupply,
                         block_timestamp: c.block_timestamp,
                         block_number: c.block_number,
                         block_hash: c.block_hash
@@ -9632,6 +9624,10 @@ module.exports = class Indexer extends AssetManager {
             keyFilename: this.BQ_SUBSTRATEETL_KEY
         })
         let chain = await this.getChain(chainID);
+        //MK need better name of this !! (1, ethereum)
+        let bq_evm_chain_id = chainID
+        let bq_evm_id = chain.id
+
         let rows_blocks = [];
         let rows_transactions = [];
         let rows_logs = [];
@@ -9643,6 +9639,13 @@ module.exports = class Indexer extends AssetManager {
         let auto_evm_schema_map = {} // tableID => rows
 
         let block = JSON.parse(JSON.stringify(evmlBlock))
+        let evm_block_number = block.number
+        let evm_block_timestamp = block.timestamp
+        let evm_block_hash = block.hash
+
+        this.buildBqEvmBlock(bq_evm_chain_id, bq_evm_id, block, rows_blocks)
+        console.log(`rows_blocks[${rows_blocks.length}]`, rows_blocks)
+
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, evmTrace, chainID)
         //console.log(`[#${block.number}] evmFullBlock`, evmFullBlock)
         let evm_chain_id = chainID
@@ -9667,34 +9670,7 @@ module.exports = class Indexer extends AssetManager {
 
         let gWei = 10 ** 9
         let ether = 10 ** 18
-        let bqEvmBlock = {
-            insertId: `${block.hash}`,
-            json: {
-                chain_id: chainID,
-                id: chain.id,
-                timestamp: block.timestamp,
-                number: block.number,
-                hash: block.hash,
-                parent_hash: block.parentHash,
-                nonce: (block.nonce != undefined) ? block.nonce : '0x0000000000000000', //64bits
-                sha3_uncles: block.sha3Uncles,
-                logs_bloom: block.logsBloom,
-                transactions_root: block.transactionsRoot,
-                state_root: block.stateRoot,
-                receipts_root: block.receiptsRoot,
-                miner: block.miner,
-                difficulty: paraTool.dechexToInt(block.difficulty),
-                total_difficulty: paraTool.dechexToInt(block.totalDifficulty),
-                size: block.size,
-                extra_data: block.extraData,
-                gas_limit: block.gasLimit,
-                gas_used: block.gasUsed,
-                transaction_count: block.transactions.length
-            }
-        }
 
-        //console.log(`bqEvmBlock`, bqEvmBlock)
-        rows_blocks.push(bqEvmBlock);
         if (block.transactions.length != evmFullBlock.transactions.length){
             //fuseBlockTransactionReceipt failed and it's generating inconsistent txns list!!
             console.log(`[#${block.number} ${block.hash}] fuseBlockTransactionReceipt failed and it's generating inconsistent txns list!!`, bqEvmBlock)
@@ -9742,8 +9718,8 @@ module.exports = class Indexer extends AssetManager {
             }
             let txType = (tx.txType != undefined) ? tx.txType : -1
             let evmTx = {
-                chain_id: chainID,
-                id: chain.id,
+                chain_id: bq_evm_chain_id,
+                id: bq_evm_id,
                 hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                 nonce: tx.nonce,
                 transaction_index: tx.transactionIndex,
@@ -9758,9 +9734,9 @@ module.exports = class Indexer extends AssetManager {
                 receipt_contract_address: receipt && receipt.contractAddress ? receipt.contractAddress : null,
                 receipt_root: null, // irrelevant
                 receipt_status: receipt && receipt.status ? 1 : 0,
-                block_timestamp: block.timestamp,
-                block_number: tx.blockNumber,
-                block_hash: tx.blockHash,
+                block_timestamp: evm_block_timestamp,
+                block_number: evm_block_number,
+                block_hash: evm_block_hash,
                 max_fee_per_gas: null,
                 max_priority_fee_per_gas: null,
                 transaction_type: txType,
@@ -9865,17 +9841,17 @@ module.exports = class Indexer extends AssetManager {
                     let eSig = l.signature ? l.signature : null
                     let eFingerprintID = l.fingerprintID ? l.fingerprintID : null
                     let evmLog = {
-                        chain_id: chainID,
-                        id: chain.id,
+                        chain_id: bq_evm_chain_id,
+                        id: bq_evm_id,
                         log_index: l.logIndex,
                         transaction_hash: (tx.transactionHash != undefined) ? tx.transactionHash : rawTx.hash,
                         transaction_index: i,
                         address: l.address.toLowerCase(),
                         data: l.data,
                         topics: l.topics,
-                        block_timestamp: block.timestamp,
-                        block_number: block.number,
-                        block_hash: block.hash,
+                        block_timestamp: evm_block_timestamp,
+                        block_number: evm_block_number,
+                        block_hash: evm_block_hash,
                         signature: eSig,
                         events: (l.events) ? JSON.stringify(l.events) : null // blockchain-etl does NOT have signature, events
                     }
@@ -9939,45 +9915,17 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
             }
-            // NOTE: we do not write out hashes yet (development)
-
-            for (const t of tx.transfers){
-                let transferType = t.type
-                let tokenIDs = null
-                let tokenValues = null
-                let operator = null
-                let value = t.value
-                if (transferType != "ERC20") {
-                    continue
-                }
-                let evmTokenTransfer = {
-                    chain_id: chainID,
-                    id: chain.id,
-                    token_address: t.tokenAddress,
-                    from_address: t.from,
-                    to_address: t.to,
-                    value: value,
-                    transaction_hash: evmTx.hash,
-                    log_index: (t.logIndex != undefined) ? t.logIndex : -1,
-                    block_timestamp: evmTx.block_timestamp,
-                    block_number: evmTx.block_number,
-                    block_hash: evmTx.block_hash,
-                    //transfer_type: transferType,
-                }
-                let bqEvmTokenTransfer = {
-                    insertId: `${evmTx.hash}_${t.logIndex}`,
-                    json: evmTokenTransfer
-                }
-                console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
-                //rows_token_transfers.push(bqEvmTokenTransfer);
-            }
+            // NOTE: we do not write out hashes yet (development) ???
+            this.buildBqTokenTransfers(bq_evm_chain_id, bq_evm_id, evm_block_timestamp, evm_block_number, evm_block_hash, tx, rows_token_transfers)
 
             let contractInfos = await this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
-            this.buildBqContracts(chainID, chain.id, contractInfos, rows_contracts)
-            this.buildBqTokens(chainID, chain.id, contractInfos, rows_tokens)
+            this.buildBqContracts(bq_evm_chain_id, bq_evm_id, contractInfos, rows_contracts)
+            this.buildBqTokens(bq_evm_chain_id, bq_evm_id, contractInfos, rows_tokens)
         }
-        console.log(`rows_contracts HERE`, rows_contracts)
-        console.log(`rows_tokens HERE`, rows_tokens)
+
+        console.log(`rows_token_transfers[${rows_token_transfers.length}]`, rows_token_transfers)
+        console.log(`rows_contracts[${rows_contracts.length}]`, rows_contracts)
+        console.log(`rows_tokens[${rows_contracts.length}]`, rows_tokens)
 
         if (blockTS) {
             // crawl any token addresses, write to btRealtime
@@ -10501,9 +10449,21 @@ module.exports = class Indexer extends AssetManager {
 
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
-        this.topicFilter = this.loadEventBloomFilter();
+        this.topicFilters = await this.loadEventBloomFilter();
         await this.assetManagerInit()
 
+    }
+
+    async getTopicFilters(){
+        let topicFilters = this.topicFilters
+        if(topicFilters){
+            return topicFilters
+        }else{
+            console.log(`Loaded topicFilter!`)
+            topicFilters = await this.loadEventBloomFilter()
+            this.topicFilters = topicFilters
+            return topicFilters
+        }
     }
 
     async index_block_evm_from_bt(chainID, blkNum, force = false) {
@@ -10575,7 +10535,7 @@ module.exports = class Indexer extends AssetManager {
                 //console.log(`[${block.number}] evmTrace`, evmTrace)
             }
             var statusesPromise = Promise.all([
-                ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
                 ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
             ])
             let [dTxns, dReceipts] = await statusesPromise
@@ -10611,7 +10571,7 @@ module.exports = class Indexer extends AssetManager {
                     evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
                     console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                     var statusesPromise = Promise.all([
-                        ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                        ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                     ])
                     let [dTxns, dReceipts] = await statusesPromise
@@ -10735,7 +10695,7 @@ module.exports = class Indexer extends AssetManager {
                     //console.log(`[${block.number}] evmTrace`, evmTrace)
                 }
                 var statusesPromise = Promise.all([
-                    ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                    ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
                     ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                 ])
                 let [dTxns, dReceipts] = await statusesPromise
@@ -10774,7 +10734,7 @@ module.exports = class Indexer extends AssetManager {
                         evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
                         console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
                         var statusesPromise = Promise.all([
-                            ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                            ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
                             ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                         ])
                         let [dTxns, dReceipts] = await statusesPromise
