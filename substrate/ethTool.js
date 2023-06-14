@@ -2687,6 +2687,7 @@ function isTxContractCreate(tx) {
     return isCreate;
 }
 
+//0xaf67fb1bf8be6a5aee2a154771ee057bd85ec55b8000dfc4b58cc49f234328c3
 function getTxContractCreateAddress(tx){
     let contractAddress = []
     let contractMap = {}
@@ -2694,7 +2695,8 @@ function getTxContractCreateAddress(tx){
     if (tx.creates != null){
         contractMap[tx.creates] = 1
         cnt ++
-    }else if (tx.createdContracts.length > 0){
+    }
+    if (tx.createdContracts.length > 0){
         for (const createAddr of tx.createdContracts){
             contractMap[createAddr] = 1
             cnt++
