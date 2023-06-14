@@ -5776,11 +5776,11 @@ module.exports = class Indexer extends AssetManager {
         this.ercTokenList[contractAddress] = tokenInfo;
     }
 
-    async process_evm_contract_create(tx, chainID, finalized = false, isTip = false) {
+    async process_evm_contract_create(contractAddress, tx, chainID, finalized = false, isTip = false) {
         // waterfall model: use `getERC20TokenInfo` to categorize ERC20 contract first. if doesn't work, we will try erc720 next, and then erc1155..
         let web3Api = this.web3Api
         let bn = tx.blockNumber
-        let contractAddress = tx.creates
+        //let contractAddress = tx.creates
         // ethTool rpccall (4)
         // TODO: generate labels with ethTool.detect_contract_labels(web3api, address, bn)
         let erc20TokenInfo = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
@@ -6155,8 +6155,8 @@ module.exports = class Indexer extends AssetManager {
         let contractType = false
         // Contract Creates
         if (ethTool.isTxContractCreate(tx)) {
-            console.log(`getTxContractCreateAddress tx`, tx)
             let createAddrs = ethTool.getTxContractCreateAddress(tx)
+            console.log(`getTxContractCreateAddress ${tx.transactionHash} createAddrs=`, createAddrs)
             let web3Api = this.web3Api
             let bn = tx.blockNumber
             let topicFilter = this.topicFilters
@@ -6168,7 +6168,7 @@ module.exports = class Indexer extends AssetManager {
                 contractInfo.block_hash = tx.blockHash
                 contractInfo.blockNumber = tx.blockNumber
                 console.log(`**** contractInfo`, contractInfo)
-                contractType = await this.process_evm_contract_create(tx, chainID, finalized, isTip);
+                contractType = await this.process_evm_contract_create(contractAddress, tx, chainID, finalized, isTip);
                 console.log("CONTRACT CREATE", contractType);
             }
         }

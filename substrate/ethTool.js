@@ -406,10 +406,16 @@ async function getTokenTotalSupply(web3Api, contractAddress, bn = 'latest', deci
 //return symbol, name, decimal, totalSupply
 async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest', RPCBackfill = null) {
     let x = RPCBackfill ? get_proxy_address(contractAddress, chainID, RPCBackfill) : null;
-    if (x) {
+    console.log(`get_proxy_address x`, x)
+    if (x != undefined) {
         contractAddress = x;
     }
-    let checkSumContractAddr = web3.utils.toChecksumAddress(contractAddress)
+    let checkSumContractAddr
+    try {
+        checkSumContractAddr = web3.utils.toChecksumAddress(contractAddress)
+    } catch (e){
+        return false
+    }
     let erc20Contract = initContract(web3Api, erc20ABI, checkSumContractAddr)
     if (bn == 'latest') {
         bn = await web3Api.eth.getBlockNumber()
@@ -3179,7 +3185,12 @@ function process_evm_trace_creates(evmTrace, res, depth, stack = [], txs) {
         try {
             //console.log(`T.type =${t.type}`)
             if ( t.type == "CREATE" || t.type == "CREATE2") { // REVIEW: what other types?
-                let transactionHash =  (txs[i].hash)?  (txs[i].hash): (txs[i].transactionHash) //mk check,
+                let transactionHash = false
+                if (t.type == "CREATE"){
+                    transactionHash =  (txs[i].hash)?  (txs[i].hash): (txs[i].transactionHash) //mk check,
+                }else if (t.type == "CREATE2"){
+                    transactionHash =  (txs[stack[0]].hash)?  (txs[stack[0]].hash): (txs[stack[0]].transactionHash) //mk check,
+                }
                 t.transactionHash = transactionHash
                 res.push(t);
                 let contractAddress = t.to;
