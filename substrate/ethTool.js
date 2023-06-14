@@ -3187,16 +3187,16 @@ function process_evm_trace_creates(evmTrace, res, depth, stack = [], txs) {
             //console.log(`T.type =${t.type}`)
             if ( t.type == "CREATE" || t.type == "CREATE2") { // REVIEW: what other types?
                 let transactionHash = false
-                if (t.type == "CREATE"){
-                    transactionHash =  (txs[i].hash)?  (txs[i].hash): (txs[i].transactionHash) //mk check,
-                }else if (t.type == "CREATE2"){
+                if (stack.length > 0){
                     transactionHash =  (txs[stack[0]].hash)?  (txs[stack[0]].hash): (txs[stack[0]].transactionHash) //mk check,
+                }else{
+                    transactionHash =  (txs[i].hash)?  (txs[i].hash): (txs[i].transactionHash) //mk check,
                 }
                 t.transactionHash = transactionHash
                 res.push(t);
                 let contractAddress = t.to;
                 let byteCode = t.input;
-                console.log(i, depth, stack, t.type, contractAddress, `transactionHash: ${transactionHash}`)
+                console.log(`[Contract ${t.type}]`,i, depth, stack, `${t.type}`, contractAddress, `transactionHash: ${transactionHash}`)
                 // KEY TODO: take bytecode + contractAddress, call async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', topicFilter = false, RPCBackfill = null) -- or better after?
             }
             // recurse into calls

@@ -8472,7 +8472,7 @@ module.exports = class Indexer extends AssetManager {
 
         // Pipe the readable stream to the write stream and return a Promise
         return new Promise((resolve, reject) => {
-            console.log('Starting to consume the readableStream');
+            //console.log('Starting to consume the readableStream');
             readableStream
                 .pipe(writeStream)
                 .on('error', (error) => {
@@ -8687,7 +8687,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            console.log(`bq+`, bqEvmTransaction)
+            //console.log(`bq+`, bqEvmTransaction.json)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
@@ -9088,7 +9088,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}${t.logIndex}`,
                 json: evmTokenTransfer
             }
-            console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
+            //console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
             rows_token_transfers.push(bqEvmTokenTransfer);
         }
         return
@@ -9833,7 +9833,7 @@ module.exports = class Indexer extends AssetManager {
                 insertId: `${tx.transactionHash}`,
                 json: evmTx
             }
-            console.log(`bq+`, bqEvmTransaction.json)
+            //console.log(`bq+`, bqEvmTransaction.json)
             rows_transactions.push(bqEvmTransaction);
             if (logs) {
                 for (let j = 0; j < logs.length; j++) {
