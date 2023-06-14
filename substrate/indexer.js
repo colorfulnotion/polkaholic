@@ -8484,8 +8484,8 @@ module.exports = class Indexer extends AssetManager {
         let rows_transactions = [];
         let rows_logs = [];
         let rows_contracts = [];
-        let row_token_transfers = [];
-        let row_token_traces = [];
+        let rows_token_transfers = [];
+        let rows_traces = [];
         let auto_evm_rows_map = {} // tableID => rows
         let auto_evm_schema_map = {} // tableID => rows
 
@@ -8769,6 +8769,37 @@ module.exports = class Indexer extends AssetManager {
                     }
                 }
             }
+
+            for (const t of tx.transfers){
+                let transferType = t.type
+                let tokenIDs = null
+                let tokenValues = null
+                let operator = null
+                let value = t.value
+                if (transferType != "ERC20") {
+                    continue
+                }
+                let evmTokenTransfer = {
+                    chain_id: chainID,
+                    id: chain.id,
+                    token_address: t.tokenAddress,
+                    from_address: t.from,
+                    to_address: t.to,
+                    value: value,
+                    transaction_hash: evmTx.hash,
+                    log_index: (t.logIndex != undefined) ? t.logIndex : -1,
+                    block_timestamp: evmTx.block_timestamp,
+                    block_number: evmTx.block_number,
+                    block_hash: evmTx.block_hash,
+                    //transfer_type: transferType,
+                }
+                let bqEvmTokenTransfer = {
+                    insertId: `${evmTx.hash}${t.logIndex}`,
+                    json: evmTokenTransfer
+                }
+                console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
+                //rows_token_transfers.push(bqEvmTokenTransfer);
+            }
             // NOTE: we do not write out hashes yet (development)
             let contractInfos = await this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
             for (const c of contractInfos){
@@ -8820,7 +8851,7 @@ module.exports = class Indexer extends AssetManager {
         // store evm_etl_local
         try {
             let dataset = "evm";
-            let tables = ["blocks", "transactions", "logs", "contracts"]; // [ "contracts", "tokens", "token_transfers"]
+            let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers"]; // [ "contracts", "tokens"]
             for (const tbl of tables) {
                 let rows = null
                 switch (tbl) {
@@ -8838,6 +8869,10 @@ module.exports = class Indexer extends AssetManager {
                     case "contracts":
                         rows = rows_contracts;
                         console.log(`contracts`, rows_contracts)
+                        break;
+                    case "token_transfers":
+                        rows = rows_token_transfers;
+                        console.log(`token_transfers`, rows_token_transfers)
                         break;
                 }
                 if (rows && rows.length > 0) {
@@ -9532,8 +9567,8 @@ module.exports = class Indexer extends AssetManager {
         let rows_transactions = [];
         let rows_logs = [];
         let rows_contracts = [];
-        let row_token_transfers = [];
-        let row_token_traces = [];
+        let rows_token_transfers = [];
+        let rows_traces = [];
         let auto_evm_rows_map = {} // tableID => rows
         let auto_evm_schema_map = {} // tableID => rows
 
@@ -9835,6 +9870,38 @@ module.exports = class Indexer extends AssetManager {
                 }
             }
             // NOTE: we do not write out hashes yet (development)
+
+            for (const t of tx.transfers){
+                let transferType = t.type
+                let tokenIDs = null
+                let tokenValues = null
+                let operator = null
+                let value = t.value
+                if (transferType != "ERC20") {
+                    continue
+                }
+                let evmTokenTransfer = {
+                    chain_id: chainID,
+                    id: chain.id,
+                    token_address: t.tokenAddress,
+                    from_address: t.from,
+                    to_address: t.to,
+                    value: value,
+                    transaction_hash: evmTx.hash,
+                    log_index: (t.logIndex != undefined) ? t.logIndex : -1,
+                    block_timestamp: evmTx.block_timestamp,
+                    block_number: evmTx.block_number,
+                    block_hash: evmTx.block_hash,
+                    //transfer_type: transferType,
+                }
+                let bqEvmTokenTransfer = {
+                    insertId: `${evmTx.hash}${t.logIndex}`,
+                    json: evmTokenTransfer
+                }
+                console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
+                //rows_token_transfers.push(bqEvmTokenTransfer);
+            }
+
             let contractInfos = await this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
             for (const c of contractInfos){
                 /*
@@ -9883,7 +9950,7 @@ module.exports = class Indexer extends AssetManager {
         if (write_bt) {
             // store into bt
             try {
-                let tables = ["blocks", "transactions", "logs", "contracts"]; // ["tokens", "token_transfers", "traces"]
+                let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers"]; // ["tokens", , "traces"]
                 let currentDayMicroTS = paraTool.getCurrentDayTS() * 1000000 //last microsecond of a day - to be garbage collected 7 days after this
                 for (const tbl of tables) {
                     let rows = null
@@ -9928,6 +9995,17 @@ module.exports = class Indexer extends AssetManager {
                             };
                             console.log(`contracts ----`, raw_contracts)
                             break;
+                        case "token_transfers":
+                            let raw_token_transfers = [];
+                            for (const token_transfer of rows_token_transfers) {
+                                raw_token_transfers.push(token_transfer.json)
+                            }
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(raw_token_transfers),
+                                timestamp: currentDayMicroTS
+                            };
+                            console.log(`token_transfers ----`, raw_token_transfers)
+                            break;
                     }
                     console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
                 }
@@ -9956,7 +10034,7 @@ module.exports = class Indexer extends AssetManager {
         try {
             //let dataset = "evm";
             let dataset = "crypto_evm"
-            let tables = ["blocks", "transactions", "logs", "contracts"]; // ["tokens", "token_transfers"]
+            let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers"]; // ["tokens"]
             for (const tbl of tables) {
                 let rows = null
                 let tblID = `${tbl}${chainID}`
