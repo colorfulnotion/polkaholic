@@ -6168,6 +6168,9 @@ module.exports = class Indexer extends AssetManager {
                 contractInfo.block_timestamp = tx.timestamp
                 contractInfo.block_hash = tx.blockHash
                 contractInfo.block_number = tx.blockNumber
+                if (contractInfo.is_erc20){
+                    contractInfo.erc20Info = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
+                }
                 console.log(`**** contractInfo`, contractInfo)
                 contractInfos.push(contractInfo)
                 contractType = await this.process_evm_contract_create(contractAddress, tx, chainID, finalized, isTip);
@@ -9895,7 +9898,7 @@ module.exports = class Indexer extends AssetManager {
                     //transfer_type: transferType,
                 }
                 let bqEvmTokenTransfer = {
-                    insertId: `${evmTx.hash}${t.logIndex}`,
+                    insertId: `${evmTx.hash}_${t.logIndex}`,
                     json: evmTokenTransfer
                 }
                 console.log(`bqTokenTransfer+`, bqEvmTokenTransfer)
