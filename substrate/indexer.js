@@ -8488,6 +8488,7 @@ module.exports = class Indexer extends AssetManager {
         let rows_logs = [];
         let rows_contracts = [];
         let rows_token_transfers = [];
+        let rows_tokens = [];
         let rows_traces = [];
         let auto_evm_rows_map = {} // tableID => rows
         let auto_evm_schema_map = {} // tableID => rows
@@ -8805,22 +8806,10 @@ module.exports = class Indexer extends AssetManager {
             }
             // NOTE: we do not write out hashes yet (development)
             let contractInfos = await this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
+            this.buildBqContracts(chainID, chain.id, contractInfos, rows_contracts)
+            this.buildBqTokens(chainID, chain.id, contractInfos, rows_tokens)
+            /*
             for (const c of contractInfos){
-                /*
-                **** contractInfo {
-                  address: '0x15d76d755caa2fb6ddf9a9adf1a649b14932e730',
-                  bytecode: '0x363d3d373d3d3d363d73d332254f274cc65aa11178b74734e2992b8f349e5af43d82803e903d91602b57fd5bf3',
-                  bytecodeHash: '0x1f8b67be329f6419c9282095843235301b6b3475e42bc9e3262b646aba807206',
-                  function_sighashes: [],
-                  event_topics: [],
-                  is_erc20: false,
-                  is_erc721: false,
-                  is_erc1155: false,
-                  block_timestamp: 1686586439,
-                  block_number: 17465083,
-                  block_hash: '0x2f5d33fc1ebe6afebbe2b9647cd550a673d5657a254417d3b4f1fcb8d0d20b68',
-                }
-                */
                 let bqContract = {
                     insertId: `${tx.transactionHash}${c.address}`,
                     json: {
@@ -8840,9 +8829,32 @@ module.exports = class Indexer extends AssetManager {
                 }
                 console.log(`bqContract+`, bqContract)
                 rows_contracts.push(bqContract);
+                if (c.is_erc20 && c.erc20Info){
+                    let erc20Info = c.erc20Info
+                    let bqToken = {
+                        insertId: `${tx.blockNumber}${c.address}`,
+                        json: {
+                            chain_id: chainID,
+                            id: chain.id,
+                            address: c.address,
+                            symbol: erc20Info.symbol,
+                            decimals: erc20Info.decimals,
+                            totalSupply: erc20Info.totalSupply,
+                            block_timestamp: c.block_timestamp,
+                            block_number: c.block_number,
+                            block_hash: c.block_hash
+                        }
+                    }
+                    console.log(`bqToken+`, bqToken)
+                    rows_tokens.push(bqToken);
+                }
             }
+            */
         }
 
+        console.log(`rows_contracts HERE`, rows_contracts)
+        console.log(`rows_tokens HERE`, rows_tokens)
+        
         /*
         if (blockTS) {
             // crawl any token addresses, write to btRealtime
@@ -8854,7 +8866,7 @@ module.exports = class Indexer extends AssetManager {
         // store evm_etl_local
         try {
             let dataset = "evm";
-            let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers"]; // [ "contracts", "tokens"]
+            let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers", "tokens"]; //
             for (const tbl of tables) {
                 let rows = null
                 switch (tbl) {
@@ -8876,6 +8888,10 @@ module.exports = class Indexer extends AssetManager {
                     case "token_transfers":
                         rows = rows_token_transfers;
                         console.log(`token_transfers`, rows_token_transfers)
+                        break;
+                    case "tokens":
+                        rows = rows_tokens;
+                        console.log(`tokens`, rows_tokens)
                         break;
                 }
                 if (rows && rows.length > 0) {
@@ -9059,6 +9075,56 @@ module.exports = class Indexer extends AssetManager {
             this.timeStat.processBlockEvents++
         }
         return r;
+    }
+
+    buildBqContracts(chain_id, chain_name, contractInfos, rows_contracts = []){
+        for (const c of contractInfos){
+            let bqContract = {
+                insertId: `${c.address}`,
+                json: {
+                    chain_id: chain_id,
+                    id: chain_name,
+                    address: c.address,
+                    bytecode: c.bytecode,
+                    function_sighashes: c.function_sighashes,
+                    event_topics: c.event_topics,
+                    is_erc20: c.is_erc20,
+                    is_erc721: c.is_erc721,
+                    is_erc1155: c.is_erc1155,
+                    block_timestamp: c.block_timestamp,
+                    block_number: c.block_number,
+                    block_hash: c.block_hash
+                }
+            }
+            console.log(`bqContract+`, bqContract)
+            rows_contracts.push(bqContract);
+        }
+        return
+    }
+
+    buildBqTokens(chain_id, chain_name, contractInfos, rows_tokens = []){
+        for (const c of contractInfos){
+            if (c.is_erc20 && c.erc20Info){
+                let erc20Info = c.erc20Info
+                let bqToken = {
+                    insertId: `${c.address}`,
+                    json: {
+                        chain_id: chain_id,
+                        id: chain_name,
+                        address: c.address,
+                        symbol: erc20Info.symbol,
+                        decimals: erc20Info.decimals,
+                        totalSupply: erc20Info.totalSupply,
+                        block_timestamp: c.block_timestamp,
+                        block_number: c.block_number,
+                        block_hash: c.block_hash
+                    }
+                }
+                console.log(`bqToken+`, bqToken)
+                rows_tokens.push(bqToken);
+            }
+        }
+        return
     }
 
     synthetic_blockTS(chainID, blockNumber) {
@@ -9571,6 +9637,7 @@ module.exports = class Indexer extends AssetManager {
         let rows_logs = [];
         let rows_contracts = [];
         let rows_token_transfers = [];
+        let rows_tokens = [];
         let rows_traces = [];
         let auto_evm_rows_map = {} // tableID => rows
         let auto_evm_schema_map = {} // tableID => rows
@@ -9906,43 +9973,11 @@ module.exports = class Indexer extends AssetManager {
             }
 
             let contractInfos = await this.process_evm_transaction(tx, chainID, true, true, false); // isTip=true, finalized=true, writeBTSubstrate = FALSE
-            for (const c of contractInfos){
-                /*
-                **** contractInfo {
-                  address: '0x15d76d755caa2fb6ddf9a9adf1a649b14932e730',
-                  bytecode: '0x363d3d373d3d3d363d73d332254f274cc65aa11178b74734e2992b8f349e5af43d82803e903d91602b57fd5bf3',
-                  bytecodeHash: '0x1f8b67be329f6419c9282095843235301b6b3475e42bc9e3262b646aba807206',
-                  function_sighashes: [],
-                  event_topics: [],
-                  is_erc20: false,
-                  is_erc721: false,
-                  is_erc1155: false,
-                  block_timestamp: 1686586439,
-                  block_number: 17465083,
-                  block_hash: '0x2f5d33fc1ebe6afebbe2b9647cd550a673d5657a254417d3b4f1fcb8d0d20b68',
-                }
-                */
-                let bqContract = {
-                    insertId: `${tx.transactionHash}${c.address}`,
-                    json: {
-                        chain_id: chainID,
-                        id: chain.id,
-                        address: c.address,
-                        bytecode: c.bytecode,
-                        function_sighashes: c.function_sighashes,
-                        event_topics: c.event_topics,
-                        is_erc20: c.is_erc20,
-                        is_erc721: c.is_erc721,
-                        is_erc1155: c.is_erc1155,
-                        block_timestamp: c.block_timestamp,
-                        block_number: c.block_number,
-                        block_hash: c.block_hash
-                    }
-                }
-                console.log(`bqContract+`, bqContract)
-                rows_contracts.push(bqContract);
-            }
+            this.buildBqContracts(chainID, chain.id, contractInfos, rows_contracts)
+            this.buildBqTokens(chainID, chain.id, contractInfos, rows_tokens)
         }
+        console.log(`rows_contracts HERE`, rows_contracts)
+        console.log(`rows_tokens HERE`, rows_tokens)
 
         if (blockTS) {
             // crawl any token addresses, write to btRealtime
@@ -9953,7 +9988,7 @@ module.exports = class Indexer extends AssetManager {
         if (write_bt) {
             // store into bt
             try {
-                let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers"]; // ["tokens", , "traces"]
+                let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers", "tokens"]; // [, , "traces"]
                 let currentDayMicroTS = paraTool.getCurrentDayTS() * 1000000 //last microsecond of a day - to be garbage collected 7 days after this
                 for (const tbl of tables) {
                     let rows = null
@@ -10009,6 +10044,17 @@ module.exports = class Indexer extends AssetManager {
                             };
                             console.log(`token_transfers ----`, raw_token_transfers)
                             break;
+                        case "tokens":
+                            let raw_tokens = [];
+                            for (const token of rows_tokens) {
+                                raw_tokens.push(token.json)
+                            }
+                            cres.data[tbl][blockHash] = {
+                                value: JSON.stringify(raw_tokens),
+                                timestamp: currentDayMicroTS
+                            };
+                            console.log(`tokens ----`, raw_tokens)
+                            break;
                     }
                     console.log(`cres.data[${tbl}][${blockHash}]`, cres.data[tbl][blockHash])
                 }
@@ -10028,16 +10074,14 @@ module.exports = class Indexer extends AssetManager {
             }
         }
 
-        console.log(`imhere aaa`)
         if (!stream_bq) {
             return
         }
-        console.log(`imhere bbb`)
         // stream into blocks, transactions
         try {
             //let dataset = "evm";
             let dataset = "crypto_evm"
-            let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers"]; // ["tokens"]
+            let tables = ["blocks", "transactions", "logs", "contracts", "token_transfers", "tokens"];
             for (const tbl of tables) {
                 let rows = null
                 let tblID = `${tbl}${chainID}`
@@ -10056,6 +10100,14 @@ module.exports = class Indexer extends AssetManager {
                     case "contracts":
                         rows = rows_contracts;
                         console.log(`contracts ++++`, rows_contracts)
+                        break;
+                    case "token_transfers":
+                        rows = rows_token_transfers;
+                        console.log(`token_transfers ++++`, rows_token_transfers)
+                        break;
+                    case "tokens":
+                        rows = rows_tokens;
+                        console.log(`tokens ++++`, rows_tokens)
                         break;
                 }
                 if (rows && rows.length > 0) {

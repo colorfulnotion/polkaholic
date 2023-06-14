@@ -406,7 +406,6 @@ async function getTokenTotalSupply(web3Api, contractAddress, bn = 'latest', deci
 //return symbol, name, decimal, totalSupply
 async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest', RPCBackfill = null) {
     let x = RPCBackfill ? get_proxy_address(contractAddress, chainID, RPCBackfill) : null;
-    console.log(`get_proxy_address x`, x)
     if (x != undefined) {
         contractAddress = x;
     }
