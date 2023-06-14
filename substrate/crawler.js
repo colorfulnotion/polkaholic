@@ -1640,7 +1640,7 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
                 if (txs.length) {
-                    txs = await ethTool.processTranssctions(txs, crawler.contractABIs, crawler.contractABISignatures);
+                    txs = await ethTool.processTransactions(txs, crawler.contractABIs, crawler.contractABISignatures);
                     for (let i = 0; i < txs.length; i++) {
                         let tx = txs[i];
                         tx.blockHash = ""; // if ( tx.blockHash != undefined) delete tx.blockHash;
@@ -2149,7 +2149,7 @@ module.exports = class Crawler extends Indexer {
                         //console.log(`[${block.number}] evmTrace`, evmTrace)
                     }
                     var statusesPromise = Promise.all([
-                        ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                        ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
                         ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                     ])
                     let [dTxns, dReceipts] = await statusesPromise
@@ -2208,7 +2208,7 @@ module.exports = class Crawler extends Indexer {
                                 //console.log(`[${block.number}] evmTrace`, evmTrace)
                             }
                             var statusesPromise = Promise.all([
-                                ethTool.processTranssctions(block.transactions, contractABIs, contractABISignatures),
+                                ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
                                 ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
                             ])
                             let [dTxns, dReceipts] = await statusesPromise

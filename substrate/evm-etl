@@ -159,6 +159,14 @@ async function main() {
             process.exit(0);
         })
 
+    program.command('generateeventbloom')
+        .description("Generate Event Bloom Filters")
+        .usage("-d evm_dev")
+        .action(async (opt) => {
+            var evmetl = new EVMETL();
+            await evmetl.generateEventBloomFilter();
+            process.exit(0);
+        })
 
     program.command('setupdataset')
         .description("Setup dataset in substrate-etl")
@@ -281,7 +289,7 @@ async function main() {
     Step0 create blocklog rec
     Step1 ./evm-etl cpblk -l 2023-05-12
     Step2 ./evm-etl backfill -c 1 -l 2023-05-12
-    Step3 ./evm-etl indexchain -c 1 -l 2023-05-12
+    Step3 ./evm-etl indexevmchain -c 1 -l 2023-05-12
     Step4 ./evm-etl cpevmdecoded -c 1 -l 2023-05-12
     Step5 ./evm-etl loadevmdecoded -l 2023-05-12
 

@@ -30,6 +30,12 @@
         "type": "STRING"
       },
       {
+        "description": "32-byte event topic hashes",
+        "mode": "REPEATED",
+        "name": "event_topics",
+        "type": "STRING"
+      },
+      {
         "description": "Whether this contract is an ERC20 contract",
         "mode": "NULLABLE",
         "name": "is_erc20",
@@ -39,6 +45,12 @@
         "description": "Whether this contract is an ERC721 contract",
         "mode": "NULLABLE",
         "name": "is_erc721",
+        "type": "BOOLEAN"
+      },
+      {
+        "description": "Whether this contract is an ERC1155 contract",
+        "mode": "NULLABLE",
+        "name": "is_erc1155",
         "type": "BOOLEAN"
       },
       {
