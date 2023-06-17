@@ -3345,7 +3345,7 @@ module.exports = class Query extends AssetManager {
                 column: {
                     cellLimit: 1
                 },
-                families: ["realtime", "evmcontract", "wasmcontract"],
+                families: ["realtime", "evmcontract", "wasmcontract", "labels"],
                 limit: 10,
             }];
 
@@ -3359,7 +3359,7 @@ module.exports = class Query extends AssetManager {
                 let address = row.id;
                 let rowData = row.data;
                 let isEVMAddr = paraTool.isValidEVMAddress(address)
-                let [assets, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                let [assets, contract, labels] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], rowData["label"], chainList)
                 let chainsMap = {};
                 for (let i = 0; i < assets.length; i++) {
                     let a = assets[i];
@@ -3483,6 +3483,7 @@ module.exports = class Query extends AssetManager {
                     requestedChainPrefix,
                     balanceUSD,
                     chains,
+		    labels,
                     numFollowing: 0,
                     numFollowers: 0,
                     isFollowing: false,
@@ -3517,14 +3518,6 @@ module.exports = class Query extends AssetManager {
                     }
                     account.numFollowers = a.numFollowers;
                     account.numFollowing = a.numFollowing;
-                    /*
-		    if (account.numFollowers > 0 && fromAddress) {
-			let sql2 = `select isFollowing, followDT from follow where fromAddress = '${fromAddress}' and toAddress = '${address}'`
-			let follows = await this.poolREADONLY.query(sql2);
-			if (follows.length > 0) {
-			    account.isFollowing = true;
-			}
-		    } */
                 }
 
                 accounts.push(account);
@@ -3537,9 +3530,10 @@ module.exports = class Query extends AssetManager {
         return (accounts);
     }
 
-    async get_account_realtime(address, realtimeData, evmcontractData, wasmcontractData, chainList = []) {
+    async get_account_realtime(address, realtimeData, evmcontractData, wasmcontractData, labelData, chainList = []) {
         let realtime = {};
         let contract = null;
+	let labels = {};
         if (realtimeData) {
             let lastCellTS = {};
             for (const assetChainEncoded of Object.keys(realtimeData)) {
@@ -3621,8 +3615,15 @@ module.exports = class Query extends AssetManager {
                 break;
             }
             // TODO
-        }
-        return [current, contract];
+        } else if (labelData) {
+            for (const labelType of Object.keys(labelData)) {
+                let cell = labelData[labelType];
+                let label = JSON.parse(cell[0].value)
+		labels[labelType] = label;
+                break;
+            }
+	}
+        return [current, contract, labels];
     }
 
     async get_account_history(address, rows, maxRows = 1000, chainList = [], daily = false) {
@@ -4110,9 +4111,9 @@ module.exports = class Query extends AssetManager {
                     })
                 }
             }
-            return [realtime, contract];
+            return [realtime, contract, labels];
         } else {
-            let families = ["realtime", "evmcontract", "wasmcontract"];
+            let families = ["realtime", "evmcontract", "wasmcontract", "label"];
             let row = false;
             contract = null;
             try {
@@ -4127,7 +4128,7 @@ module.exports = class Query extends AssetManager {
                     filter
                 });
                 let rowData = row.data;
-                [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], [])
+                [realtime, contract, labels] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], rowData["label"], [])
             } catch (err) {
 
             }
@@ -4172,7 +4173,7 @@ module.exports = class Query extends AssetManager {
                     })
                 }
             }
-            return [realtime, contract];
+            return [realtime, contract, labels];
         }
     }
 
@@ -4372,10 +4373,10 @@ module.exports = class Query extends AssetManager {
                 case "realtime":
                     if (row) {
                         let rowData = row.data;
-                        let [realtime, contract] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], chainList)
+                        let [realtime, contract, labels] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], rowData["label"], chainList)
                         return realtime;
                     } else {
-                        let [realtime, contract] = await this.get_account_realtime(address, null, null, null, chainList)
+                        let [realtime, contract, labels] = await this.get_account_realtime(address, null, null, null, null, chainList)
                         return realtime;
                     }
                 case "ss58h160":

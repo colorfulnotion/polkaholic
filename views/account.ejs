@@ -140,51 +140,10 @@ let suggest = false; // disabled for now
         <% } %>
         <i>(source: Kusama On-chain Identity, <%= verificationStatus %>)</i><br/>
   <% } %>
-    <% if ( false ) { %>
-      <button type="button" class="btn btn-link" data-mdb-toggle="modal" data-mdb-target="#suggestModal">
-        Suggest Nickname
-      </button>
-
-      <div
-        class="modal fade"
-        id="suggestModal"
-        data-mdb-backdrop="static"
-        data-mdb-keyboard="false"
-        tabindex="-1"
-        aria-labelledby="suggestModalLabel"
-        aria-hidden="true"
-      >
-        <div class="modal-dialog">
-          <div class="modal-content">
-            <div class="modal-header">
-              <h5 class="modal-title" id="suggestModalLabel">Suggest Nickname</h5>
-              <button type="button" class="btn-close" data-mdb-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body">
-Help others, earn 25 HOLIC for suggesting a public nickname:<br/>
-              <label class="form-label" for="nickname">Nickname</label>
-              <input type="text" id="nickname" class="form-control" />
-	      Account Type:
-<select id="addressType" class="select">
-  <option value="exchange">Exchange</option>
-  <option value="defi">Defi / NFT Project</option>
-  <option value="dapp">Dapp</option>
-  <option value="company">Company</option>
-  <option value="person">Person (not eligible for rewards)</option>
-</select>
-<small>
-Rewards granted upon reasonable verification.  Important: PII info (Person) will not be published or be eligible for rewards.
-</small>
-            </div>
-
-            <div class="modal-footer">
-              <button type="button" class="btn btn-secondary" data-mdb-dismiss="modal">Close</button>
-              <button type="button" class="btn btn-primary" id="submitSuggestion">Submit Suggestion</button>
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <% if ( account.labels ) { %>
+       <% if ( account.labels.merklescience ) { %>
+             <%- include('labelsmerklescience', {title: "Merkle Science", labels: account.labels.merklescience}); %>
+       <% } %>
     <% } %>
 	  <b>Public Key:</b> <code><%- account.address; %></code> <a href='/qrcode/<%= account.address; %>'><i class="fa-solid fa-qrcode"></i></a>
         </p>
