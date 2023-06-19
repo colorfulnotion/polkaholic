@@ -2109,6 +2109,7 @@ module.exports = class Crawler extends Indexer {
         ]
         if (evmChainList.includes(chainID)) {
             console.log(`evmchain no longer supported`)
+            process.exit(0)
             return [null, null, null];
         } else {
             console.log("loading substrate");
