@@ -177,7 +177,7 @@ async function main() {
                     await crawler.index_block(chain, bn, blockHash);
                 }
 
-		            let x = await crawler.crawl_block_trace(chain, t2)
+                let x = await crawler.crawl_block_trace(chain, t2)
                 let blockHash = x.blockHash;
 
                 await crawler.index_block(chain, blockNumber, blockHash);

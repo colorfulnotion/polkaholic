@@ -65,9 +65,9 @@ function showcodecontracts(codeHash) {
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     return presentBlockNumber(row.chainID, row.chainName, data)
-		} else {
+                } else {
                     return data;
-		}
+                }
             }
         }, {
             data: 'deployer',
@@ -78,7 +78,7 @@ function showcodecontracts(codeHash) {
                     return data;
                 }
             }
-        } ]
+        }]
     });
     let table = tableContracts;
     table.clear();
@@ -88,16 +88,16 @@ function showcodecontracts(codeHash) {
 }
 
 function showcodesource(codeHash, code) {
-    let  out = "";
+    let out = "";
     let i = 0;
     out += `<div><button class="btn-primary" href="https://chainide.com/${codeHash}">Open with ChainIDE</button></div>`
     for (const s of source) {
-	const u = new URL(s.srcUrl);
-	const p = u.pathname.replaceAll(`/wasmcode/${codeHash}/`, "")
-	out = out + `<div><a href="${u}" class="btn btn-link" style="text-transform: none;">${p}</a></div><div id="codesrc${i}"></div>`;
-	if ( s.source ) {
-	    out = out + "<textarea style='width: 100%; height: 400px; font-family: Courier; font-size: 8pt'>" + JSON.parse(s.source) + "</textarea>";
-	}
+        const u = new URL(s.srcUrl);
+        const p = u.pathname.replaceAll(`/wasmcode/${codeHash}/`, "")
+        out = out + `<div><a href="${u}" class="btn btn-link" style="text-transform: none;">${p}</a></div><div id="codesrc${i}"></div>`;
+        if (s.source) {
+            out = out + "<textarea style='width: 100%; height: 400px; font-family: Courier; font-size: 8pt'>" + JSON.parse(s.source) + "</textarea>";
+        }
 
     }
     document.getElementById("codesourceagg").innerHTML = out;
@@ -106,10 +106,10 @@ function showcodesource(codeHash, code) {
 function showcodetab(hash, codeHash) {
     switch (hash) {
         case "#contracts":
-        showcodecontracts(codeHash); // contracts: datatables
+            showcodecontracts(codeHash); // contracts: datatables
             break;
         case "#codesource":
-        showcodesource(codeHash, code); 
+            showcodesource(codeHash, code);
             break;
     }
 }

@@ -179,7 +179,7 @@ module.exports = class Crawler extends Indexer {
                 "method": "state_traceBlock",
                 "params": [blockHash, "state", "", "Put"]
             }
-            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality") && chain.id == "composable" ) {
+            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality") && chain.id == "composable") {
                 chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
                 if (chain.onfinalityConfig && chain.onfinalityConfig.length > 5) {
                     chain.RPCBackfill = chain.onfinalityConfig;

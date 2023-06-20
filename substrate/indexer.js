@@ -850,7 +850,7 @@ module.exports = class Indexer extends AssetManager {
         let wasmContracts = []
         let btHashes_rows = [];
         let btRealtime_rows = [];
-	console.log(this.wasmContractMap);
+        console.log(this.wasmContractMap);
         for (const k of Object.keys(this.wasmContractMap)) {
             let w = this.wasmContractMap[k]
             if (w.withCode) {
@@ -5205,7 +5205,7 @@ module.exports = class Indexer extends AssetManager {
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
 
-		console.log("rExtrinsic", rExtrinsic)
+                console.log("rExtrinsic", rExtrinsic)
                 if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
                     this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
                 }
@@ -6162,14 +6162,14 @@ module.exports = class Indexer extends AssetManager {
             let web3Api = this.web3Api
             let bn = tx.blockNumber
             let topicFilters = await this.getTopicFilters()
-            for (const createAddr of createAddrs){
+            for (const createAddr of createAddrs) {
                 let contractAddress = createAddr
                 let contractInfo = await ethTool.ProcessContractByteCode(web3Api, contractAddress, bn, topicFilters)
                 // add timestamp/blockHash/blockNumber
                 contractInfo.block_timestamp = tx.timestamp
                 contractInfo.block_hash = tx.blockHash
                 contractInfo.block_number = tx.blockNumber
-                if (contractInfo.is_erc20){
+                if (contractInfo.is_erc20) {
                     contractInfo.erc20Info = await ethTool.getERC20TokenInfo(web3Api, contractAddress, bn)
                 }
                 console.log(`**** contractInfo`, contractInfo)
@@ -7246,8 +7246,8 @@ module.exports = class Indexer extends AssetManager {
         for (let index = 0; index < block.extrinsics.length; index++) {
             let extrinsicRaw = block.extrinsics[index];
             let ext = await this.process_extrinsic(api, extrinsicRaw, eventsIndexed[index], block, index, finalized, isTip, tracesPresent);
-	    console.log(ext)
-	   
+            console.log(ext)
+
             if (ext) {
                 extrinsics.push(ext);
                 if ((this.currentTS() - blockTS < 86400 * 2) && finalized) { // only save in recentExtrinsic if finalized (otherwise extrinsicID would not be usable as a deduping key)
@@ -8350,9 +8350,9 @@ module.exports = class Indexer extends AssetManager {
             receiptsAvailable = true
             evmReceipts = r.evmReceipts
         }
-        if (!traceAvailable){
+        if (!traceAvailable) {
             //MK: need to figure out btTrace -> rpcTrace translation
-            if (evmRPCInternalApi){
+            if (evmRPCInternalApi) {
                 evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blkNum, log_timeout_ms, log_retry_max, log_retry_ms)
             }
         }
@@ -8581,8 +8581,8 @@ module.exports = class Indexer extends AssetManager {
         return r;
     }
 
-    buildBqContracts(bq_evm_chain_id, bq_evm_id, contractInfos, rows_contracts = []){
-        for (const c of contractInfos){
+    buildBqContracts(bq_evm_chain_id, bq_evm_id, contractInfos, rows_contracts = []) {
+        for (const c of contractInfos) {
             let bqContract = {
                 insertId: `${c.address}`,
                 json: {
@@ -8606,7 +8606,7 @@ module.exports = class Indexer extends AssetManager {
         return
     }
 
-    buildBqEvmBlock(bq_evm_chain_id, bq_evm_id, block, rows_blocks = []){
+    buildBqEvmBlock(bq_evm_chain_id, bq_evm_id, block, rows_blocks = []) {
         let bqEvmBlock = {
             insertId: `${block.hash}`,
             json: {
@@ -8637,8 +8637,8 @@ module.exports = class Indexer extends AssetManager {
         return
     }
 
-    buildBqTokenTransfers(bq_evm_chain_id, bq_evm_id, evm_block_timestamp, evm_block_number, evm_block_hash, tx, rows_token_transfers = []){
-        for (const t of tx.transfers){
+    buildBqTokenTransfers(bq_evm_chain_id, bq_evm_id, evm_block_timestamp, evm_block_number, evm_block_hash, tx, rows_token_transfers = []) {
+        for (const t of tx.transfers) {
             let transferType = t.type
             let tokenIDs = null
             let tokenValues = null
@@ -8671,9 +8671,9 @@ module.exports = class Indexer extends AssetManager {
         return
     }
 
-    buildBqTokens(bq_evm_chain_id, bq_evm_id, contractInfos, rows_tokens = []){
-        for (const c of contractInfos){
-            if (c.is_erc20 && c.erc20Info){
+    buildBqTokens(bq_evm_chain_id, bq_evm_id, contractInfos, rows_tokens = []) {
+        for (const c of contractInfos) {
+            if (c.is_erc20 && c.erc20Info) {
                 let erc20Info = c.erc20Info
                 let bqToken = {
                     insertId: `${c.address}`,
@@ -9440,11 +9440,11 @@ module.exports = class Indexer extends AssetManager {
 
     }
 
-    async getTopicFilters(){
+    async getTopicFilters() {
         let topicFilters = this.topicFilters
-        if(topicFilters){
+        if (topicFilters) {
             return topicFilters
-        }else{
+        } else {
             console.log(`Loaded topicFilter!`)
             topicFilters = await this.loadEventBloomFilter()
             this.topicFilters = topicFilters

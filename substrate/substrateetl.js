@@ -1611,10 +1611,10 @@ FROM
                 let codeHash = u8aToHex(pub);
                 let codeStruct = c[1].toHuman();
                 let code = codeStruct.code;
-		console.log("contracts.codeStorage", chainID, codeHash, numContracts);
+                console.log("contracts.codeStorage", chainID, codeHash, numContracts);
                 out.push(`(${mysql.escape(codeHash)}, '${chainID}', ${mysql.escape(code)})`);
             }
-            last_key = (query.length >= perPageLimit ) ? query[query.length - 1][0] : "";
+            last_key = (query.length >= perPageLimit) ? query[query.length - 1][0] : "";
             // write out
             await this.upsertSQL({
                 "table": "wasmCode",

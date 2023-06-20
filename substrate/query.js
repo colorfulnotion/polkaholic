@@ -3483,7 +3483,7 @@ module.exports = class Query extends AssetManager {
                     requestedChainPrefix,
                     balanceUSD,
                     chains,
-		    labels,
+                    labels,
                     numFollowing: 0,
                     numFollowers: 0,
                     isFollowing: false,
@@ -3533,7 +3533,7 @@ module.exports = class Query extends AssetManager {
     async get_account_realtime(address, realtimeData, evmcontractData, wasmcontractData, labelData, chainList = []) {
         let realtime = {};
         let contract = null;
-	let labels = {};
+        let labels = {};
         if (realtimeData) {
             let lastCellTS = {};
             for (const assetChainEncoded of Object.keys(realtimeData)) {
@@ -3619,10 +3619,10 @@ module.exports = class Query extends AssetManager {
             for (const labelType of Object.keys(labelData)) {
                 let cell = labelData[labelType];
                 let label = JSON.parse(cell[0].value)
-		labels[labelType] = label;
+                labels[labelType] = label;
                 break;
             }
-	}
+        }
         return [current, contract, labels];
     }
 
@@ -6319,7 +6319,7 @@ module.exports = class Query extends AssetManager {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
             let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, extrinsicID, extrinsicHash, language, compiler, storer, metadata, status, convert(srcURLs using utf8) srcURLs, verifier, convert(authors using utf8) authors, contractName, verifyDT from wasmCode where codeHash = '${codeHash}' ${w}`
             let wasmCodes = await this.poolREADONLY.query(sql);
-	    
+
             if (wasmCodes.length == 0) {
                 // return not found error
                 throw new paraTool.NotFoundError(`WASM Code Hash not found: ${codeHash}`)
@@ -6333,31 +6333,37 @@ module.exports = class Query extends AssetManager {
             wasmCode.id = id;
             wasmCode.chainName = chainName;
 
-	    // fetch all the contracts
+            // fetch all the contracts
             sql = `select chainID, address, extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer from contract where codeHash ='${codeHash}' and chainID = '${wasmCode.chainID}'`
-	    let contracts = await this.poolREADONLY.query(sql);
-	    for ( const c of contracts ) {
-		c.id = id;
-		c.chainName = chainName;
-	    }
-	    wasmCode.contracts = contracts;
-	    let srcURLs = wasmCode.srcURLs ? JSON.parse(wasmCode.srcURLs) : [];
-	    wasmCode.source = [];
+            let contracts = await this.poolREADONLY.query(sql);
+            for (const c of contracts) {
+                c.id = id;
+                c.chainName = chainName;
+            }
+            wasmCode.contracts = contracts;
+            let srcURLs = wasmCode.srcURLs ? JSON.parse(wasmCode.srcURLs) : [];
+            wasmCode.source = [];
             const axios = require("axios");
-	    for ( const srcUrl of srcURLs ) {
-		// fetch the source
-		if ( srcUrl.includes(".zip")  || srcUrl.includes("Cargo.lock") || srcUrl.includes("Cargo.toml") || srcUrl.includes(".contract") ) {
-		    wasmCode.source.push({srcUrl});
-		} else {
-		    try {
-			let response = await axios.get(srcUrl, { responseType: 'text' })
-			response = response.data;
-			wasmCode.source.push({srcUrl, source: JSON.stringify(response)});
-		    } catch (e) {
-		    }
-		}
-	    }
-	    return wasmCode
+            for (const srcUrl of srcURLs) {
+                // fetch the source
+                if (srcUrl.includes(".zip") || srcUrl.includes("Cargo.lock") || srcUrl.includes("Cargo.toml") || srcUrl.includes(".contract")) {
+                    wasmCode.source.push({
+                        srcUrl
+                    });
+                } else {
+                    try {
+                        let response = await axios.get(srcUrl, {
+                            responseType: 'text'
+                        })
+                        response = response.data;
+                        wasmCode.source.push({
+                            srcUrl,
+                            source: JSON.stringify(response)
+                        });
+                    } catch (e) {}
+                }
+            }
+            return wasmCode
         } catch (err) {
             console.log(err)
         }
@@ -6602,9 +6608,9 @@ module.exports = class Query extends AssetManager {
                     throw new paraTool.InvalidError("Could not find metadata");
                 }
             }
-	    if ( publishSource ) {
-		srcURLs.push("https://" + path.join(bucketDir, codeHash, entry.entryName));
-	    }
+            if (publishSource) {
+                srcURLs.push("https://" + path.join(bucketDir, codeHash, entry.entryName));
+            }
             if (metadata) {
                 console.log("found metadata with srcURLs=", srcURLs);
             }

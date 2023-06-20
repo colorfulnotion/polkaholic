@@ -34,7 +34,9 @@ const exec = util.promisify(require('child_process').exec);
 const path = require('path');
 const fs = require('fs');
 const os = require("os");
-const { BloomFilter } = require('bloom-filters');
+const {
+    BloomFilter
+} = require('bloom-filters');
 
 // Imports the Google Cloud client library for Bunyan
 const {
@@ -1908,17 +1910,181 @@ from chain where chainID = '${chainID}' limit 1`);
         return r;
     }
 
+    gs_evm_file_name(chainID, logDT, blockNumber) {
+        return `${chainID}/${logDT.replaceAll("-","/")}/${blockNumber}.json.gz`
+    }
+
+    gs_substrate_file_name(relayChain, paraID, blockNumber) {
+        let folder = Math.floor(blockNumber / 10000).toString().padStart(8, "0");
+        return `${relayChain}/${paraID}/${folder}/${blockNumber}.json.gz`
+    }
+
+    async fetch_evm_block_gs(chainID, blockNumber) {
+        // TODO: shift back to substrate model 
+        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} from blockNumber = '${blockNumber}' limit 1`
+        let blocks = await this.poolREADONLY.query(sql);
+        if (blocks.length == 1) {
+            let b = blocks[0];
+            let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
+            const storage = new Storage();
+            const bucket = storage.bucket(bucketName);
+            const bucketName = 'crypto_evm';
+            const fileName = this.gs_evm_file_name(chainID, logDT, blockNumber);
+            const file = bucket.file(fileName);
+            const buffer = await file.download();
+            const r = JSON.parse(buffer[0]);
+            return {
+                evmFullBlock: r.block
+            }
+        }
+        return null;
+    }
+
+
+
+    async fetch_substrate_block_gs(chainID, blockNumber) {
+        const storage = new Storage();
+        const bucketName = 'crypto_substrate';
+        const bucket = storage.bucket(bucketName);
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        const fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber);
+        const file = bucket.file(fileName);
+        const buffer = await file.download();
+        const r = JSON.parse(buffer[0]);
+        let evm_chainID = null;
+        if (chainID == 2004) evm_chainID = 1284;
+        if (chainID == 2006) evm_chainID = 592;
+        if (evm_chainID) {
+            let x = fetch_evm_block_gs(evm_chainID, blockNumber);
+            if (x) {
+                r.evmBlock = x.block;
+            }
+        }
+        return r;
+    }
+
+    async fetch_block_gs(chainID, blockNumber) {
+        try {
+            if (chainID == 1 || chainID == 10 || chainID == 1284 || chainID == 592 || chainID == 43114 || chainID == 42161) {
+                return this.fetch_evm_block_gs(chainID, blockNumber);
+            } else {
+                return this.fetch_substrate_block_gs(chainID, blockNumber);
+            }
+        } catch (e) {
+            console.log(e)
+            return null;
+        }
+    }
+
+    async extract_blocks(bnStart, bnEnd, chainID) {
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        const tableChain = this.getTableChain(chainID);
+        const {
+            Storage
+        } = require('@google-cloud/storage');
+        const storage = new Storage();
+        let bucketName = "crypto_substrate";
+        const bucket = storage.bucket(bucketName);
+        let jmp = 100;
+
+	
+        for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+            let bn1 = bn0 + jmp - 1;
+            if (bn1 > bnEnd) bn1 = bnEnd;
+	    // check if we have archived
+	    let sql = `select sum(if(archived=1,1,0)) as archived, count(*) cnt from block${chainID} where blockNumber >= ${bn0} and blockNumber <= ${bn1}`;
+	    let recs = await this.poolREADONLY.query(sql);
+	    if ( recs.length > 0 ) {
+		let c = recs[0];
+		let archived = parseInt(c.archived);
+		let cnt = parseInt(c.cnt);
+		if ( archived == cnt ) {
+		    // we have no work to do!
+		    console.log("NO WORK TO DO", bn0, bn1, c);
+		    continue;
+		}  else {
+		    console.log("... workload: ", bn0, bn1, "archived", c.archived, "cnt", cnt);
+		}
+	    }
+	    
+	    
+            let start = paraTool.blockNumberToHex(bn0);
+            let end = paraTool.blockNumberToHex(bn1);
+            let [rows] = await tableChain.getRows({
+                start: start,
+                end: end
+            });
+	    let out = [];
+            for (const row of rows) {
+                let blockNumber = parseInt(row.id.substr(2), 16);
+                let r = this.build_block_from_row(row);
+                let result = {}
+                result["blockraw"] = r["block"];
+                result["events"] = r["events"];
+                result["feed"] = r["feed"];
+                if (result["blockraw"] && result["events"] && result["feed"]) {
+                    const compressedData = JSON.stringify(result);
+                    const fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber);
+                    const file = bucket.file(fileName);
+                    const writeStream = file.createWriteStream({
+                        contentType: 'application/json',
+                        gzip: true
+                    });
+                    writeStream.write(compressedData);
+                    writeStream.end();
+
+                    // Wait for the write stream to finish writing
+                    await new Promise((resolve, reject) => {
+                        writeStream.on('finish', resolve);
+                        writeStream.on('error', reject);
+                    });
+                    console.log(`gs://${bucketName}/${fileName}`);
+		    out.push(`(${blockNumber}, 1)`)
+                } else {
+                    console.log("PROBLEM", r);
+                }
+            }
+	    if ( out.length > 0 ) {
+		await this.upsertSQL({
+		    "table": `block${chainID}`,
+		    "keys": ["blockNumber"],
+		    "vals": ["archived"],
+		    "data": out,
+		    "replace": ["archived"]
+		});
+	    }
+        }
+    }
+
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
+	// WIP
+        if ( (chainID <= 2) && blockNumber < 35000 ) { // fetch { blockraw, events, feed } from GS storage 
+            try {
+                let r = await this.fetch_block_gs(chainID, blockNumber);
+                return r;
+            } catch (e) {
+                console.log("ERR", e);
+            }
+        }
+
         const filter = {
             filter: [{
                 family: families,
                 cellLimit: 100
             }]
         };
-
         const tableChain = this.getTableChain(chainID);
-        const [row] = await tableChain.row(paraTool.blockNumberToHex(blockNumber)).get(filter);
-        return this.build_feed_from_row(row, blockHash)
+        let row = null
+        try {
+            [row] = await tableChain.row(paraTool.blockNumberToHex(blockNumber)).get(filter);
+            let x = this.build_feed_from_row(row, blockHash)
+            return x;
+        } catch (e) {
+
+        }
+	return null
     }
 
     async fetch_block_row(chain, blockNumber, families = ["blockraw", "trace", "events", "feed", "n", "finalized", "feed", "autotrace"], feedOnly = false, blockHash = false) {
@@ -2074,7 +2240,7 @@ from chain where chainID = '${chainID}' limit 1`);
         }
     }
 
-    async loadEventBloomFilter(){
+    async loadEventBloomFilter() {
         let dir = `./schema/bloom/`
         let fn = path.join(dir, `event_topic.json`)
         var exported = JSON.parse(fs.readFileSync(fn));
