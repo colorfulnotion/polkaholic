@@ -134,41 +134,14 @@ async function main() {
             process.exit(0);
         });
 
-
-    program.command('indexblockstream')
-        .description(`Index Block`)
-        .usage("22007 195623")
-        .argument('<chainID>', 'ChainID', myParseInt)
-        .option('-f, --force', `Force crawl`, false)
-        .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
-        .action(async (chainID, blockNumber, opt) => {
-            let crawler = new Crawler();
-            crawler.setDebugLevel(paraTool.debugTracing)
-            let chain = await crawler.getChain(chainID);
-            let blockchainID = chain.chainID
-            let force = opt.force;
-            let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-                paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
-                paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
-            ]
-            //ONLY RUN IT ONCE
-            let bq_stream = true
-            if (evmChainIDList.includes(blockchainID)) {
-                let blockNumbers = await crawler.get_evmchain_workload(chainID, 5000);
-                console.log(blockNumbers);
-                await crawler.index_block_evm(chainID, blockNumbers, bq_stream);
-            }
-            process.exit(0);
-        })
-
     program.command('indexblock')
         .description(`Index Block`)
         .usage("22007 195623")
         .argument('<chainID>', 'ChainID', myParseInt)
-        .argument('<blockNumber>', 'Block Number', myParseInt)
+        .argument('<blockNumbers>', 'Block Numbers')
         .option('-f, --force', `Force crawl`, false)
         .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
-        .action(async (chainID, blockNumber, opt) => {
+        .action(async (chainID, blockNumbers, opt) => {
             let crawler = new Crawler();
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
@@ -180,10 +153,8 @@ async function main() {
             ]
 
             if (evmChainIDList.includes(blockchainID)) {
-                let res = await crawler.index_block_evm_from_bt(chainID, blockNumber, force);
-                if (!res) {
-                    await crawler.index_block_evm(chainID, blockNumber, false);
-                }
+                console.log(`evmchain no longer supported`)
+                process.exit(1)
             } else {
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();
@@ -194,9 +165,9 @@ async function main() {
                     let t2 = {
                         chainID,
                         blockNumber: bn,
-                        crawlBlockEVM: 1,
-                        crawlReceiptsEVM: 1,
-                        crawlTraceEVM: 1,
+                        crawlBlockEVM: 0,
+                        crawlReceiptsEVM: 0,
+                        crawlTraceEVM: 0,
                         crawlTrace: 1,
                     }
                     console.log(`crawl_block_trace`, t2)
@@ -205,7 +176,13 @@ async function main() {
                     console.log("blockHash: ", blockHash, blockNumber, x);
                     await crawler.index_block(chain, bn, blockHash);
                 }
+
+		            let x = await crawler.crawl_block_trace(chain, t2)
+                let blockHash = x.blockHash;
+
+                await crawler.index_block(chain, blockNumber, blockHash);
             }
+
             process.exit(0);
         })
 

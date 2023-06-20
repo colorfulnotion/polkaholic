@@ -22,7 +22,8 @@ if ( spec ) {
   });
 }
 
-tabs.push({ title: "Upload Contract", target: "upload" });
+tabs.push({ title: "Code", target: "codesource" });
+tabs.push({ title: "Contracts Using Code", target: "contracts" });
 
 for (let i=0; i<tabs.length; i++) {
   let t = tabs[i];
@@ -45,12 +46,21 @@ for (let i=0; i<tabs.length; i++) {
      <%- include('wasmcodeOverview', {code: code}); %>
   </div>
 
-  <div class="tab-pane" id="upload" role="tabpanel" aria-labelledby="upload-tab">
-    <form method="post" action="/uploadcode/<%= codeHash; %>" enctype="multipart/form-data">
-      <label class="form-label" for="customFile">Upload .contract data</label>
-      <input type="file" class="form-control" name="contractFile" id="contractFile" />
-      <input type='submit'>
-    </form>
+  <div class="tab-pane" id="codesource" role="tabpanel" aria-labelledby="code-tab">
+      <div id="codesourceagg">
+      </div>
+  </div>
+  <div class="tab-pane" id="contracts" role="tabpanel" aria-labelledby="contracts-tab">
+    <table id="tablecontracts" class="display" style='width: 100%'>
+      <thead>
+        <tr class="tableheader">
+          <th><%- include("tooltip", {k: "contractaddress"}) %>Contract Address</th>
+          <th><%- include("tooltip", {k: "extrinsichash"}) %>Extrinsic ID</th>
+          <th><%- include("tooltip", {k: "instantiatedat"}) %>Instantiated At</th>
+          <th><%- include("tooltip", {k: "deployer"}) %>Deployer</th>
+        </tr>
+      </thead>
+    </table>
   </div>
 </div>
 <script>
@@ -58,6 +68,10 @@ var baseURL = '<%= config.baseURL; %>'
 let codeHash = '<%= codeHash; %>';
 let tabs = <%- JSON.stringify(tabs); %>;
 let isEVM = 0;
+let metadata = <%- code.metadata; %>;
+let contracts = <%- JSON.stringify(code.contracts); %>;
+let source = <%- JSON.stringify(code.source); %>;
+let code = <%- JSON.stringify(code); %>;
 </script>
 
 <%- include('footer', {apiUrl: apiUrl}); %>
