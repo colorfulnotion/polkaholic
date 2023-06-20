@@ -723,7 +723,7 @@ function getParaIDExtra(relaychain = 'polkadot') {
         case 'kusama':
             return 20000
             break;
-        case 'westend':
+        case 'shibuya':
             return 30000
             break;
         case 'rococo':
@@ -757,7 +757,7 @@ function getRelayChainByChainID(chainID = 0) {
         case 2:
             return 'kusama';
         case 3:
-            return 'westend';
+            return 'shibuya';
         case 4:
             return 'rococo';
         case 6:
@@ -1547,8 +1547,7 @@ module.exports = {
     chainIDMoonbaseBeta: 60888,
     chainIDMoonbaseRelay: 60000,
 
-    chainIDShibuya: 81000, //TODO: (Q:where is shibuya relay?)
-    chainIDShibuyaRelay: 80000,
+    chainIDShibuya: 30000,
 
     // polkadot/kusama
     chainIDPolkadot: 0,

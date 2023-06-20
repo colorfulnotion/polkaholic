@@ -138,10 +138,10 @@ async function main() {
         .description(`Index Block`)
         .usage("22007 195623")
         .argument('<chainID>', 'ChainID', myParseInt)
-        .argument('<blockNumber>', 'Block Number', myParseInt)
+        .argument('<blockNumbers>', 'Block Numbers')
         .option('-f, --force', `Force crawl`, false)
         .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
-        .action(async (chainID, blockNumber, opt) => {
+        .action(async (chainID, blockNumbers, opt) => {
             let crawler = new Crawler();
             crawler.setDebugLevel(paraTool.debugTracing)
             let chain = await crawler.getChain(chainID);
@@ -176,7 +176,13 @@ async function main() {
                     console.log("blockHash: ", blockHash, blockNumber, x);
                     await crawler.index_block(chain, bn, blockHash);
                 }
+
+		            let x = await crawler.crawl_block_trace(chain, t2)
+                let blockHash = x.blockHash;
+
+                await crawler.index_block(chain, blockNumber, blockHash);
             }
+
             process.exit(0);
         })
 

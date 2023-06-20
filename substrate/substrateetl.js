@@ -118,10 +118,9 @@ module.exports = class SubstrateETL extends AssetManager {
             }
         }
         // setup paraID specific tables, including paraID=0 for the relay chain
-        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "evmtxs", "evmtransfers", "calls", "traces"] // remove evmtx, evmtransfers
-        tbls = ["calls", "traces"] // remove evmtx, evmtransfers
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "calls", "traces"] // remove evmtx, evmtransfers
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
-        let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama') ${p} order by chainID`
+        let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama', 'shibuya') ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         console.log(`***** setup "chain" tables:${tbls} (chainID=${chainID}) ******`)
         for (const rec of recs) {
@@ -134,20 +133,11 @@ module.exports = class SubstrateETL extends AssetManager {
                 let fld = this.partitioned_table(tbl);
                 let p = fld ? `--time_partitioning_field ${fld} --time_partitioning_type DAY` : "";
                 let cmd = `bq ${opType}  --project_id=${projectID}  --schema=schema/substrateetl/${tbl}.json ${p} --table ${bqDataset}.${tbl}${paraID}`
-
-                if (tbl == "calls") {
-                    cmd = `bq query --max_rows=3 --format=sparse --destination_table '${bqDataset}.${tbl}${paraID}' --project_id=${projectID} --time_partitioning_field ${fld} --replace --location=us --use_legacy_sql=false 'select * from \`polkadot_enterprise_US.${tbl}\` where relay_chain = "${relayChain}" and para_id=${paraID}'`;
-                } else {
-                    cmd = `bq query --max_rows=3 --format=sparse --destination_table '${bqDataset}.${tbl}${paraID}' --project_id=${projectID} --time_partitioning_field ${fld} --replace --location=us --use_legacy_sql=false 'select * from \`polkadot_enterprise_US.${tbl}\` where relay_chain = "${relayChain}" and para_id="${paraID}"'`;
-                }
-                if ((tbl == "evmtxs" || tbl == "evmtransfers") && rec.isEVM == 0) {
-                    cmd = null;
-                }
                 try {
                     if (cmd) {
                         console.log(cmd);
                         if (execute) {
-                            await exec(cmd);
+                            //await exec(cmd);
                         }
                     }
                 } catch (e) {
@@ -1542,7 +1532,7 @@ FROM
     | deployer      | varchar(67) | YES  | MUL | NULL    |       | contractevents{paraID} left join extrinsic_id with extrinsics{paraID}
     +---------------+-------------+------+-----+---------+-------+
     	    */
-    async updateContracts(chainID, loadSourceTables = false, perPagelimit = 1000, startDT = "2023-04-01") {
+    async updateContracts(chainID, loadSourceTables = false, perPageLimit = 10, startDT = "2023-04-01") {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
@@ -1555,6 +1545,7 @@ FROM
         let paraID = chain.paraID;
         let chainName = chain.chainName;
         let id = chain.id;
+        let bqDataset = this.get_relayChain_dataset(relayChain);
 
         let wsEndpoint = chain.WSEndpoint;
         let alts = {
@@ -1596,17 +1587,14 @@ FROM
         let done = false;
         while (!done) {
             let query = null;
-            console.log("contracts.codeStorage", chainID, last_key);
             try {
                 query = await api.query.contracts.codeStorage.entriesPaged({
                     args: [],
-                    pageSize: perPagelimit,
+                    pageSize: perPageLimit,
                     startKey: last_key
                 })
             } catch (err) {
                 console.log(err)
-                done = true;
-                return (false);
             }
             if (query.length == 0) {
                 console.log(`Query Completed: total ${numContracts} contracts`)
@@ -1623,9 +1611,10 @@ FROM
                 let codeHash = u8aToHex(pub);
                 let codeStruct = c[1].toHuman();
                 let code = codeStruct.code;
+		console.log("contracts.codeStorage", chainID, codeHash, numContracts);
                 out.push(`(${mysql.escape(codeHash)}, '${chainID}', ${mysql.escape(code)})`);
             }
-            last_key = (query.length > 999) ? query[query.length - 1][0] : "";
+            last_key = (query.length >= perPageLimit ) ? query[query.length - 1][0] : "";
             // write out
             await this.upsertSQL({
                 "table": "wasmCode",
@@ -1644,7 +1633,7 @@ FROM
             try {
                 query = await api.query.contracts.contractInfoOf.entriesPaged({
                     args: [],
-                    pageSize: perPagelimit,
+                    pageSize: perPageLimit,
                     startKey: last_key
                 })
             } catch (err) {
@@ -1688,7 +1677,7 @@ Example of contractInfoOf:
                 out.push(`('${address}', '${chainID}', '${codeHash}', '${storageBytes}', '${storageItems}', '${storageByteDeposit}', '${storageItemDeposit}', '${storageBaseDeposit}')`);
             }
 
-            last_key = (query.length > 999) ? query[query.length - 1][0] : "";
+            last_key = (query.length >= perPageLimit) ? query[query.length - 1][0] : "";
             if (last_key == "") done = true;
             // write out
             await this.upsertSQL({
@@ -1700,72 +1689,14 @@ Example of contractInfoOf:
             });
         }
 
-        // 1. Build contractsevents{paraID} from startDT with a single bq load operation that generates an empirically small table
-        if (loadSourceTables) {
-            try {
-                let bqDataset = this.get_relayChain_dataset(relayChain);
-                let targetSQL = `SELECT * FROM \`substrate-etl.${bqDataset}.extrinsics${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
-                let destinationTbl = `contracts.contractsextrinsics${id}`
-                let partitionedFld = 'block_time'
-                let cmd = `bq query --destination_table '${destinationTbl}' --project_id=${this.project} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                console.log(cmd);
-                await exec(cmd);
-
-                targetSQL = `SELECT * FROM \`substrate-etl.${bqDataset}.events${paraID}\` WHERE DATE(block_time) >= "${startDT}" and section = "contracts"`;
-                destinationTbl = `contracts.contractsevents${id}`
-                cmd = `bq query --destination_table '${destinationTbl}' --project_id=${this.project} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                console.log(cmd);
-                await exec(cmd);
-            } catch (err) {
-                console.log(err);
-            }
-        }
-        // 3. For any codeHash without any recent verification (based on wasmCode.status), check if sirato has any verification info
-        try {
-            let sql = `select codeHash from wasmCode where chainID = '${chainID}' and ( lastStatusCheckDT is null or lastStatusCheckDT < date_sub(Now(), interval 1 hour) ) and status in ('Unknown', 'Unverified')`;
-            let codeRecs = await this.poolREADONLY.query(sql);
-            for (const code of codeRecs) {
-                let codeHash = code.codeHash;
-                let baseUrl = `https://ink-verifier.sirato.xyz/api/contracts/${codeHash}/metadata.json`
-                // 0x760b41275855b824d54f65f9f44dd3f61f16e2253f295a59bdda0593693c3208
-                // extract out what we want from the below
-
-                try {
-                    const resp = await axios.get(baseUrl);
-                    let metadata = resp.data;
-                    let source = metadata ? metadata.source : null;
-                    if (source) {
-                        let language = source ? source.language : null;
-                        let compiler = source ? source.compiler : null;
-                        let contract = metadata ? metadata.contract : null;
-                        let contractName = contract ? contract.name : null;
-                        let version = contract ? contract.version : null;
-                        let authors = contract ? contract.authors : null;
-                        let status = await this.get_verification_status(codeHash);
-                        sql = `update wasmCode set metadata = ${mysql.escape(JSON.stringify(metadata))}, language = ${mysql.escape(language)}, compiler = ${mysql.escape(compiler)}, contractName = ${mysql.escape(contractName)}, version = ${mysql.escape(version)}, authors = ${mysql.escape(JSON.stringify(authors))}, status = '${status}' where codeHash = '${codeHash}'`
-                        if (sql) {
-                            this.batchedSQL.push(sql);
-                            await this.update_batchedSQL();
-                        }
-                    }
-                } catch (err) {
-                    let sql = `update wasmCode  set lastStatusCheckDT = Now() where codeHash = '${codeHash}'`
-                    this.batchedSQL.push(sql);
-                    await this.update_batchedSQL();
-                }
-            }
-        } catch (err) {
-            console.log(err);
-        }
-
-        // 2. Filter contractsevents{paraID} 3 times based:
+        // 2. Filter events{paraID} 3 times based:
         let tables = ["contracts", "contractscode", "contractscall"];
         for (const tbl of tables) {
             let sql = null;
             switch (tbl) {
                 case "contractscode":
                     // (a) CodeStored ==> wasmCode.{extrinsicHash, extrinsicID, storer (*), codeStoredBN, codeStoredTS }
-                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
+                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) codeStoredTS, block_number, block_hash, data from substrate-etl.contracts.events_${id}
   where section = 'contracts' and method = 'CodeStored')
   select events.*, signer_pub_key from events left join substrate-etl.${bqDataset}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
                     let rows = await this.execute_bqJob(sql);
@@ -1786,7 +1717,7 @@ Example of contractInfoOf:
                 // (b) Instantiated ==> contracts.{extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer (*) }
                 {
                     // TODO: ContractEmitted
-                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.contracts.contractsevents${id}
+                    sql = ` With events as (select extrinsic_id, extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, data from substrate-etl.contracts.events${id}
   where section = 'contracts' and method = 'Instantiated')
   select events.*, signer_pub_key from events left join substrate-etl.${bqDataset}.extrinsics${paraID} as extrinsics on events.extrinsic_id = extrinsics.extrinsic_id`
                     let rows = await this.execute_bqJob(sql);
@@ -1812,7 +1743,7 @@ Example of contractInfoOf:
                 // (c) Called ==> contractscall -- TODO decode, e.g. flip call
                 {
                     // NOTE that this is not complete becuase of utility batch , etc. so we should use contracts.called events, but for some reason this was not systematic, grr.
-                    sql = `select extrinsic_id, \`hash\` as extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, params, signer_pub_key from substrate-etl.contracts.contractsextrinsics${id} where section = 'contracts' and method = 'call'`
+                    sql = `select extrinsic_id, \`hash\` as extrinsic_hash, UNIX_SECONDS(block_time) blockTS, block_number, block_hash, params, signer_pub_key from substrate-etl.contracts.calls${id} where section = 'contracts' and method = 'call'`
                     let rows = await this.execute_bqJob(sql);
                     let out = []
                     for (const r of rows) {

@@ -850,6 +850,7 @@ module.exports = class Indexer extends AssetManager {
         let wasmContracts = []
         let btHashes_rows = [];
         let btRealtime_rows = [];
+	console.log(this.wasmContractMap);
         for (const k of Object.keys(this.wasmContractMap)) {
             let w = this.wasmContractMap[k]
             if (w.withCode) {
@@ -5204,7 +5205,7 @@ module.exports = class Indexer extends AssetManager {
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
 
-                //TODO: add shibuya testnet later
+		console.log("rExtrinsic", rExtrinsic)
                 if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
                     this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
                 }
@@ -7245,6 +7246,8 @@ module.exports = class Indexer extends AssetManager {
         for (let index = 0; index < block.extrinsics.length; index++) {
             let extrinsicRaw = block.extrinsics[index];
             let ext = await this.process_extrinsic(api, extrinsicRaw, eventsIndexed[index], block, index, finalized, isTip, tracesPresent);
+	    console.log(ext)
+	   
             if (ext) {
                 extrinsics.push(ext);
                 if ((this.currentTS() - blockTS < 86400 * 2) && finalized) { // only save in recentExtrinsic if finalized (otherwise extrinsicID would not be usable as a deduping key)
