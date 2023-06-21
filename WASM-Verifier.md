@@ -32,6 +32,16 @@ To support development
 ```
 curl -X POST -F "package=@flipper.zip" -F "signature=0xe209e220e80cc196f033e48a9e4a9bb178144372cdefb711a0ba211a1013fc3171d3b537fd3c3d2716753d664b7c6b3a3f887738672d484efd5d7da73bda89f71b" https://api.polkaholic.io/verify/shibuya/0x396418ff533172de8407004f53051b5409f6892564ddeba12f75cc855cb16fe0
 ```
+
+To support the option where a developer can submit metadata without supplying source code, we have a `publishSource=0` optional flag:
+
+```
+curl -X POST -F "package=@flipper.zip" -F "signature=0xe209e220e80cc196f033e48a9e4a9bb178144372cdefb711a0ba211a1013fc3171d3b537fd3c3d2716753d664b7c6b3a3f887738672d484efd5d7da73bda89f71b" https://api.polkaholic.io/verify/shibuya/0x396418ff533172de8407004f53051b5409f6892564ddeba12f75cc855cb16fe0?publishSource=0
+```
+
+The zip source, if provided, is copied into a private bucket but is not available for viewing. 
+
+
 * Info API Test case: 
 ```
 curl "https://api.polkaholic.io/info/shibuya/0x396418ff533172de8407004f53051b5409f6892564ddeba12f75cc855cb16fe0"

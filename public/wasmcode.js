@@ -34,7 +34,7 @@ function showcodecontracts(codeHash) {
             data: 'address',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    return presentIDwithIdenticon(data)
+                    return presentWASMContract(data);
                 } else {
 
                 }
