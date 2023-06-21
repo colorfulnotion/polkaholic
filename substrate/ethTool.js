@@ -744,8 +744,9 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         console.log(`decorateTxn: missing receipts`, dReceipt)
         return;
     }
-    if (dTxn.hash != dReceipt.transactionHash) {
-        console.log(`decorateTxn: txnHash mismatch (tx:${dTxn.hash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
+    let dTxnTxHash = (dTxn.hash)?  dTxn.hash: dTxn.transactionHash
+    if (dTxnTxHash != dReceipt.transactionHash) {
+        console.log(`decorateTxn: txnHash mismatch (tx:${dTxnTxHash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
         return
     }
     //todo: how to detect reverted but successful case?
@@ -790,7 +791,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
     let fTxn = {
         chainID: (chainID) ? chainID : paraTool.dechexToInt(dTxn.chainId),
-        transactionHash: dTxn.hash,
+        transactionHash: (dTxn.hash)?  dTxn.hash: dTxn.transactionHash,
         substrate: null,
         status: dReceipt.status,
         blockHash: dTxn.blockHash,
@@ -1718,7 +1719,7 @@ function parseAbiSignature(abiStrArr) {
 }
 */
 
-async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, chainID) {
+async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID) {
     let fBlk = evmBlk
     let blockTS = fBlk.timestamp
     let fTxns = []
@@ -1731,13 +1732,16 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, cha
     // recurse through all the trace records in dTrace, and for any with value, accumulate in feedTrace
     let feedtrace = []
     let feedcreates = []
+    let feedtraceMap = {};
+    let traceCreateMap = {};
+    /*
     if (dTrace) {
         process_evm_trace(dTrace, feedtrace, 0, [0], dTxns);
-        //console.log(`*** start process_evm_trace_creates`)
+        console.log(`*** start process_evm_trace_creates`)
         process_evm_trace_creates(dTrace, feedcreates, 0, [], dTxns);
-        //console.log(`*** done process_evm_trace_creates`, feedcreates)
+        console.log(`*** done process_evm_trace_creates`, feedcreates)
     }
-    let feedtraceMap = {};
+
     if (feedtrace.length > 0) {
         for (let t = 0; t < feedtrace.length; t++) {
             let internalTx = feedtrace[t];
@@ -1747,8 +1751,6 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, cha
             feedtraceMap[internalTx.transactionHash].push(internalTx);
         }
     }
-
-    let traceCreateMap = {};
     if (feedcreates.length > 0) {
         for (let t = 0; t < feedcreates.length; t++) {
             let createTx = feedcreates[t];
@@ -1758,7 +1760,29 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, cha
             traceCreateMap[createTx.transactionHash].push(createTx.to);
         }
     }
+    */
+    if (flatTraces) {
+        for (const t of flatTraces) {
+            //check for create/create2
+            let createsOps = ["create", "create2"]
+            if (createsOps.includes(t.trace_type)) {
+                console.log(`CONTRACT Create!`, t)
+                if (traceCreateMap[t.transaction_hash] == undefined) {
+                    traceCreateMap[t.transaction_hash] = [];
+                }
+                let contractAddress = (t.to_address != undefined) ? t.to_address : t.to
+                traceCreateMap[t.transaction_hash].push(contractAddress);
+            }
 
+            //check for internal
+            if (t.value > 0 && trace_address_to_str(t.trace_address) != '') {
+                if (feedtraceMap[t.transaction_hash] == undefined) {
+                    feedtraceMap[t.transaction_hash] = [];
+                }
+                feedtraceMap[t.transaction_hash].push(t);
+            }
+        }
+    }
     for (i = 0; i < dTxns.length; i += 1) {
         let dTxn = dTxns[i]
         let dReceipt = dReceipts[i]
@@ -1790,6 +1814,62 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, cha
     fBlk.transactionsInternal = fTxnsInternal
     fBlk.transactionsConnected = fTxnsConnected
     return fBlk
+}
+
+async function decorateEvmBlock(chainID, r){
+    console.log('decorate_evm_block', r)
+    let contractABIs = this.contractABIs;
+    let contractABISignatures = this.contractABISignatures;
+    //let evmRPCInternalApi = this.evmRPCInternal
+
+    let blkNum = false
+    let blkHash = false
+    let blockTS = false
+    let blockAvailable = false
+    let traceAvailable = false
+    let receiptsAvailable = false
+    let rpcBlock = r.block
+    let rpcReceipts = r.receipts
+    //let chainID = r.chain_id
+    let evmReceipts = []
+    let evmTrace = false
+    let blk = false
+    let stream_bq = false
+    let write_bt = false
+
+    if (rpcBlock) {
+        blockAvailable = true
+        blk = standardizeRPCBlock(rpcBlock)
+        console.log(`evmBlk++`, blk)
+        blkNum = blk.number;
+        blkHash = blk.hash;
+        blockTS = blk.timestamp;
+    } else {
+        console.log(`r.block missing`, r)
+    }
+    if (r.traces) {
+        traceAvailable = true
+        evmTrace = r.trace
+    }
+    if (rpcReceipts) {
+        receiptsAvailable = true
+        evmReceipts = standardizeRPCReceiptLogs(rpcReceipts)
+    } else {
+        console.log(`r.rpcReceipts missing`, r)
+    }
+    //console.log(`blk.transactions`, blk.transactions)
+    console.log(`decorate_evm_block [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , blockTS=${blockTS}`)
+    var statusesPromise = Promise.all([
+        processTransactions(blk.transactions, contractABIs, contractABISignatures),
+        processReceipts(evmReceipts, contractABIs, contractABISignatures)
+    ])
+    let [dTxns, dReceipts] = await statusesPromise
+    //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
+    //console.log(`[#${blkNum} ${blkHash}] dReceipts`, dReceipts)
+    let flatTraces = debugTraceToFlatTraces(evmTrace, dTxns)
+    //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
+    let evmFullBlock = await fuseBlockTransactionReceipt(blk, dTxns, dReceipts, flatTraces, chainID)
+    return evmFullBlock;
 }
 
 async function processTransactions(txns, contractABIs, contractABISignatures) {
@@ -2069,8 +2149,83 @@ function categorizeTokenSwaps(dLog) {
     return false
 }
 
+function debugTraceToFlatTraces(rpcTraces, txns) {
+    let traces = [];
+    if (!rpcTraces) {
+        return traces
+    }
+    for (let tx_index = 0; tx_index < rpcTraces.length; tx_index++) {
+        let tx = txns[tx_index]
+        let tx_transaction_hash = (tx.hash) ? tx.hash : tx.transactionHash
+        let tx_trace = (rpcTraces[tx_index].result) ? rpcTraces[tx_index].result : rpcTraces[tx_index];
+        traces.push(...iterate_transaction_trace(
+            tx_transaction_hash,
+            tx_index,
+            tx_trace
+        ));
+    }
+    return traces;
+}
+
+function iterate_transaction_trace(tx_transaction_hash, tx_index, tx_trace, trace_address = []) {
+    //console.log(`tx_trace`, tx_trace)
+    let trace = {};
+    trace.transaction_hash = tx_transaction_hash
+    trace.transaction_index = tx_index;
+
+    trace.from_address = (tx_trace['from'] != undefined) ? tx_trace['from'].toLowerCase() : null;
+    trace.to_address = (tx_trace['to'] != undefined) ? tx_trace['to'].toLowerCase() : null;
+
+    trace.input = tx_trace['input'];
+    trace.output = (tx_trace['output'] != undefined) ? tx_trace['output'] : null;
+
+    trace.value = (tx_trace['value'] != undefined) ? paraTool.dechexToIntStr(tx_trace['value']) : 0;
+    trace.gas = paraTool.dechexToIntStr(tx_trace['gas']);
+    trace.gas_used = paraTool.dechexToIntStr(tx_trace['gasUsed']);
+
+    trace.error = (tx_trace['error'] != undefined) ? tx_trace['error'] : null;
+
+    // lowercase for compatibility with parity traces
+    trace.trace_type = (tx_trace['type'] != undefined) ? tx_trace['type'].toLowerCase() : null;
+    trace.call_type = null
+
+    if (trace.trace_type === 'selfdestruct') {
+        // rename to suicide for compatibility with parity traces
+        trace.trace_type = 'suicide';
+    } else if (['call', 'callcode', 'delegatecall', 'staticcall'].includes(trace.trace_type)) {
+        trace.call_type = trace.trace_type;
+        trace.trace_type = 'call';
+    }
+
+    let result = [trace];
+
+    let calls = tx_trace['calls'] || [];
+
+    trace.subtraces = calls.length;
+    trace.trace_address = trace_address;
+    trace.trace_id = `${trace.trace_type}_${tx_transaction_hash}_${trace_address_to_str(trace.trace_address)}`
+
+    for (let call_index = 0; call_index < calls.length; call_index++) {
+        let call_trace = calls[call_index];
+        result.push(...iterate_transaction_trace(
+            tx_transaction_hash,
+            tx_index,
+            call_trace,
+            [...trace_address, call_index]
+        ));
+    }
+    return result;
+}
+
+function trace_address_to_str(trace_address) {
+    if (trace_address === null || trace_address.length === 0) {
+        return '';
+    }
+    return trace_address.map(address_point => address_point.toString()).join('_');
+}
 
 function categorizeTokenTransfers(dLog) {
+    //console.log(`categorizeTokenTransfers`, dLog)
     if (dLog.decodeStatus == "success") {
         let dSig = dLog.signature
         let dEvents = dLog.events
@@ -2391,14 +2546,6 @@ function decode_log(log, contractABIs, contractABISignatures) {
     return unknown
 }
 
-//curl https://rpc.moonriver.moonbeam.network -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"fromBlock": "0x10cca1", "toBlock": "0x10cca1"}],"id":1}'
-//curl https://rpc.moonriver.moonbeam.network -X POST -H "Content-Type: application/json" -d '{"jsonrpc":"2.0","method":"eth_getLogs","params":[{"blockHash": "0x5843b718bd8310095c078643fbb33020bfe8a98efb99906a1980c95a5d8da04e"}],"id":1}'
-
-//retrive both block and log
-//https://rpc.astar.network:8545
-//https://rpc.moonriver.moonbeam.network
-//https://rpc.api.moonbeam.network
-
 async function crawl_evm_logs(web3Api, bn) {
     var queryOpt = {
         fromBlock: bn,
@@ -2536,128 +2683,6 @@ function loadWallet(pk) {
         console.log(`loadWallet error=${error.toString()}`)
     }
     return false
-}
-
-/* 0.1MOVR to 22023 -> 22007
-Function: transfer(address, uint256, (uint8,bytes[]), uint64)
-#	Name	Type	Data
-1	currency_address	address	0x0000000000000000000000000000000000000802
-2	amount	uint256	100000000000000000
-2	destination.parents	uint8	1
-2	destination.interior	bytes	0x00000007d7,0x015c88c4cdb316381d45d7dfbe59623516cfe5805808313e76f7ce6af6333a443700
-
-Byte Value	Selector	Data Type
-0x00	Parachain	bytes4
-0x01	AccountId32	bytes32
-0x02	AccountIndex64	u64
-0x03	AccountKey20	bytes20
-0x04	PalletInstance	byte
-0x05	GeneralIndex	u128
-0x06	GeneralKey	bytes[]
-
-Selector	    Data Value	            Represents
-Parachain	    "0x00+000007E7"	        Parachain ID 2023
-AccountId32	    "0x01+AccountId32+00"	AccountId32, Network Any
-AccountKey20	"0x03+AccountKey20+00"	AccountKey20, Network Any
-PalletInstance	"0x04+03"	            Pallet Instance 3
-
-see: https://docs.moonbeam.network/builders/xcm/xc20/xtokens/#xtokens-transfer-function
-*/
-
-function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22006) {
-    console.log(`xTokenBuilder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
-    var xTokensContractAbiStr = '[{"inputs":[{"internalType":"address","name":"currency_address","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"components":[{"internalType":"uint8","name":"parents","type":"uint8"},{"internalType":"bytes[]","name":"interior","type":"bytes[]"}],"internalType":"struct IxTokens.Multilocation","name":"destination","type":"tuple"},{"internalType":"uint64","name":"weight","type":"uint64"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
-    var xTokensContractAbi = JSON.parse(xTokensContractAbiStr)
-    var xTokensContractAddress = '0x0000000000000000000000000000000000000804' //this is the precompiled interface
-    var xTokensContract = new web3Api.eth.Contract(xTokensContractAbi, xTokensContractAddress);
-    let weight = 6000000000
-    let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
-    let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
-    let junction = []
-    let junctionInterior = []
-    junction.push(1) // local asset would have 0. (but this is not xcm?)
-    if (paraIDDest != 0) {
-        let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
-        parachainHex = '0x' + parachainHex.padStart(10, '0')
-        junctionInterior.push(parachainHex)
-    }
-    //assume "any"
-    if (beneficiary.length == 66) {
-        let accountId32 = `0x01${beneficiary.substr(2)}00`
-        junctionInterior.push(accountId32)
-    } else if (beneficiary.length == 42) {
-        let accountKey20 = `0x03${beneficiary.substr(2)}00`
-        junctionInterior.push(accountKey20)
-    }
-    let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
-    junction.push(junctionInterior)
-    console.log(`junction`, junction)
-    console.log(`junctionInterior`, junctionInterior)
-    //[1,["0x00000007d4","0x01108cb67dcbaab765b66fdb99e3c4997ead09f1f82186e425dc9fec271e97aa7e00"]]
-    console.log(`xTokenBuilder currency_address=${currency_address}, Human Readable Amount=${amount}(rawAmount=${rawAmount}, using decimals=${decimals}), junction=${junction}, weight=${weight}`)
-    var data = xTokensContract.methods.transfer(currency_address, rawAmount, junction, weight).encodeABI()
-    let txStruct = {
-        to: xTokensContractAddress,
-        value: '0',
-        gas: 2000000,
-        data: data
-    }
-    console.log(`xTokenBuilder txStruct=`, txStruct)
-    return txStruct
-}
-
-function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 0) {
-    let isBeneficiaryEVM = (beneficiary.length == 42) ? true : false
-    console.log(`xc20Builder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}(isEVM=${isBeneficiaryEVM}), chainIDDest=${chainIDDest}`)
-    //https://github.com/AstarNetwork/astar-frame/blob/polkadot-v0.9.28/precompiles/xcm/XCM.sol
-    var xc20ContractAbiStr = '[{"inputs":[{"internalType":"address[]","name":"asset_id","type":"address[]"},{"internalType":"uint256[]","name":"asset_amount","type":"uint256[]"},{"internalType":"bytes32","name":"recipient_account_id","type":"bytes32"},{"internalType":"bool","name":"is_relay","type":"bool"},{"internalType":"uint256","name":"parachain_id","type":"uint256"},{"internalType":"uint256","name":"fee_index","type":"uint256"}],"name":"assets_withdraw","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"asset_id","type":"address[]"},{"internalType":"uint256[]","name":"asset_amount","type":"uint256[]"},{"internalType":"address","name":"recipient_account_id","type":"address"},{"internalType":"bool","name":"is_relay","type":"bool"},{"internalType":"uint256","name":"parachain_id","type":"uint256"},{"internalType":"uint256","name":"fee_index","type":"uint256"}],"name":"assets_withdraw","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]'
-
-    var xc20ContractAbi = JSON.parse(xc20ContractAbiStr)
-    var xc20ContractAddress = '0x0000000000000000000000000000000000005004' //this is the precompiled interface
-    var xc20Contract = new web3Api.eth.Contract(xc20ContractAbi, xc20ContractAddress);
-    let weight = 6000000000
-    let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
-    let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
-    /*
-    function assets_withdraw(
-    address[] calldata asset_id,
-    uint256[] calldata asset_amount,
-    bytes32/address  recipient_account_id,
-    bool      is_relay,
-    uint256   parachain_id,
-    uint256   fee_index
-    ) external returns (bool);
-    */
-    let currency_address_list = []
-    let amountList = []
-    let isRelay = true
-    let feeIndex = 0
-    let data = '0x'
-    if (paraIDDest != 0) {
-        isRelay = false
-    }
-    //only teleport one asset for now
-    currency_address_list.push(currency_address)
-    let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
-    amountList.push(rawAmount)
-    if (isBeneficiaryEVM) {
-        //0xecf766ff  /BeneficiaryEVM
-        console.log(`xc20Builder method=0xecf766ff, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, beneficiary=${beneficiary}, using decimals=${decimals})`)
-        data = xc20Contract.methods['0xecf766ff'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()
-    } else if (beneficiary.length == 66) {
-        //0x019054d0 /BeneficiarySubstrate
-        console.log(`xc20Builder method=0x019054d0, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, using decimals=${decimals})`)
-        data = xc20Contract.methods['0x019054d0'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()
-    }
-    let txStruct = {
-        to: xc20ContractAddress,
-        gasPrice: web3.utils.numberToHex('30052000000'), //30.052Gwei
-        value: '0',
-        gas: 2000000,
-        data: data
-    }
-    console.log(`xc20Builder txStruct=`, txStruct)
-    return txStruct
 }
 
 function isTxContractCreate(tx) {
@@ -3039,7 +3064,7 @@ async function getContractByteCode(web3Api, contractAddress, bn = 'latest', RPCB
     try {
         code = web3Api.eth.getCode(contractAddress)
     } catch (e) {
-        console.log(`getContractByteCode error`, e)
+        console.log(`getContractByteCode contractAddress=${contractAddress}. error`, e)
         return false
     }
     return code
@@ -3263,6 +3288,101 @@ function standardizeRPCReceiptLogs(receipts) {
     return receipts
 }
 
+function xTokenBuilder(web3Api, currency_address = '0x0000000000000000000000000000000000000802', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 22006) {
+    console.log(`xTokenBuilder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}, chainIDDest=${chainIDDest}`)
+    var xTokensContractAbiStr = '[{"inputs":[{"internalType":"address","name":"currency_address","type":"address"},{"internalType":"uint256","name":"amount","type":"uint256"},{"components":[{"internalType":"uint8","name":"parents","type":"uint8"},{"internalType":"bytes[]","name":"interior","type":"bytes[]"}],"internalType":"struct IxTokens.Multilocation","name":"destination","type":"tuple"},{"internalType":"uint64","name":"weight","type":"uint64"}],"name":"transfer","outputs":[],"stateMutability":"nonpayable","type":"function"}]'
+    var xTokensContractAbi = JSON.parse(xTokensContractAbiStr)
+    var xTokensContractAddress = '0x0000000000000000000000000000000000000804' //this is the precompiled interface
+    var xTokensContract = new web3Api.eth.Contract(xTokensContractAbi, xTokensContractAddress);
+    let weight = 6000000000
+    let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
+    let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
+    let junction = []
+    let junctionInterior = []
+    junction.push(1) // local asset would have 0. (but this is not xcm?)
+    if (paraIDDest != 0) {
+        let parachainHex = paraTool.bnToHex(paraIDDest).substr(2)
+        parachainHex = '0x' + parachainHex.padStart(10, '0')
+        junctionInterior.push(parachainHex)
+    }
+    //assume "any"
+    if (beneficiary.length == 66) {
+        let accountId32 = `0x01${beneficiary.substr(2)}00`
+        junctionInterior.push(accountId32)
+    } else if (beneficiary.length == 42) {
+        let accountKey20 = `0x03${beneficiary.substr(2)}00`
+        junctionInterior.push(accountKey20)
+    }
+    let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
+    junction.push(junctionInterior)
+    console.log(`junction`, junction)
+    console.log(`junctionInterior`, junctionInterior)
+    //[1,["0x00000007d4","0x01108cb67dcbaab765b66fdb99e3c4997ead09f1f82186e425dc9fec271e97aa7e00"]]
+    console.log(`xTokenBuilder currency_address=${currency_address}, Human Readable Amount=${amount}(rawAmount=${rawAmount}, using decimals=${decimals}), junction=${junction}, weight=${weight}`)
+    var data = xTokensContract.methods.transfer(currency_address, rawAmount, junction, weight).encodeABI()
+    let txStruct = {
+        to: xTokensContractAddress,
+        value: '0',
+        gas: 2000000,
+        data: data
+    }
+    console.log(`xTokenBuilder txStruct=`, txStruct)
+    return txStruct
+}
+
+function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFFfFFfFFFFFffFFFffffFfFFFfF', amount = 1, decimals = 18, beneficiary = '0xd2473025c560e31b005151ebadbc3e1f14a2af8fa60ed87e2b35fa930523cd3c', chainIDDest = 0) {
+    let isBeneficiaryEVM = (beneficiary.length == 42) ? true : false
+    console.log(`xc20Builder currency_address=${currency_address}, amount=${amount}, decimals=${decimals}, beneficiary=${beneficiary}(isEVM=${isBeneficiaryEVM}), chainIDDest=${chainIDDest}`)
+    //https://github.com/AstarNetwork/astar-frame/blob/polkadot-v0.9.28/precompiles/xcm/XCM.sol
+    var xc20ContractAbiStr = '[{"inputs":[{"internalType":"address[]","name":"asset_id","type":"address[]"},{"internalType":"uint256[]","name":"asset_amount","type":"uint256[]"},{"internalType":"bytes32","name":"recipient_account_id","type":"bytes32"},{"internalType":"bool","name":"is_relay","type":"bool"},{"internalType":"uint256","name":"parachain_id","type":"uint256"},{"internalType":"uint256","name":"fee_index","type":"uint256"}],"name":"assets_withdraw","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"},{"inputs":[{"internalType":"address[]","name":"asset_id","type":"address[]"},{"internalType":"uint256[]","name":"asset_amount","type":"uint256[]"},{"internalType":"address","name":"recipient_account_id","type":"address"},{"internalType":"bool","name":"is_relay","type":"bool"},{"internalType":"uint256","name":"parachain_id","type":"uint256"},{"internalType":"uint256","name":"fee_index","type":"uint256"}],"name":"assets_withdraw","outputs":[{"internalType":"bool","name":"","type":"bool"}],"stateMutability":"nonpayable","type":"function"}]'
+
+    var xc20ContractAbi = JSON.parse(xc20ContractAbiStr)
+    var xc20ContractAddress = '0x0000000000000000000000000000000000005004' //this is the precompiled interface
+    var xc20Contract = new web3Api.eth.Contract(xc20ContractAbi, xc20ContractAddress);
+    let weight = 6000000000
+    let relayChain = paraTool.getRelayChainByChainID(chainIDDest)
+    let paraIDDest = paraTool.getParaIDfromChainID(chainIDDest)
+    /*
+    function assets_withdraw(
+    address[] calldata asset_id,
+    uint256[] calldata asset_amount,
+    bytes32/address  recipient_account_id,
+    bool      is_relay,
+    uint256   parachain_id,
+    uint256   fee_index
+    ) external returns (bool);
+    */
+    let currency_address_list = []
+    let amountList = []
+    let isRelay = true
+    let feeIndex = 0
+    let data = '0x'
+    if (paraIDDest != 0) {
+        isRelay = false
+    }
+    //only teleport one asset for now
+    currency_address_list.push(currency_address)
+    let rawAmount = paraTool.toBaseUnit(`${amount}`, decimals)
+    amountList.push(rawAmount)
+    if (isBeneficiaryEVM) {
+        //0xecf766ff  /BeneficiaryEVM
+        console.log(`xc20Builder method=0xecf766ff, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, beneficiary=${beneficiary}, using decimals=${decimals})`)
+        data = xc20Contract.methods['0xecf766ff'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()
+    } else if (beneficiary.length == 66) {
+        //0x019054d0 /BeneficiarySubstrate
+        console.log(`xc20Builder method=0x019054d0, currency_address_list=${currency_address_list}, Human Readable Amount=${amount}(amountList=${amountList}, using decimals=${decimals})`)
+        data = xc20Contract.methods['0x019054d0'](currency_address_list, amountList, beneficiary, isRelay, paraIDDest, feeIndex).encodeABI()
+    }
+    let txStruct = {
+        to: xc20ContractAddress,
+        gasPrice: web3.utils.numberToHex('30052000000'), //30.052Gwei
+        value: '0',
+        gas: 2000000,
+        data: data
+    }
+    console.log(`xc20Builder txStruct=`, txStruct)
+    return txStruct
+}
 
 module.exports = {
     toHex: function(bytes) {
@@ -3283,9 +3403,6 @@ module.exports = {
         return crawl_evm_logs(web3Api, bn)
     },
     crawlEvmReceipts: async function(web3Api, blk, isParallel = true) {
-        return crawl_evm_receipts(web3Api, blk, isParallel)
-    },
-    detect_contract_labels: async function(web3Api, blk, isParallel = true) {
         return crawl_evm_receipts(web3Api, blk, isParallel)
     },
     detectContractLabels: async function(web3Api, contractAddress, bn) {
@@ -3349,12 +3466,6 @@ module.exports = {
     sendSignedRLPTx: async function(web3Api, rlpTX) {
         return sendSignedRLPTx(web3Api, rlpTX)
     },
-    xTokenBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
-        return xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
-    },
-    xc20AssetWithdrawBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
-        return xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
-    },
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)
     },
@@ -3364,8 +3475,8 @@ module.exports = {
     processTransactions: async function(txns, contractABIs, contractABISignatures) {
         return processTransactions(txns, contractABIs, contractABISignatures)
     },
-    fuseBlockTransactionReceipt: async function(evmBlk, dTxns, dReceipts, dTrace, chainID) {
-        return fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, dTrace, chainID)
+    fuseBlockTransactionReceipt: async function(evmBlk, dTxns, flatTraces, dTrace, chainID) {
+        return fuseBlockTransactionReceipt(evmBlk, dTxns, flatTraces, dTrace, chainID)
     },
     decorateTxn: function(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
         return decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID);
@@ -3417,9 +3528,13 @@ module.exports = {
             return null
         }
     },
+    debugTraceToFlatTraces: function(rpcTraces, txns) {
+        return debugTraceToFlatTraces(rpcTraces, txns)
+    },
     processEVMTrace: function(evmTrace, evmTxs) {
         let res = []
         process_evm_trace(evmTrace, res, 0, [0], evmTxs);
+        //res = debug_trace_to_flat_traces(evmTrace, evmTxs)
         return res
     },
     keccak256: function(hex) {
@@ -3458,4 +3573,11 @@ module.exports = {
     computeModifiedFingerprintID: computeModifiedFingerprintID,
     getEVMFlds: getEVMFlds,
     getSchemaWithoutDesc: getSchemaWithoutDesc,
+    xTokenBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
+        return xTokenBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
+    },
+    xc20AssetWithdrawBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
+        return xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
+    },
+    decorateEvmBlock: decorateEvmBlock,
 };

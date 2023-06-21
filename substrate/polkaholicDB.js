@@ -1920,22 +1920,20 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async fetch_evm_block_gs(chainID, blockNumber) {
-        // TODO: shift back to substrate model 
-        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} from blockNumber = '${blockNumber}' limit 1`
+        // TODO: shift back to substrate model
+        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockNumber = '${blockNumber}' limit 1`
         let blocks = await this.poolREADONLY.query(sql);
         if (blocks.length == 1) {
             let b = blocks[0];
             let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
             const storage = new Storage();
-            const bucket = storage.bucket(bucketName);
             const bucketName = 'crypto_evm';
-            const fileName = this.gs_evm_file_name(chainID, logDT, blockNumber);
+            const bucket = storage.bucket(bucketName);
+            const fileName = this.gs_evm_file_name(chainID, logDT0, blockNumber);
             const file = bucket.file(fileName);
             const buffer = await file.download();
-            const r = JSON.parse(buffer[0]);
-            return {
-                evmFullBlock: r.block
-            }
+            const r = JSON.parse(buffer[0]); // block, receipts, evm
+            return r
         }
         return null;
     }
@@ -1966,7 +1964,7 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_block_gs(chainID, blockNumber) {
         try {
-            if (chainID == 1 || chainID == 10 || chainID == 1284 || chainID == 592 || chainID == 43114 || chainID == 42161) {
+	    if (chainID == 1 || chainID == 10 || chainID == 43114 || chainID == 42161) {
                 return this.fetch_evm_block_gs(chainID, blockNumber);
             } else {
                 return this.fetch_substrate_block_gs(chainID, blockNumber);
@@ -1989,7 +1987,7 @@ from chain where chainID = '${chainID}' limit 1`);
         const bucket = storage.bucket(bucketName);
         let jmp = 100;
 
-	
+
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -2008,8 +2006,8 @@ from chain where chainID = '${chainID}' limit 1`);
 		    console.log("... workload: ", bn0, bn1, "archived", c.archived, "cnt", cnt);
 		}
 	    }
-	    
-	    
+
+
             let start = paraTool.blockNumberToHex(bn0);
             let end = paraTool.blockNumberToHex(bn1);
             let [rows] = await tableChain.getRows({
@@ -2059,8 +2057,7 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
-	// WIP
-        if ( (chainID <= 2) && blockNumber < 35000 ) { // fetch { blockraw, events, feed } from GS storage 
+        if ( ( chainID == 2004 && blockNumber => 3683465 && blockNumber <= 3690513 ) || ( (chainID <= 2) && blockNumber < 35000 ) ) { // fetch { blockraw, events, feed } from GS storage
             try {
                 let r = await this.fetch_block_gs(chainID, blockNumber);
                 return r;
