@@ -28,6 +28,19 @@ async function main() {
         .description('Manage polkaholic export to BigQuery substrate-etl project')
         .version(`${cli_version}`);
 
+    program.command('extract')
+        .description("Stream data out to GS")
+        .option('-c, --chainID <chainID>', 'Chain ID', "2")
+        .option('-s, --startBlock <startBN>', 'Start Block', "1")
+        .option('-e, --endBlock <endBN>', 'End Block', "1000")
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            let chainID = opt.chainID ? opt.chainID : 2;
+            let startBN = opt.startBlock ? parseInt(opt.startBlock, 10) : 1;
+            let endBN = opt.endBlock ? parseInt(opt.endBlock, 10) : 10000;
+            await substrateetl.extract_blocks(startBN, endBN, chainID);
+        })
+
     program.command('dump')
         .description("Stream data out to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', null)
@@ -461,7 +474,7 @@ async function main() {
         });
 
     program.command('contracts')
-        .description(`Update Contracts for (2006-astar, 2094-pendulum, 22007-shiden, 22124-amplitude, 40000-rococo`)
+        .description(`Update Contracts for (2006-astar, 2094-pendulum, 22007-shiden, 22124-amplitude, 30000-shibuya, 40000-rococo`)
         .option('-c, --chainID <chainID>', 'ChainID to update contracts', null, myParseInt)
         .action(async (opt) => {
             var manager = new SubstrateETL();

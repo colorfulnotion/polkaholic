@@ -179,7 +179,7 @@ module.exports = class Crawler extends Indexer {
                 "method": "state_traceBlock",
                 "params": [blockHash, "state", "", "Put"]
             }
-            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality") && chain.id == "composable" ) {
+            if (chain.onfinalityStatus == "Active" && chain.onfinalityID && chain.onfinalityID.length > 32 && this.APIWSEndpoint.includes("onfinality") && chain.id == "composable") {
                 chain.RPCBackfill = `https://${chain.id}.api.onfinality.io/rpc?apikey=${chain.onfinalityID}`
                 if (chain.onfinalityConfig && chain.onfinalityConfig.length > 5) {
                     chain.RPCBackfill = chain.onfinalityConfig;
@@ -2099,198 +2099,6 @@ module.exports = class Crawler extends Indexer {
         return (false);
     }
 
-    crawl_evm_core(web3, chainID) {
-        let lastHeaderReceived = this.getCurrentTS();
-        let evmRPCBlockReceiptsApi = this.evmRPCBlockReceipts
-        let evmRPCInternalApi = this.evmRPCInternal
-        let contractABIs = this.contractABIs;
-        let contractABISignatures = this.contractABISignatures;
-
-        web3.eth.subscribe('newBlockHeaders', async (error, result) => {
-            if (!error) {
-                lastHeaderReceived = this.getCurrentTS();
-                console.log(`newBlockHeaders`, result)
-                let blockNumber = result.number;
-                let block = null;
-                let block_tries = 0;
-                let block_retry_max = 10
-                let block_retry_ms = 200
-                let log_retry_max = 10
-                let log_retry_ms = 2000
-                let log_timeout_ms = 5000
-                let stream_bq = true
-                let write_bt = true
-
-                //let qnSupportedChainIDs = [paraTool.chainIDArbitrum, paraTool.chainIDOptimism, paraTool.chainIDPolygon]
-                let qnSupportedChainIDs = []
-                let res = false
-                if (qnSupportedChainIDs.includes(chainID)) {
-                    res = await this.crawlQNEvmBlockAndReceiptsWithRetry(evmRPCInternalApi, blockNumber, 3000, 10, 2000)
-                }
-                if (res && res.block != undefined && res.receipts != undefined) {
-                    console.log(`[${blockNumber}] qn_getBlockReceipts OK`)
-                    //block = res.block
-                    /*
-                    let evmBlockFunc = ethTool.crawlEvmBlock(web3, blockNumber)
-                    let evmBlockCtx = `ethTool.crawlEvmBlock(web3, ${blockNumber})`
-                    block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-                    */
-                    block = ethTool.standardizeRPCBlock(res.block)
-                    let evmReceipts = ethTool.standardizeRPCReceiptLogs(res.receipts)
-                    //let evmReceipts = res.receipts
-                    let evmTrace = false
-                    if (evmRPCInternalApi) {
-                        /*
-                        let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, blockNumber)
-                        let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${blockNumber})`
-                        evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx)
-                        */
-                        evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                        //console.log(`[${block.number}] evmTrace`, evmTrace)
-                    }
-                    var statusesPromise = Promise.all([
-                        ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
-                        ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
-                    ])
-                    let [dTxns, dReceipts] = await statusesPromise
-                    await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
-                } else {
-                    let resultBN = result.number
-                    let delayedEvmChainIDs = [paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM]
-                    if (delayedEvmChainIDs.includes(chainID)) {
-                        resultBN = result.number - 10
-                    }
-                    let evmBlockFunc = web3.eth.getBlock(resultBN, true)
-                    let evmBlockCtx = `web3.eth.getBlock(${resultBN}, true)`
-
-                    block = await this.retryWithDelay(() => evmBlockFunc, block_retry_max, block_retry_ms, evmBlockCtx)
-                    /*
-                    do {
-                        try {
-                            block = await web3.eth.getBlock(result.hash, true);
-                            block_tries++;
-                        } catch (err) {
-                            // console.log("crawlEVM", result, err);
-                        }
-                    } while (!block && block_tries < 10)
-                    */
-                    let numTransactions = block && block.transactions ? block.transactions.length : 0;
-                    let rows_blocks = [];
-                    let rows_transactions = [];
-                    let rows_logs = [];
-
-                    try {
-                        if (numTransactions >= 0) {
-                            console.log(`[#${block.number}] ${block.hash} numTransactions=${numTransactions}`)
-                            let isParallel = true
-                            let log_retry_max = 10
-                            let log_retry_ms = 2000
-                            let log_timeout_ms = 5000
-                            let evmReceipts = false
-
-                            if (evmRPCBlockReceiptsApi) {
-                                evmReceipts = await this.crawlEvmBlockReceiptsWithRetry(evmRPCBlockReceiptsApi, blockNumber, log_timeout_ms, log_retry_max, log_retry_ms)
-                            } else {
-                                let evmReceiptsFunc = ethTool.crawlEvmReceipts(web3, block, isParallel)
-                                let evmReceiptsCtx = `ethTool.crawlEvmReceipts(web3, block, ${isParallel})`
-                                evmReceipts = await this.retryWithDelay(() => evmReceiptsFunc, log_retry_max, log_retry_ms, evmReceiptsCtx)
-                            }
-
-                            if (!evmReceipts) evmReceipts = [];
-                            evmReceipts = ethTool.standardizeRPCReceiptLogs(evmReceipts)
-                            console.log(`[#${block.number}] evmReceipts DONE (len=${evmReceipts.length})`)
-                            let evmTrace = false
-                            if (evmRPCInternalApi) {
-                                let evmTraceFunc = this.crawlEvmBlockTraces(evmRPCInternalApi, block.number)
-                                let evmTraceCtx = `this.crawlEvmBlockTraces(evmRPCInternalApi, ${block.number})`
-                                evmTrace = await this.retryWithDelay(() => evmTraceFunc, log_retry_max, log_retry_ms, evmTraceCtx, numTransactions)
-                                //evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, block.number, log_timeout_ms, log_retry_max, log_retry_ms)
-                                //console.log(`[${block.number}] evmTrace`, evmTrace)
-                            }
-                            var statusesPromise = Promise.all([
-                                ethTool.processTransactions(block.transactions, contractABIs, contractABISignatures),
-                                ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
-                            ])
-                            let [dTxns, dReceipts] = await statusesPromise
-                            await this.stream_evm(block, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
-                        }
-                    } catch (err) {
-                        console.log(`crawlEvmReceipts err`, err)
-                    }
-                }
-            } else {
-                console.error(error);
-            }
-        });
-        /*
-        web3.eth.subscribe('logs', (error, result) => {
-            if (!error) {
-                //console.log("LOGS", result);
-            } else {
-                console.error(error);
-            }
-        });
-        */
-
-        let lastHeaderReceivedSecAgoExitThreshold = 100
-        setInterval(() => {
-            if (this.getCurrentTS() - lastHeaderReceived > lastHeaderReceivedSecAgoExitThreshold) {
-                console.log(`EXIT: lastHeaderReceivedSecAgo ${this.getCurrentTS() - lastHeaderReceived}`, )
-                process.exit(0);
-            }
-        }, 2000);
-    }
-
-    async crawlEVM(chainID) {
-        let chain = await this.getChain(chainID);
-        await this.initEvmSchemaMap()
-        if (!(chain.isEVM > 0 && chain.WSEndpoint)) {
-            return (false);
-        }
-
-        // TODO: extract this
-        const Web3 = require('web3')
-        let provider = null
-        const startConnection = () => {
-            provider = new Web3.providers.WebsocketProvider(
-                chain.WSEndpoint, {
-                    clientConfig: {
-                        keepalive: true,
-                        keepaliveInterval: 60000,
-                        maxReceivedFrameSize: 10000000, // bytes - default: 1MiB, current: 2MiB
-                        maxReceivedMessageSize: 10000000, // bytes - default: 8MiB, current: 10Mib
-                    },
-                    reconnect: {
-                        auto: true,
-                        delay: 50000,
-                        maxAttempts: 5,
-                        onTimeout: false
-                    }
-                }
-            );
-            provider.connection.addEventListener('close', () => {
-                startConnection()
-            })
-        }
-        startConnection();
-
-        const web3 = new Web3(provider);
-        this.web3Api = web3;
-        if (chain.evmRPCBlockReceipts != undefined) {
-            this.evmRPCBlockReceipts = chain.evmRPCBlockReceipts
-        }
-        if (chain.evmRPCInternal != undefined) {
-            this.evmRPCInternal = chain.evmRPCInternal
-        }
-        if (chain.evmRPC != undefined) {
-            this.evmRPC = chain.evmRPC
-        }
-        this.contractABIs = await this.getContractABI();
-
-        await this.assetManagerInit()
-        this.crawl_evm_core(web3, chainID)
-    }
-
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
@@ -2300,7 +2108,8 @@ module.exports = class Crawler extends Indexer {
             paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
         ]
         if (evmChainList.includes(chainID)) {
-            this.crawlEVM(chainID);
+            console.log(`evmchain no longer supported`)
+            process.exit(0)
             return [null, null, null];
         } else {
             console.log("loading substrate");
