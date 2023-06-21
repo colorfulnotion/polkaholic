@@ -52,11 +52,6 @@ for (let i=0; i<tabs.length; i++) {
       </div>
 
       <div class="tab-pane fade" id="v-tabs-code" role="tabpanel" aria-labelledby="v-tabs-code-tab">
-    <form method="post" action="/uploadcontract/<%= address; %>" enctype="multipart/form-data">
-      <label class="form-label" for="customFile">Upload .contract data</label>
-      <input type="file" class="form-control" name="contractFile" id="contractFile" />
-      <input type='submit'>
-    </form>
       </div>
 
      </div>
@@ -73,10 +68,10 @@ let tabs = <%- JSON.stringify(tabs); %>;
 <%
 
 if ( contract && contract.metadata ) { %>
-let metadata = <%- contract.metadata; %>;
-$(document).ready(function() {
-  readContract(<%= contract.chainID %>, metadata, address);
-});
+  let metadata = <%- contract.metadata; %>;
+  $(document).ready(function() {
+    readContract(<%= contract.chainID %>, metadata, address);
+  });
 <% } %>
 </script>
 

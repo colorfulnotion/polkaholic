@@ -53,7 +53,14 @@ let f = code;
         <%- uiTool.presentFullTx(f.extrinsicHash); %>
       </td>
     </tr>
-
+<% if ( code.verifier == "0x58E0fB1aAB0B04Bd095AbcdF34484DA47Fe9fF77" ) { %>
+    <tr>
+      <td>Verified?</td>
+      <td>
+<div><button class="btn-success">Verified by <img src="https://cdn.polkaholic.io/chainide_logo.svg" width="100"/></button></div>
+      </td>
+    </tr>
+<% } %>
     <tr>
       <td>WASM</td>
       <td>

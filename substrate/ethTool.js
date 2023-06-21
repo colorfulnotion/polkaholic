@@ -29,7 +29,9 @@ const {
     ethers
 } = require("ethers");
 
-const { EVM } = require("evm");
+const {
+    EVM
+} = require("evm");
 const whatsabi = require("@shazow/whatsabi")
 
 function shexdec(inp) {
@@ -138,8 +140,8 @@ function getABIByAssetType(assetType) {
     }
 }
 
-function computeSelector(signature, byteLen = 4){
-    let hash = web3.utils.keccak256(signature).substr(0, byteLen*2 + 2)
+function computeSelector(signature, byteLen = 4) {
+    let hash = web3.utils.keccak256(signature).substr(0, byteLen * 2 + 2)
     return hash
 }
 
@@ -150,13 +152,13 @@ function detectERC165(codeHashInfo, bytecode) {
     */
     let erc165FuncList = ['0x01ffc9a7']
     let isERC165 = false
-    if (codeHashInfo){
+    if (codeHashInfo) {
         isERC165 = erc165FuncList.every(f => codeHashInfo.func.includes(f))
     }
     return isERC165
 }
 
-function detectERC20(codeHashInfo, bytecode){
+function detectERC20(codeHashInfo, bytecode) {
     /*
     (Optional)
     'name()' //0x06fdde03
@@ -174,9 +176,9 @@ function detectERC20(codeHashInfo, bytecode){
     'Transfer(address indexed _from, address indexed _to, uint256 _value)'  	 //0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef
     */
     let erc20FuncList = ['0x18160ddd', '0x70a08231', '0xa9059cbb', '0x23b872dd', '0x095ea7b3', '0xdd62ed3e']
-    let erc20EventList = ['0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925','0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef']
+    let erc20EventList = ['0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925', '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef']
     let isERC20 = false
-    if (codeHashInfo){
+    if (codeHashInfo) {
         //isERC20 = erc20FuncList.every(f => codeHashInfo.func.includes(f)) && erc20EventList.every(f => bytecode.includes(f.substr(2)))
         let containsERC20Func = erc20FuncList.every(f => codeHashInfo.func.includes(f)) || erc20FuncList.every(f => bytecode.includes(f.substr(2)))
         //let containsERC20Evt = erc20EventList.every(f => codeHashInfo.events.includes(f)) || erc20EventList.every(f => bytecode.includes(f.substr(2)))
@@ -185,7 +187,7 @@ function detectERC20(codeHashInfo, bytecode){
     return isERC20
 }
 
-function detectERC721(codeHashInfo, bytecode){
+function detectERC721(codeHashInfo, bytecode) {
     /*
     (Optional)
     'name()' //0x06fdde03
@@ -212,7 +214,7 @@ function detectERC721(codeHashInfo, bytecode){
     let erc721FuncList = ['0x70a08231', '0x6352211e', '0x42842e0e', '0xb88d4fde', '0x23b872dd', '0x095ea7b3', '0x081812fc', '0xa22cb465', '0xe985e9c5']
     let erc721EventList = ['0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef', '0x8c5be1e5ebec7d5bd14f71427d1e84f3dd0314c0f7b2291e5b200ac8c7c3b925', '0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31']
     let isERC721 = false
-    if (codeHashInfo){
+    if (codeHashInfo) {
         //isERC721 = erc721FuncList.every(f => codeHashInfo.func.includes(f)) && erc721EventList.every(e => codeHashInfo.events.includes(e))
         let containsERC721Func = erc721FuncList.every(f => codeHashInfo.func.includes(f)) || erc721FuncList.every(f => bytecode.includes(f.substr(2)))
         //let containsERC721Evt = erc721EventList.every(f => codeHashInfo.events.includes(f)) || erc721EventList.every(f => bytecode.includes(f.substr(2)))
@@ -221,7 +223,7 @@ function detectERC721(codeHashInfo, bytecode){
     return isERC721
 }
 
-function detectERC1155(codeHashInfo, bytecode){
+function detectERC1155(codeHashInfo, bytecode) {
     /*
     (Required)
 
@@ -241,7 +243,7 @@ function detectERC1155(codeHashInfo, bytecode){
     let erc1155FuncList = ['0x00fdd58e', '0x4e1273f4', '0xa22cb465', '0xe985e9c5', '0xf242432a', '0x2eb2c2d6'];
     let erc1155EventList = ['0xce567dca3f200f220920489ca2b5937696c31e25759ff6cb3582b35133d50fdd', '0x4e8a6893a947e8293beb559c78d360a8b657ed145adab57611365a2c9ce4987f', '0x17307eab39ab6107e8899845ad3d59bd9653f200f220920489ca2b5937696c31', '0x0e89341c1d7b373c554619aebc66b5346cd25d8a062de9b97e7f4c36665b7702'];
     let isERC1155 = false;
-    if (codeHashInfo){
+    if (codeHashInfo) {
         //isERC1155 = erc1155FuncList.every(f => codeHashInfo.func.includes(f)) && erc1155EventList.every(e => codeHashInfo.events.includes(e));
         let containsERC1155Func = erc1155FuncList.every(f => codeHashInfo.func.includes(f)) || erc1155FuncList.every(f => bytecode.includes(f.substr(2)))
         //let containsERC1155Evt = erc1155EventList.every(f => codeHashInfo.events.includes(f)) || erc1155EventList.every(f => bytecode.includes(f.substr(2)))
@@ -412,7 +414,7 @@ async function getERC20TokenInfo(web3Api, contractAddress, bn = 'latest', RPCBac
     let checkSumContractAddr
     try {
         checkSumContractAddr = web3.utils.toChecksumAddress(contractAddress)
-    } catch (e){
+    } catch (e) {
         return false
     }
     let erc20Contract = initContract(web3Api, erc20ABI, checkSumContractAddr)
@@ -782,8 +784,8 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     if (gasPrice >= baseFeePerGas) {
         baseFeePerGas = gasPrice - maxPriorityFeePerGas
     }
-    let contractAddress = (dReceipt.contractAddress != undefined)? dReceipt.contractAddress: null
-    if (contractAddress && dTxn.decodedInput != undefined){
+    let contractAddress = (dReceipt.contractAddress != undefined) ? dReceipt.contractAddress : null
+    if (contractAddress && dTxn.decodedInput != undefined) {
         dTxn.decodedInput.contractAddress = contractAddress
     }
     let fTxn = {
@@ -1075,7 +1077,7 @@ function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
 function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
     //etherscan is marking native case as "Trafer"
     //let contractcreationAddress = (txn.creates != undefined) ? txn.creates : false
-    let isTxContractCreate = (txn.to == undefined)? true: false
+    let isTxContractCreate = (txn.to == undefined) ? true : false
     let txInput = txn.input
     let methodID = '0x';
     let decodedTxnInput = {};
@@ -2319,7 +2321,7 @@ function standardizeDecodedEvnetType(dEventVal, dEventType) {
             // console.log(`boolean dEventType, dEventVal`, dEventVal)
             decodedVal = (decodedVal.includes('1')) ? true : false
         }
-    } catch (e){
+    } catch (e) {
         console.log(`dEventVal=${dEventVal}, dEventType=${dEventType}`, e)
     }
     return decodedVal
@@ -2359,7 +2361,7 @@ function decode_log(log, contractABIs, contractABISignatures) {
         let eventABIStr = foundApi.abi
         let cachedDecoder = foundApi.decoder
         let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
-        if (decodedRes.transactionLogIndex == undefined){
+        if (decodedRes.transactionLogIndex == undefined) {
             console.log(`decodedRes transactionLogIndex missing`, decodedRes)
             //process.exit(0)
         }
@@ -2661,11 +2663,11 @@ function xc20AssetWithdrawBuilder(web3Api, currency_address = '0xFFfFfFffFFfffFF
 function isTxContractCreate(tx) {
     if (!tx) return (false);
     let isCreate = (tx.creates != null)
-    if (tx.createdContracts.length > 0){
+    if (tx.createdContracts.length > 0) {
         console.log(`${tx.transactionHash} -> contract created[${tx.createdContracts}], len=${tx.createdContracts.length}`)
         return true
     }
-    if (isCreate)  {
+    if (isCreate) {
         console.log(`${tx.transactionHash} -> contract created ${tx.creates}`)
         return true
     }
@@ -2688,16 +2690,16 @@ function isTxContractCreate(tx) {
 }
 
 //0xaf67fb1bf8be6a5aee2a154771ee057bd85ec55b8000dfc4b58cc49f234328c3
-function getTxContractCreateAddress(tx){
+function getTxContractCreateAddress(tx) {
     let contractAddress = []
     let contractMap = {}
     let cnt = 0
-    if (tx.creates != null){
+    if (tx.creates != null) {
         contractMap[tx.creates] = 1
-        cnt ++
+        cnt++
     }
-    if (tx.createdContracts.length > 0){
-        for (const createAddr of tx.createdContracts){
+    if (tx.createdContracts.length > 0) {
+        for (const createAddr of tx.createdContracts) {
             contractMap[createAddr] = 1
             cnt++
         }
@@ -3036,7 +3038,7 @@ async function getContractByteCode(web3Api, contractAddress, bn = 'latest', RPCB
     let code = false
     try {
         code = web3Api.eth.getCode(contractAddress)
-    } catch (e){
+    } catch (e) {
         console.log(`getContractByteCode error`, e)
         return false
     }
@@ -3061,20 +3063,20 @@ async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', 
     }
 
     let bytecode = await getContractByteCode(web3Api, contractAddress)
-    if (bytecode){
+    if (bytecode) {
         contractInfo.bytecode = bytecode
         contractInfo.bytecodeHash = web3.utils.keccak256(bytecode)
         let codeHashInfo = getsigHashes(bytecode, topicFilter)
         contractInfo.function_sighashes = codeHashInfo.func
         contractInfo.event_topics = codeHashInfo.events
         //contractInfo.is_erc165 = detectERC165(codeHashInfo, bytecode)
-        if (detectERC20(codeHashInfo, bytecode)){
+        if (detectERC20(codeHashInfo, bytecode)) {
             contractInfo.is_erc20 = true
             //console.log(`**** [ERC20] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
-        }else if (detectERC721(codeHashInfo, bytecode)){
+        } else if (detectERC721(codeHashInfo, bytecode)) {
             //console.log(`**** [ERC721] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
             contractInfo.is_erc721 = true
-        }else if (detectERC1155(codeHashInfo, bytecode)){
+        } else if (detectERC1155(codeHashInfo, bytecode)) {
             //console.log(`**** [ERC1155] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
             contractInfo.is_erc1155 = true
         }
@@ -3093,7 +3095,7 @@ function extractPushData(opcodes, topicFilter = false) {
         .filter(opcode => pushNames.includes(opcode.name))
         .map(opcode => {
             let abiType = "function";
-            if (opcode.name === 'PUSH32'){
+            if (opcode.name === 'PUSH32') {
                 abiType = 'event';
             }
             let hexSignature = "0x" + opcode.pushData.toString('hex');
@@ -3103,29 +3105,33 @@ function extractPushData(opcodes, topicFilter = false) {
             }
         })
         .filter(item => !blacklist.some(blacklisted => item.signature.includes(blacklisted)));
-        let res = {func:[], events: [], unknownEvents: []}
-        let byteHash = {}
-        if (topicFilter) res.filtered = true
-        for (const op of filteredOps){
-            let hash = op.signature
-            if (byteHash[hash] == undefined){
-                byteHash[hash] = 1
-                if (op.abiType == "function"){
-                    res.func.push(hash)
-                }else if (op.abiType == "event"){
-                    if (topicFilter && topicFilter.has(hash)){
-                        res.events.push(hash)
-                    }else{
-                        res.unknownEvents.push(hash)
-                    }
+    let res = {
+        func: [],
+        events: [],
+        unknownEvents: []
+    }
+    let byteHash = {}
+    if (topicFilter) res.filtered = true
+    for (const op of filteredOps) {
+        let hash = op.signature
+        if (byteHash[hash] == undefined) {
+            byteHash[hash] = 1
+            if (op.abiType == "function") {
+                res.func.push(hash)
+            } else if (op.abiType == "event") {
+                if (topicFilter && topicFilter.has(hash)) {
+                    res.events.push(hash)
+                } else {
+                    res.unknownEvents.push(hash)
                 }
             }
         }
-        return res
+    }
+    return res
 }
 
 
-function getsigHashes(bytecode, topicFilter = false){
+function getsigHashes(bytecode, topicFilter = false) {
     const evm = new EVM(bytecode);
     let opcodes = evm.getOpcodes()
     let res = extractPushData(opcodes, topicFilter)
@@ -3185,18 +3191,18 @@ function process_evm_trace_creates(evmTrace, res, depth, stack = [], txs) {
         let t = evmTrace[i].result ? evmTrace[i].result : evmTrace[i];
         try {
             //console.log(`T.type =${t.type}`)
-            if ( t.type == "CREATE" || t.type == "CREATE2") { // REVIEW: what other types?
+            if (t.type == "CREATE" || t.type == "CREATE2") { // REVIEW: what other types?
                 let transactionHash = false
-                if (stack.length > 0){
-                    transactionHash =  (txs[stack[0]].hash)?  (txs[stack[0]].hash): (txs[stack[0]].transactionHash) //mk check,
-                }else{
-                    transactionHash =  (txs[i].hash)?  (txs[i].hash): (txs[i].transactionHash) //mk check,
+                if (stack.length > 0) {
+                    transactionHash = (txs[stack[0]].hash) ? (txs[stack[0]].hash) : (txs[stack[0]].transactionHash) //mk check,
+                } else {
+                    transactionHash = (txs[i].hash) ? (txs[i].hash) : (txs[i].transactionHash) //mk check,
                 }
                 t.transactionHash = transactionHash
                 res.push(t);
                 let contractAddress = t.to;
                 let byteCode = t.input;
-                console.log(`[Contract ${t.type}]`,i, depth, stack, `${t.type}`, contractAddress, `transactionHash: ${transactionHash}`)
+                console.log(`[Contract ${t.type}]`, i, depth, stack, `${t.type}`, contractAddress, `transactionHash: ${transactionHash}`)
                 // KEY TODO: take bytecode + contractAddress, call async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', topicFilter = false, RPCBackfill = null) -- or better after?
             }
             // recurse into calls
