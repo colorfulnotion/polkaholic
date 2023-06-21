@@ -4070,6 +4070,7 @@ module.exports = class Query extends AssetManager {
         if (!this.validAddress(address)) {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
+	let labels = [];
         let realtime = {};
         let w = (chainID) ? `and asset.chainID = '${chainID}'` : ""
         let contract = null;

@@ -1928,6 +1928,7 @@ app.get('/wasmcontract/:address/:chainID?', async (req, res) => {
         let address = req.params["address"];
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
         let contract = await query.getWASMContract(address, chainID);
+	console.log("wasmcontract", contract);
         res.render('wasmcontract', {
             address: address,
             chainInfo: query.getChainInfo(),
