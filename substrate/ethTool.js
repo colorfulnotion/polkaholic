@@ -3064,7 +3064,7 @@ async function getContractByteCode(web3Api, contractAddress, bn = 'latest', RPCB
     try {
         code = web3Api.eth.getCode(contractAddress)
     } catch (e) {
-        console.log(`getContractByteCode contractAddress=${contractAddress}. error`, e)
+        console.log(`getContractByteCode error`, e)
         return false
     }
     return code

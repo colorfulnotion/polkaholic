@@ -8,6 +8,10 @@ async function getAPI(chainID) {
     if (chainID == 2006 || chainID == "astar" ) {
 	WSEndpoint = "wss://astar.api.onfinality.io/public-ws";
     }
+    if (chainID == 30000 || chainID == "shibuya" ) {
+	WSEndpoint = "wss://rpc.shibuya.astar.network";
+    }
+    console.log("WSENdpoint", chainID, WSEndpoint);
     if ( WSEndpoint == null ) return(null);
     const {
         WsProvider,

@@ -1921,7 +1921,7 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_evm_block_gs(chainID, blockNumber) {
         // TODO: shift back to substrate model
-        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockNumber = '${blockNumber}' limit 1`
+        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} from blockNumber = '${blockNumber}' limit 1`
         let blocks = await this.poolREADONLY.query(sql);
         if (blocks.length == 1) {
             let b = blocks[0];

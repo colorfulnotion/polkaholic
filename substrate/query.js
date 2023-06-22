@@ -4137,6 +4137,7 @@ module.exports = class Query extends AssetManager {
         if (!this.validAddress(address)) {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
+	let labels = [];
         let realtime = {};
         let w = (chainID) ? `and asset.chainID = '${chainID}'` : ""
         let contract = null;
@@ -6595,11 +6596,16 @@ module.exports = class Query extends AssetManager {
 
     async getChainWASMCodeInfo(network, codeHash = null) {
         let chainID = this.network_to_chainID(network);
-        let sql = codeHash ? `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, verifyDT, signature, verifier from wasmCode where codeHash = '${codeHash}' and chainID = '${chainID}'` : `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, verifyDT, signature, verifier where chainID = '${chainID}' order by verifyDT desc limit 10`;
-        let recs = await this.poolREADONLY.query(sql);
+        let sql = codeHash ? `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, CONVERT(srcURLs using utf8) as srcURLs, verifyDT, signature, verifier from wasmCode where codeHash = '${codeHash}' and chainID = '${chainID}'` : `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, verifyDT, signature, verifier where chainID = '${chainID}' order by verifyDT desc limit 10`;
+	let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 1) {
             let r = recs[0];
-            r.metadata = JSON.parse(r.metadata);
+            try {
+		r.metadata = JSON.parse(r.metadata);
+		r.srcURLs = JSON.parse(r.srcURLs);
+	    } catch (err) {
+
+	    }
             return r;
         }
 
@@ -6636,7 +6642,7 @@ module.exports = class Query extends AssetManager {
         if (verifier == null) {
             throw new paraTool.InvalidError(`Invalid signature ${signature} for ${codeHash}`)
         }
-        console.log("VERIFIER:", verifier);
+        console.log("VERIFIER:", verifier, "publishSource", publishSource);
         if (await this.verified_wasm_codeHash(chainID, codeHash)) {
             // TODO: reenable
             // throw new paraTool.InvalidError(`Already verified ${codeHash} for ${network}`)
@@ -6661,7 +6667,7 @@ module.exports = class Query extends AssetManager {
         // 4. gets metadata from unzipped file of 3, parsing metadata JSON
         let metadata = null;
         let cdnURL = "https://" + path.join(bucketDir, codeHash, originalname); // zip file
-        let srcURLs = [cdnURL];
+        let srcURLs = (publishSource>0) ? [cdnURL] : [];
         for (const entry of extractedEntries) {
             if (entry.isDirectory) continue;
             if (entry.entryName.includes(".contract")) {
@@ -6675,7 +6681,7 @@ module.exports = class Query extends AssetManager {
                     throw new paraTool.InvalidError("Could not find metadata");
                 }
             }
-            if (publishSource) {
+            if (publishSource>0) {
                 srcURLs.push("https://" + path.join(bucketDir, codeHash, entry.entryName));
             }
             if (metadata) {

@@ -34,7 +34,7 @@ function showcodecontracts(codeHash) {
             data: 'address',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
-                    return presentIDwithIdenticon(data)
+                    return presentWASMContract(data);
                 } else {
 
                 }
@@ -90,7 +90,7 @@ function showcodecontracts(codeHash) {
 function showcodesource(codeHash, code) {
     let out = "";
     let i = 0;
-    out += `<div><button class="btn-primary" href="https://chainide.com/${codeHash}">Open with ChainIDE</button></div>`
+    out += `<div><a class="btn btn-large btn-primary" target="_new" href="https://chainide.com/wasm/${codeHash}">Open: <img src="https://cdn.polkaholic.io/chainide_logo.svg" width="75"/></a></div>`
     for (const s of source) {
         const u = new URL(s.srcUrl);
         const p = u.pathname.replaceAll(`/wasmcode/${codeHash}/`, "")
