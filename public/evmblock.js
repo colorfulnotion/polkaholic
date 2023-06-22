@@ -11,6 +11,7 @@ let tableEVMBlockEvents = false;
 
 function showevmblockextrinsics(objects) {
     refreshTabcount("extrinsics")
+    console.log("EXECU");
     let tableName = '#tableevmblockextrinsics'
     if (!initevmblockextrinsics) {
         initevmblockextrinsics = true;
@@ -119,8 +120,8 @@ function showevmblockextrinsics(objects) {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             //let res = (row.result == 1) ? 'Success' : 'Failed'
-                            let txStatus = presentSuccessFailure(row.result, row.err)
-                            return txStatus;
+                            //let txStatus = presentSuccessFailure(row.result, row.err)
+                            //return txStatus;
                         }
                         return data;
                     }
@@ -767,29 +768,40 @@ $.fn.dataTable.ext.search.push(
 
 function refreshTabcount(tblType = 'extrinsics') {
     if (tblType == 'extrinsics') {
-        let checked = document.getElementById('showallextrinsics').checked;
-        if (checked) {
-            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${extrinsics.length})`;
-        } else {
-            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
-        }
+	let extrinsicsTab = document.getElementById('extrinsics-tab');
+	if ( extrinsicsTab ) {
+            let checked = document.getElementById('showallextrinsics').checked;
+            if (checked) {
+		extrinsicsTab.innerHTML = `Extrinsics (${extrinsics.length})`;
+            } else {
+		extrinsicsTab.innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+            }
+	}
     } else if (tblType == 'events') {
-        let checked = document.getElementById('showallevents').checked;
-        if (checked) {
-            document.getElementById('events-tab').innerHTML = `Events (${events.length})`;
-        } else {
-            document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
-        }
+	let eventsTab = document.getElementById('events-tab');
+	if ( eventsTab ) {
+            let checked = document.getElementById('showallevents').checked;
+            if (checked) {
+		eventsTab.innerHTML = `Events (${events.length})`;
+            } else {
+		eventsTab.innerHTML = `Events (${totalEvents})`;
+            }
+	}
     }
 }
 
 $("#showallextrinsics").on('click', function(e) {
     refreshTabcount("extrinsics")
-    showevmblockextrinsics(extrinsics);
+    if ( extrinsics && extrinsics.length ) {
+    console.log("EXECU0");
+	showevmblockextrinsics(extrinsics);
+    }
 });
 $("#showallevents").on('click', function(e) {
     refreshTabcount("events")
-    showevmblockevents(events);
+    if ( events && events.length ) {
+	showevmblockevents(events);
+    }
 });
 
 $(document).ready(function() {
@@ -797,6 +809,9 @@ $(document).ready(function() {
     showevmblocktransactions(evmtxs);
     showevmblockinternal(evminternal);
     showevmblockremote(evmremote);
-    showevmblockextrinsics(extrinsics);
-    showevmblockevents(events);
+    if ( extrinsics.length > 0 ) {
+	console.log("EXECU1", extrinsics);
+	showevmblockextrinsics(extrinsics);
+    }
+    if ( events.length > 0 ) showevmblockevents(events);
 });

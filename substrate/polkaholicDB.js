@@ -1921,7 +1921,7 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_evm_block_gs(chainID, blockNumber) {
         // TODO: shift back to substrate model
-        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} from blockNumber = '${blockNumber}' limit 1`
+        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockNumber = '${blockNumber}' limit 1`
         let blocks = await this.poolREADONLY.query(sql);
         if (blocks.length == 1) {
             let b = blocks[0];
@@ -1933,6 +1933,7 @@ from chain where chainID = '${chainID}' limit 1`);
             const file = bucket.file(fileName);
             const buffer = await file.download();
             const r = JSON.parse(buffer[0]); // block, receipts, evm
+	    console.log("fetch_evm_block", r);
             return r
         }
         return null;
@@ -2057,9 +2058,10 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
-        if ( ( chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513 ) || ( (chainID <= 2) && blockNumber < 35000 ) ) { // fetch { blockraw, events, feed } from GS storage
+        if ( ( chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513 ) || ( chainID == 1 ) || ( (chainID <= 2) && blockNumber < 35000 ) ) { // fetch { blockraw, events, feed } from GS storage
             try {
                 let r = await this.fetch_block_gs(chainID, blockNumber);
+		console.log("fetch_block", r);
                 return r;
             } catch (e) {
                 console.log("ERR", e);

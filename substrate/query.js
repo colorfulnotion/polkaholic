@@ -2659,6 +2659,7 @@ module.exports = class Query extends AssetManager {
 
     async getBlock(chainID_or_chainName, blockNumber, blockHash = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
+	console.log("DECORD", chainID, id);
         if (chainID === false) throw new paraTool.NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
         let chain = await this.getChain(chainID);
         if (blockNumber > chain.blocksCovered) {
@@ -2668,10 +2669,10 @@ module.exports = class Query extends AssetManager {
             let families = ["feed", "finalized", "feedevm"];
             let row = await this.fetch_block(chainID, blockNumber, families, true, blockHash);
             let evmFullBlock = (row.evmFullBlock)? row.evmFullBlock: false
-            console.log(`[${chainID}]${blockNumber} row`, row)
             if (row && row.receipts != undefined){
                 try {
-		    row.evmFullBlock = await this.decorate_evm_block(chainID, row)
+		    row.evmBlock = await this.decorate_evm_block(chainID, row)
+		   
                     return row
 		} catch (err) {
 		    console.log(err);
