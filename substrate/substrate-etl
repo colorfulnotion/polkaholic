@@ -31,14 +31,26 @@ async function main() {
     program.command('extract')
         .description("Stream data out to GS")
         .option('-c, --chainID <chainID>', 'Chain ID', "2")
-        .option('-s, --startBlock <startBN>', 'Start Block', "1")
-        .option('-e, --endBlock <endBN>', 'End Block', "1000")
+        .option('-s, --startBlock <startBN>', 'Start Block')
+        .option('-e, --endBlock <endBN>', 'End Block')
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             let chainID = opt.chainID ? opt.chainID : 2;
-            let startBN = opt.startBlock ? parseInt(opt.startBlock, 10) : 1;
-            let endBN = opt.endBlock ? parseInt(opt.endBlock, 10) : 10000;
-            await substrateetl.extract_blocks(startBN, endBN, chainID);
+	    let startBN = 1;
+	    let endBN = 1000000;
+	    if ( opt.startBlock && opt.endBlock ) {
+		startBN = parseInt(opt.startBlock, 10);
+		endBN = parseInt(opt.endBlock, 10);
+		await substrateetl.extract_blocks(startBN, endBN, chainID);
+	    } else {
+		while ( 1 ) {
+		    let [chainID, sector] = await substrateetl.get_archiver_chain_sector();
+		    console.log(chainID, sector);
+		    await substrateetl.extract_blocks(sector * 10000, (sector+1)*10000, chainID);
+		    await substrateetl.update_archiver_chain_sector(chainID, sector);
+		    await substrateetl.sleep(2000);
+		}
+	    }
         })
 
     program.command('dump')

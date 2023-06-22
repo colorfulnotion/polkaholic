@@ -2599,6 +2599,64 @@ module.exports = class Query extends AssetManager {
         return trace
     }
 
+    async decorate_evm_block(chainID, r){
+        console.log('decorate_evm_block', r)
+        let contractABIs = this.contractABIs;
+        let contractABISignatures = this.contractABISignatures;
+        //let evmRPCInternalApi = this.evmRPCInternal
+
+        let blkNum = false
+        let blkHash = false
+        let blockTS = false
+        let blockAvailable = false
+        let traceAvailable = false
+        let receiptsAvailable = false
+        let rpcBlock = r.block
+        let rpcReceipts = r.receipts
+        //let chainID = r.chain_id
+        let evmReceipts = []
+        let evmTrace = false
+        let blk = false
+        let stream_bq = false
+        let write_bt = false
+
+        if (rpcBlock) {
+            blockAvailable = true
+            blk = ethTool.standardizeRPCBlock(rpcBlock)
+            console.log(`evmBlk++`, blk)
+            blkNum = blk.number;
+            blkHash = blk.hash;
+            blockTS = blk.timestamp;
+        } else {
+            console.log(`r.block missing`, r)
+        }
+        if (r.traces) {
+            traceAvailable = true
+            evmTrace = r.trace
+        }
+        if (rpcReceipts) {
+            receiptsAvailable = true
+            evmReceipts = ethTool.standardizeRPCReceiptLogs(rpcReceipts)
+        } else {
+            console.log(`r.rpcReceipts missing`, r)
+        }
+        //console.log(`blk.transactions`, blk.transactions)
+        console.log(`decorate_evm_block [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
+        var statusesPromise = Promise.all([
+            ethTool.processTransactions(blk.transactions, contractABIs, contractABISignatures),
+            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+        ])
+        let [dTxns, dReceipts] = await statusesPromise
+        console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
+        console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
+        let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
+        //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
+        //fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID)
+        let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(blk, blk.transactions, dReceipts, flatTraces, chainID)
+        //let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(blk, dTxns, dReceipts, flatTraces, chainID)
+        return evmFullBlock;
+    }
+
     async getBlock(chainID_or_chainName, blockNumber, blockHash = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         if (chainID === false) throw new paraTool.NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
@@ -2609,10 +2667,19 @@ module.exports = class Query extends AssetManager {
         try {
             let families = ["feed", "finalized", "feedevm"];
             let row = await this.fetch_block(chainID, blockNumber, families, true, blockHash);
-            // TODO: check response
-            let block = row.feed;
-            if (block) {
-                block = await this.decorateBlock(row.feed, chainID, row.evmFullBlock, decorate, decorateExtra);
+            let evmFullBlock = (row.evmFullBlock)? row.evmFullBlock: false
+            console.log(`[${chainID}]${blockNumber} row`, row)
+            if (row && row.receipts != undefined){
+                try {
+		    row.evmFullBlock = await this.decorate_evm_block(chainID, row)
+                    return row
+		} catch (err) {
+		    console.log(err);
+		}
+            }
+            if (row.feed) {
+		let block = row.feed;
+                block = await this.decorateBlock(row.feed, chainID, evmFullBlock, decorate, decorateExtra);
 
                 let sql = `select numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from block${chainID} where blockNumber = '${blockNumber}' limit 1`;
                 let blockStatsRecs = await this.poolREADONLY.query(sql);
@@ -6537,7 +6604,7 @@ module.exports = class Query extends AssetManager {
 		r.metadata = JSON.parse(r.metadata);
 		r.srcURLs = JSON.parse(r.srcURLs);
 	    } catch (err) {
-		
+
 	    }
             return r;
         }
@@ -6581,7 +6648,7 @@ module.exports = class Query extends AssetManager {
             // throw new paraTool.InvalidError(`Already verified ${codeHash} for ${network}`)
         }
 
-        // 1. creates local codehash-specific directory 
+        // 1. creates local codehash-specific directory
         let targetDirectory = path.join(outputDirectory, codeHash);
         if (!fs.existsSync(targetDirectory)) {
             fs.mkdirSync(targetDirectory);
@@ -6592,12 +6659,12 @@ module.exports = class Query extends AssetManager {
         //console.log(`cp ${zipFilePath} ${zipFilePathOriginalName}`);
         fs.copyFileSync(zipFilePath, zipFilePathOriginalName);
 
-        // 3. unzips zipfile into codehash-specific directory 
+        // 3. unzips zipfile into codehash-specific directory
         const zip = new AdmZip(zipFilePath);
         zip.extractAllTo(targetDirectory, true);
         const extractedEntries = zip.getEntries();
 
-        // 4. gets metadata from unzipped file of 3, parsing metadata JSON 
+        // 4. gets metadata from unzipped file of 3, parsing metadata JSON
         let metadata = null;
         let cdnURL = "https://" + path.join(bucketDir, codeHash, originalname); // zip file
         let srcURLs = (publishSource>0) ? [cdnURL] : [];
