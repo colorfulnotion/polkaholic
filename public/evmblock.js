@@ -768,39 +768,39 @@ $.fn.dataTable.ext.search.push(
 
 function refreshTabcount(tblType = 'extrinsics') {
     if (tblType == 'extrinsics') {
-	let extrinsicsTab = document.getElementById('extrinsics-tab');
-	if ( extrinsicsTab ) {
+        let extrinsicsTab = document.getElementById('extrinsics-tab');
+        if (extrinsicsTab) {
             let checked = document.getElementById('showallextrinsics').checked;
             if (checked) {
-		extrinsicsTab.innerHTML = `Extrinsics (${extrinsics.length})`;
+                extrinsicsTab.innerHTML = `Extrinsics (${extrinsics.length})`;
             } else {
-		extrinsicsTab.innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+                extrinsicsTab.innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
             }
-	}
+        }
     } else if (tblType == 'events') {
-	let eventsTab = document.getElementById('events-tab');
-	if ( eventsTab ) {
+        let eventsTab = document.getElementById('events-tab');
+        if (eventsTab) {
             let checked = document.getElementById('showallevents').checked;
             if (checked) {
-		eventsTab.innerHTML = `Events (${events.length})`;
+                eventsTab.innerHTML = `Events (${events.length})`;
             } else {
-		eventsTab.innerHTML = `Events (${totalEvents})`;
+                eventsTab.innerHTML = `Events (${totalEvents})`;
             }
-	}
+        }
     }
 }
 
 $("#showallextrinsics").on('click', function(e) {
     refreshTabcount("extrinsics")
-    if ( extrinsics && extrinsics.length ) {
-    console.log("EXECU0");
-	showevmblockextrinsics(extrinsics);
+    if (extrinsics && extrinsics.length) {
+        console.log("EXECU0");
+        showevmblockextrinsics(extrinsics);
     }
 });
 $("#showallevents").on('click', function(e) {
     refreshTabcount("events")
-    if ( events && events.length ) {
-	showevmblockevents(events);
+    if (events && events.length) {
+        showevmblockevents(events);
     }
 });
 
@@ -809,9 +809,9 @@ $(document).ready(function() {
     showevmblocktransactions(evmtxs);
     showevmblockinternal(evminternal);
     showevmblockremote(evmremote);
-    if ( extrinsics.length > 0 ) {
-	console.log("EXECU1", extrinsics);
-	showevmblockextrinsics(extrinsics);
+    if (extrinsics.length > 0) {
+        console.log("EXECU1", extrinsics);
+        showevmblockextrinsics(extrinsics);
     }
-    if ( events.length > 0 ) showevmblockevents(events);
+    if (events.length > 0) showevmblockevents(events);
 });

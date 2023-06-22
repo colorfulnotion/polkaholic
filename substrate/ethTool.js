@@ -744,7 +744,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
         console.log(`decorateTxn: missing receipts`, dReceipt)
         return;
     }
-    let dTxnTxHash = (dTxn.hash)?  dTxn.hash: dTxn.transactionHash
+    let dTxnTxHash = (dTxn.hash) ? dTxn.hash : dTxn.transactionHash
     if (dTxnTxHash != dReceipt.transactionHash) {
         console.log(`decorateTxn: txnHash mismatch (tx:${dTxnTxHash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
         return
@@ -791,7 +791,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
     let fTxn = {
         chainID: (chainID) ? chainID : paraTool.dechexToInt(dTxn.chainId),
-        transactionHash: (dTxn.hash)?  dTxn.hash: dTxn.transactionHash,
+        transactionHash: (dTxn.hash) ? dTxn.hash : dTxn.transactionHash,
         substrate: null,
         status: dReceipt.status,
         blockHash: dTxn.blockHash,
@@ -1816,7 +1816,7 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces,
     return fBlk
 }
 
-async function decorateEvmBlock(chainID, r){
+async function decorateEvmBlock(chainID, r) {
     console.log('decorate_evm_block', r)
     let contractABIs = this.contractABIs;
     let contractABISignatures = this.contractABISignatures;

@@ -2599,7 +2599,7 @@ module.exports = class Query extends AssetManager {
         return trace
     }
 
-    async decorate_evm_block(chainID, r){
+    async decorate_evm_block(chainID, r) {
         console.log('decorate_evm_block', r)
         let contractABIs = this.contractABIs;
         let contractABISignatures = this.contractABISignatures;
@@ -2659,7 +2659,7 @@ module.exports = class Query extends AssetManager {
 
     async getBlock(chainID_or_chainName, blockNumber, blockHash = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
-	console.log("DECORD", chainID, id);
+        console.log("DECORD", chainID, id);
         if (chainID === false) throw new paraTool.NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
         let chain = await this.getChain(chainID);
         if (blockNumber > chain.blocksCovered) {
@@ -2668,18 +2668,18 @@ module.exports = class Query extends AssetManager {
         try {
             let families = ["feed", "finalized", "feedevm"];
             let row = await this.fetch_block(chainID, blockNumber, families, true, blockHash);
-            let evmFullBlock = (row.evmFullBlock)? row.evmFullBlock: false
-            if (row && row.receipts != undefined){
+            let evmFullBlock = (row.evmFullBlock) ? row.evmFullBlock : false
+            if (row && row.receipts != undefined) {
                 try {
-		    row.evmBlock = await this.decorate_evm_block(chainID, row)
-		   
+                    row.evmBlock = await this.decorate_evm_block(chainID, row)
+
                     return row
-		} catch (err) {
-		    console.log(err);
-		}
+                } catch (err) {
+                    console.log(err);
+                }
             }
             if (row.feed) {
-		let block = row.feed;
+                let block = row.feed;
                 block = await this.decorateBlock(row.feed, chainID, evmFullBlock, decorate, decorateExtra);
 
                 let sql = `select numXCMTransfersIn, numXCMMessagesIn, numXCMTransfersOut, numXCMMessagesOut, valXCMTransferIncomingUSD, valXCMTransferOutgoingUSD from block${chainID} where blockNumber = '${blockNumber}' limit 1`;
@@ -4138,7 +4138,7 @@ module.exports = class Query extends AssetManager {
         if (!this.validAddress(address)) {
             throw new paraTool.InvalidError(`Invalid address ${address}`)
         }
-	let labels = [];
+        let labels = [];
         let realtime = {};
         let w = (chainID) ? `and asset.chainID = '${chainID}'` : ""
         let contract = null;
@@ -6598,15 +6598,15 @@ module.exports = class Query extends AssetManager {
     async getChainWASMCodeInfo(network, codeHash = null) {
         let chainID = this.network_to_chainID(network);
         let sql = codeHash ? `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, CONVERT(srcURLs using utf8) as srcURLs, verifyDT, signature, verifier from wasmCode where codeHash = '${codeHash}' and chainID = '${chainID}'` : `select codeHash, chainID, status, CONVERT(metadata using utf8) as metadata, verifyDT, signature, verifier where chainID = '${chainID}' order by verifyDT desc limit 10`;
-	let recs = await this.poolREADONLY.query(sql);
+        let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 1) {
             let r = recs[0];
             try {
-		r.metadata = JSON.parse(r.metadata);
-		r.srcURLs = JSON.parse(r.srcURLs);
-	    } catch (err) {
+                r.metadata = JSON.parse(r.metadata);
+                r.srcURLs = JSON.parse(r.srcURLs);
+            } catch (err) {
 
-	    }
+            }
             return r;
         }
 
@@ -6668,7 +6668,7 @@ module.exports = class Query extends AssetManager {
         // 4. gets metadata from unzipped file of 3, parsing metadata JSON
         let metadata = null;
         let cdnURL = "https://" + path.join(bucketDir, codeHash, originalname); // zip file
-        let srcURLs = (publishSource>0) ? [cdnURL] : [];
+        let srcURLs = (publishSource > 0) ? [cdnURL] : [];
         for (const entry of extractedEntries) {
             if (entry.isDirectory) continue;
             if (entry.entryName.includes(".contract")) {
@@ -6682,7 +6682,7 @@ module.exports = class Query extends AssetManager {
                     throw new paraTool.InvalidError("Could not find metadata");
                 }
             }
-            if (publishSource>0) {
+            if (publishSource > 0) {
                 srcURLs.push("https://" + path.join(bucketDir, codeHash, entry.entryName));
             }
             if (metadata) {

@@ -76,18 +76,18 @@ module.exports = class AssetManager extends PolkaholicDB {
     convertChainID(chainID_or_chainName) {
         let chainID = false
         let id = false
-	let evm_chainID = {
-            1: "ethereum" ,
+        let evm_chainID = {
+            1: "ethereum",
             1284: "moonbeam",
             1285: "moonriver",
             592: "astar"
-	};
+        };
         try {
-             chainID = parseInt(chainID_or_chainName, 10);
-             if (isNaN(chainID)) {
-                 [chainID, id] = this.getChainIDByName(chainID_or_chainName)
-             } else if ( evm_chainID[chainID] !== undefined ) {
-		 return [chainID, evm_chainID[chainID]]
+            chainID = parseInt(chainID_or_chainName, 10);
+            if (isNaN(chainID)) {
+                [chainID, id] = this.getChainIDByName(chainID_or_chainName)
+            } else if (evm_chainID[chainID] !== undefined) {
+                return [chainID, evm_chainID[chainID]]
             } else {
                 [chainID, id] = this.getNameByChainID(chainID_or_chainName)
             }
