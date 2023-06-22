@@ -11,7 +11,7 @@ let tableEVMBlockEvents = false;
 
 function showevmblockextrinsics(objects) {
     refreshTabcount("extrinsics")
-    console.log("EXECU");
+
     let tableName = '#tableevmblockextrinsics'
     if (!initevmblockextrinsics) {
         initevmblockextrinsics = true;
@@ -119,9 +119,9 @@ function showevmblockextrinsics(objects) {
                     data: 'result',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            //let res = (row.result == 1) ? 'Success' : 'Failed'
-                            //let txStatus = presentSuccessFailure(row.result, row.err)
-                            //return txStatus;
+                            let res = (row.result == 1) ? 'Success' : 'Failed'
+                            let txStatus = presentSuccessFailure(row.result, row.err)
+                            return txStatus;
                         }
                         return data;
                     }
@@ -793,7 +793,6 @@ function refreshTabcount(tblType = 'extrinsics') {
 $("#showallextrinsics").on('click', function(e) {
     refreshTabcount("extrinsics")
     if (extrinsics && extrinsics.length) {
-        console.log("EXECU0");
         showevmblockextrinsics(extrinsics);
     }
 });
@@ -810,7 +809,6 @@ $(document).ready(function() {
     showevmblockinternal(evminternal);
     showevmblockremote(evmremote);
     if (extrinsics.length > 0) {
-        console.log("EXECU1", extrinsics);
         showevmblockextrinsics(extrinsics);
     }
     if (events.length > 0) showevmblockevents(events);

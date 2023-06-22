@@ -2659,7 +2659,7 @@ module.exports = class Query extends AssetManager {
 
     async getBlock(chainID_or_chainName, blockNumber, blockHash = false, decorate = true, decorateExtra = ["data", "address", "usd", "related"]) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
-        console.log("DECORD", chainID, id);
+
         if (chainID === false) throw new paraTool.NotFoundError(`Invalid chain: ${chainID_or_chainName}`)
         let chain = await this.getChain(chainID);
         if (blockNumber > chain.blocksCovered) {
