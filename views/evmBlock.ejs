@@ -7,12 +7,14 @@
 let defHash = '#overview';
 let tabs = [
 { title: "Overview", target: "overview" },
-{ title: "Transactions", target: "evmtxs" },
-{ title: "Extrinsics", target: "extrinsics" },
-{ title: "Events", target: "events" },
+{ title: "Transactions", target: "evmtxs" }
 ]
+if ( chainID == 2004 || chainID == 2006 || chainID == 22023 || chainID == 22007 ) {
+  tabs.push({ title: "Extrinsics", target: "extrinsics" });
+  tabs.push({ title: "Events", target: "events" });
+}
 
-if ( b.evmBlock.transactionsInternal && ( b.evmBlock.transactionsInternal.length > 0 ) ) {
+if ( b.traces && ( b.traces.length > 0 ) ) {
   tabs.splice(2, 0, { title: "Internal Txns", target: "internal" });
 }
 
@@ -79,6 +81,7 @@ for (let i=0; i<tabs.length; i++) {
   <table id="tableinternal" class="display" style="width: 100%">
     <thead>
     <tr class="tableheader">
+       <th>Index</th>
        <th><%- include("tooltip", {k: "parenttxhash"}) %>Parent Txn Hash</th>
        <th><%- include("tooltip", {k: "typetraceaddress"}) %>Type Trace Address</th>
        <th><%- include("tooltip", {k: "evmfrom"}) %>From</th>
@@ -147,11 +150,10 @@ let evmtxs = <%- JSON.stringify(b.evmBlock.transactions.reverse()); %>;
 let evmtxs = '[]';
 <% } %>
 
-
-<% if (b.evmBlock != undefined && b.evmBlock.transactionsInternal !=undefined) { %>
-let evminternal = <%- JSON.stringify(b.evmBlock.transactionsInternal); %>;
+<% if (b.traces !=undefined) { %>
+let evminternal = <%- JSON.stringify(b.traces); %>;
 <% } else { %>
-let evminternal = '[]';
+let evminternal = [];
 <% } %>
 
 <% if (b.evmBlock != undefined && b.evmBlock.transactionsConnected !=undefined) { %>
@@ -163,7 +165,7 @@ let evmremote = '[]';
 <% if (b.extrinsics != undefined) { %>
 let extrinsics = <%- JSON.stringify(b.extrinsics); %>;
 <% } else { %>
-let extrinsics = '[]';
+let extrinsics = [];
 <% } %>
 // extract events from extrinsics, and tally totalSubstrateSignedExtrinsics, totalEvents
 let events = [];
@@ -173,7 +175,8 @@ for (const extrinsic of extrinsics) {
    let extrinsicEventIndex = 0; // this is the eventIndex within the extrinsic
    let signed = ( ( extrinsic.signer == undefined ) || ( extrinsic.evm ) ) ? false : true;
    if ( signed ) totalSubstrateSignedExtrinsics++;
-   for (const e of extrinsic.events) {
+   if ( extrinsic.events ) {
+     for (const e of extrinsic.events) {
         let pieces = e.eventID.split('-') //2-12039596-1-1
         e.rawEventID = `${pieces[1]}-${pieces[3]}`
         e.extrinsicID = extrinsic.extrinsicID
@@ -183,15 +186,16 @@ for (const extrinsic of extrinsics) {
 	    extrinsicEventIndex++
         if ( signed ) totalEvents++
 	    events.push(e);
+	    }
    }
 }
 document.getElementById('evmtxs-tab').innerHTML = `Transactions (${evmtxs.length})`;
-let internalTab = document.getElementById('internal-tab');
-if ( evminternal && internalTab ) internalTab.innerHTML = `Internal Txns (${evminternal.length})`;
 let remoteTab = document.getElementById('remote-tab');
 if ( evmremote && remoteTab ) remoteTab.innerHTML = `Remote Executions (${evmremote.length})`;
-document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
-document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
+let extrinsicsTab = document.getElementById('extrinsics-tab');
+let eventsTab = document.getElementById('events-tab');
+if ( extrinsicsTab ) extrinsicsTab.innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+if ( eventsTab ) eventsTab.innerHTML = `Events (${totalEvents})`;
 </script>
 <script src="/evmblock.js"></script>
 

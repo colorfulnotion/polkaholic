@@ -36,21 +36,21 @@ async function main() {
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             let chainID = opt.chainID ? opt.chainID : 2;
-	    let startBN = 1;
-	    let endBN = 1000000;
-	    if ( opt.startBlock && opt.endBlock ) {
-		startBN = parseInt(opt.startBlock, 10);
-		endBN = parseInt(opt.endBlock, 10);
-		await substrateetl.extract_blocks(startBN, endBN, chainID);
-	    } else {
-		while ( 1 ) {
-		    let [chainID, sector] = await substrateetl.get_archiver_chain_sector();
-		    console.log(chainID, sector);
-		    await substrateetl.extract_blocks(sector * 10000, (sector+1)*10000, chainID);
-		    await substrateetl.update_archiver_chain_sector(chainID, sector);
-		    await substrateetl.sleep(2000);
-		}
-	    }
+            let startBN = 1;
+            let endBN = 1000000;
+            if (opt.startBlock && opt.endBlock) {
+                startBN = parseInt(opt.startBlock, 10);
+                endBN = parseInt(opt.endBlock, 10);
+                await substrateetl.extract_blocks(startBN, endBN, chainID);
+            } else {
+                while (1) {
+                    let [chainID, sector] = await substrateetl.get_archiver_chain_sector();
+                    console.log(chainID, sector);
+                    await substrateetl.extract_blocks(sector * 10000, (sector + 1) * 10000, chainID);
+                    await substrateetl.update_archiver_chain_sector(chainID, sector);
+                    await substrateetl.sleep(2000);
+                }
+            }
         })
 
     program.command('dump')

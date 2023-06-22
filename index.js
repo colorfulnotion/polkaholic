@@ -860,9 +860,7 @@ app.get('/blocks/:chainIDorChainName?', async (req, res) => {
         let chainIDorChainName = req.params.chainIDorChainName ? req.params.chainIDorChainName : null;
         let [chainID, id, chain] = await getHostChain(req, chainIDorChainName)
         if (chain) {
-            var blocks = await query.getChainRecentBlocks(chainID);
             res.render('blocks', {
-                blocks: blocks,
                 chainID: chainID,
                 id: id,
                 chainInfo: query.getChainInfo(chainID),
@@ -1440,9 +1438,9 @@ app.get('/block/:chainID_or_chainName/:blockNumber', async (req, res) => {
         var b = await query.getBlock(chainID, blockNumber, blockHash, decorate, decorateExtra);
         if (b) {
             let view = "block";
-	    if ( chain.isEVM == 1 ) {
-		view = "evmBlock"
-	    }
+            if (chain.isEVM == 1) {
+                view = "evmBlock"
+            }
             res.render(view, {
                 b: b,
                 blockNumber: blockNumber,
@@ -1931,7 +1929,6 @@ app.get('/wasmcontract/:address/:chainID?', async (req, res) => {
         let address = req.params["address"];
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
         let contract = await query.getWASMContract(address, chainID);
-	console.log("wasmcontract", contract);
         res.render('wasmcontract', {
             address: address,
             chainInfo: query.getChainInfo(),

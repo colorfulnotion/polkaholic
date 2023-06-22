@@ -11,6 +11,7 @@ let tableEVMBlockEvents = false;
 
 function showevmblockextrinsics(objects) {
     refreshTabcount("extrinsics")
+
     let tableName = '#tableevmblockextrinsics'
     if (!initevmblockextrinsics) {
         initevmblockextrinsics = true;
@@ -118,7 +119,7 @@ function showevmblockextrinsics(objects) {
                     data: 'result',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
-                            //let res = (row.result == 1) ? 'Success' : 'Failed'
+                            let res = (row.result == 1) ? 'Success' : 'Failed'
                             let txStatus = presentSuccessFailure(row.result, row.err)
                             return txStatus;
                         }
@@ -471,7 +472,60 @@ function showevmblockremote(objects) {
     table.draw();
 }
 
-function showevmblockinternal(objects) {
+
+function dechexToInt(hexString) {
+    if (typeof hexString !== 'string' || !hexString.startsWith('0x')) {
+        throw new Error('Invalid hexadecimal string format');
+    }
+
+    const decimalString = hexString.slice(2); // Remove the "0x" prefix
+    const decimalNumber = parseInt(decimalString, 16);
+
+    return decimalNumber;
+}
+
+function process_evm_trace(transactionHash, idx, t, res, depth, stack = []) {
+    try {
+        if (t.value && t.value != "0x0" && stack.length > 1) {
+            res.push({
+                idx,
+                transactionHash,
+                stack: stack,
+                from: t.from,
+                to: t.to,
+                gas: dechexToInt(t.gas),
+                gasUsed: dechexToInt(t.gasUsed),
+                value: dechexToInt(t.value) / 10 ** 18,
+            });
+        }
+        if (t.calls != undefined) {
+            for (let i = 0; i < t.calls.length; i++) {
+                let newStack = [...stack];
+                newStack.push(i);
+                // recursive call
+                process_evm_trace(transactionHash, idx, t.calls[i], res, depth + 1, newStack);
+            }
+        }
+    } catch (err) {
+        console.log(err);
+    }
+}
+
+function processTraces(traces, txs) {
+    let res = [];
+    txs = txs.sort(function(b, a) {
+        return b.transactionIndex - a.transactionIndex;
+    })
+    for (let i = 0; i < traces.length; i++) {
+        let stack = [i];
+        process_evm_trace(txs[i].transactionHash, i, traces[i].result, res, 0, stack);
+    }
+
+    return res;
+}
+
+
+function showevmblockinternal(traces, txs) {
     let tableName = '#tableinternal'
     if (!initevmblockinternal) {
         initevmblockinternal = true;
@@ -481,6 +535,11 @@ function showevmblockinternal(objects) {
                 "targets": [3, 4]
             }],
             columns: [{
+                    data: 'idx',
+                    render: function(data, type, row, meta) {
+                        return data;
+                    }
+                }, {
                     data: 'transactionHash',
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
@@ -493,10 +552,7 @@ function showevmblockinternal(objects) {
                                 console.log(row);
                             }
                         }
-                        if (row.extrinsicID != undefined) {
-                            return data;
-                        }
-                        return "";
+                        return data;
                     }
                 },
                 {
@@ -504,7 +560,9 @@ function showevmblockinternal(objects) {
                     render: function(data, type, row, meta) {
                         if (type == 'display') {
                             if (row.stack != undefined) {
-                                return presentStack(data);
+                                let s = presentStack(data);
+                                let trace = `<a class="btn btn-sm text-capitalize" href="https://openchain.xyz/trace/ethereum/${row.transactionHash}" target="_target">Trace ${s}</a>`;
+                                return trace
                             }
                         }
                         return "";
@@ -552,7 +610,6 @@ function showevmblockinternal(objects) {
                 {
                     data: 'gasUsed',
                     render: function(data, type, row, meta) {
-                        console.log(row);
                         if (row.gasUsed) {
                             return data;
                         } else {
@@ -565,8 +622,11 @@ function showevmblockinternal(objects) {
     }
     let table = tableEVMBlockInternal;
     table.clear();
-    if (objects != undefined) {
-        table.rows.add(objects);
+    if (traces != undefined) {
+        let linkedTraces = processTraces(traces, txs);
+        table.rows.add(linkedTraces);
+        let internalTab = document.getElementById('internal-tab');
+        if (internalTab) internalTab.innerHTML = `Internal Txns (${linkedTraces.length})`;
     }
     table.draw();
 }
@@ -767,36 +827,48 @@ $.fn.dataTable.ext.search.push(
 
 function refreshTabcount(tblType = 'extrinsics') {
     if (tblType == 'extrinsics') {
-        let checked = document.getElementById('showallextrinsics').checked;
-        if (checked) {
-            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${extrinsics.length})`;
-        } else {
-            document.getElementById('extrinsics-tab').innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+        let extrinsicsTab = document.getElementById('extrinsics-tab');
+        if (extrinsicsTab) {
+            let checked = document.getElementById('showallextrinsics').checked;
+            if (checked) {
+                extrinsicsTab.innerHTML = `Extrinsics (${extrinsics.length})`;
+            } else {
+                extrinsicsTab.innerHTML = `Extrinsics (${totalSubstrateSignedExtrinsics})`;
+            }
         }
     } else if (tblType == 'events') {
-        let checked = document.getElementById('showallevents').checked;
-        if (checked) {
-            document.getElementById('events-tab').innerHTML = `Events (${events.length})`;
-        } else {
-            document.getElementById('events-tab').innerHTML = `Events (${totalEvents})`;
+        let eventsTab = document.getElementById('events-tab');
+        if (eventsTab) {
+            let checked = document.getElementById('showallevents').checked;
+            if (checked) {
+                eventsTab.innerHTML = `Events (${events.length})`;
+            } else {
+                eventsTab.innerHTML = `Events (${totalEvents})`;
+            }
         }
     }
 }
 
 $("#showallextrinsics").on('click', function(e) {
     refreshTabcount("extrinsics")
-    showevmblockextrinsics(extrinsics);
+    if (extrinsics && extrinsics.length) {
+        showevmblockextrinsics(extrinsics);
+    }
 });
 $("#showallevents").on('click', function(e) {
     refreshTabcount("events")
-    showevmblockevents(events);
+    if (events && events.length) {
+        showevmblockevents(events);
+    }
 });
 
 $(document).ready(function() {
     setuptabs(tabs, id, blockNumber, blockHash, defHash);
     showevmblocktransactions(evmtxs);
-    showevmblockinternal(evminternal);
+    showevmblockinternal(evminternal, evmtxs);
     showevmblockremote(evmremote);
-    showevmblockextrinsics(extrinsics);
-    showevmblockevents(events);
+    if (extrinsics.length > 0) {
+        showevmblockextrinsics(extrinsics);
+    }
+    if (events.length > 0) showevmblockevents(events);
 });
