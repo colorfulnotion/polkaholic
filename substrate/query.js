@@ -2632,7 +2632,7 @@ module.exports = class Query extends AssetManager {
         }
         if (r.traces) {
             traceAvailable = true
-            evmTrace = r.trace
+            evmTrace = r.traces
         }
         if (rpcReceipts) {
             receiptsAvailable = true

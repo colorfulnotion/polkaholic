@@ -1849,7 +1849,7 @@ async function decorateEvmBlock(chainID, r) {
     }
     if (r.traces) {
         traceAvailable = true
-        evmTrace = r.trace
+        evmTrace = r.traces
     }
     if (rpcReceipts) {
         receiptsAvailable = true
