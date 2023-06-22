@@ -3,23 +3,16 @@
   let prevBlockUrl = `/block/${id}/${blockNumber - 1}`;
   let nextBlockUrl = `/block/${id}/${blockNumber + 1}`;
   let block = b.evmBlock;
+  console.log("THIS IS IT", block);
 %>
  <table class="table table-hover table-bordered">
   <tr>
     <td><%- include("tooltip", {k: "block"}) %>Block</td>
     <td>
       <a href='<%= prevBlockUrl; %>' class="btn btn-link btn-sm">&lt;</a>
-      <span class="font-weight-bold"><%= b.number %></span>
+      <span class="font-weight-bold"><%= block.number %></span>
       <a href='<%= nextBlockUrl; %>' class="btn btn-link btn-sm">&gt;</a>
     </td>
-  </tr>
-  <tr>
-    <td><%- include("tooltip", {k: "finalized"}) %>Finalized</td>
-    <td><span id="status"><%- include("finalized", {finalized: b.finalized}); %></span></td>
-  </tr>
-  <tr>
-    <td><%- include("tooltip", {k: "blocktimestamp"}) %>Timestamp</td>
-    <td class='date'><%- `${uiTool.presentSecondsAgoTS(b.blockTS)}`%><%- ` (${uiTool.presentTS(b.blockTS)})`; %></td>
   </tr>
   <tr>
     <td><%- include("tooltip", {k: "transactions"}) %>Transactions</td>
@@ -106,24 +99,6 @@ if ( block && block.transactions ) { %>
       </td>
     </tr>
 <% } %>
-  <tr>
-    <td><%- include("tooltip", {k: "blockhash"}) %>Substrate Block Hash</td>
-    <td>
-      <%- uiTool.getFullHash(b.hash); %>
-    </td>
-  </tr>
-  <tr>
-    <td><%- include("tooltip", {k: "parenthash"}) %>Substrate Parent Hash</td>
-    <td>
-      <%- uiTool.getFullHash(b.header.parentHash); %>
-    </td>
-  </tr>
-  <tr>
-    <td><%- include("tooltip", {k: "stateroot"}) %>Substrate State Root</td>
-    <td>
-      <%- uiTool.getFullHash(b.header.stateRoot); %>
-    </td>
-  </tr>
 <% if ( b.author != undefined && b.miner != undefined && b.author.toLowerCase() != block.miner.toLowerCase()) { %>
   <tr>
     <td><%- include("tooltip", {k: "author"}) %>Author</td>
@@ -136,17 +111,5 @@ if ( block && block.transactions ) { %>
      </td>
   </tr>
 <% } %>
-  <tr>
-    <td><%- include("tooltip", {k: "specversion"}) %>Spec Version</td>
-    <td>
-      <%- uiTool.presentSpecVersion(id, b.specVersion); %>
-    </td>
-  </tr>
-  <tr>
-    <td><%- include("tooltip", {k: "trace"}) %>Trace</td>
-    <td>
-      <%- uiTool.presentTrace(id, blockNumber, b.hash); %>
-    </td>
-  </tr>
  </table>
 </div>

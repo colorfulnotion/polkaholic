@@ -149,6 +149,27 @@ module.exports = class SubstrateETL extends AssetManager {
         process.exit(0)
     }
 
+    async update_archiver_chain_sector(chainID, sector) {
+	let startBN = sector * 10000;
+	let endBN = startBN + 10000;
+	let sql = `insert into archiver (chainID, sector, archived, cnt) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt from block${chainID} where blockNumber >= ${startBN} and blockNumber < ${endBN} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt)`
+	this.batchedSQL.push(sql);
+	await this.update_batchedSQL();
+    }
+    
+    async get_archiver_chain_sector() {
+	let sql = `select chainID, sector from archiver where  archived < cnt order by rand() limit 1`;
+	let recs = await this.poolREADONLY.query(sql);
+	if ( recs.length == 1 ) {
+	    let r = recs[0];
+	    let chainID = parseInt(r.chainID, 10);
+	    let sector = parseInt(r.sector, 10);
+	    return [chainID, sector];
+	}
+	console.log("FAIL", sql)
+	return [null, null];
+    }
+    
     async cleanReapedExcess(chainID) {
         let projectID = `${this.project}`
         if (chainID == 2004 || chainID == 22023) {
