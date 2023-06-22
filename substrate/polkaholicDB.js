@@ -1933,7 +1933,6 @@ from chain where chainID = '${chainID}' limit 1`);
             const file = bucket.file(fileName);
             const buffer = await file.download();
             const r = JSON.parse(buffer[0]); // block, receipts, evm
-	    console.log("fetch_evm_block", r);
             return r
         }
         return null;
