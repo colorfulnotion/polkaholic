@@ -1921,7 +1921,7 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_evm_block_gs(chainID, blockNumber) {
         // TODO: shift back to substrate model
-        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} from blockNumber = '${blockNumber}' limit 1`
+        let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockNumber = '${blockNumber}' limit 1`
         let blocks = await this.poolREADONLY.query(sql);
         if (blocks.length == 1) {
             let b = blocks[0];
@@ -1964,7 +1964,7 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_block_gs(chainID, blockNumber) {
         try {
-	    if (chainID == 1 || chainID == 10 || chainID == 43114 || chainID == 42161) {
+            if (chainID == 1 || chainID == 10 || chainID == 43114 || chainID == 42161) {
                 return this.fetch_evm_block_gs(chainID, blockNumber);
             } else {
                 return this.fetch_substrate_block_gs(chainID, blockNumber);
@@ -1991,21 +1991,21 @@ from chain where chainID = '${chainID}' limit 1`);
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
-	    // check if we have archived
-	    let sql = `select sum(if(archived=1,1,0)) as archived, count(*) cnt from block${chainID} where blockNumber >= ${bn0} and blockNumber <= ${bn1}`;
-	    let recs = await this.poolREADONLY.query(sql);
-	    if ( recs.length > 0 ) {
-		let c = recs[0];
-		let archived = parseInt(c.archived);
-		let cnt = parseInt(c.cnt);
-		if ( archived == cnt ) {
-		    // we have no work to do!
-		    console.log("NO WORK TO DO", bn0, bn1, c);
-		    continue;
-		}  else {
-		    console.log("... workload: ", bn0, bn1, "archived", c.archived, "cnt", cnt);
-		}
-	    }
+            // check if we have archived
+            let sql = `select sum(if(archived=1,1,0)) as archived, count(*) cnt from block${chainID} where blockNumber >= ${bn0} and blockNumber <= ${bn1}`;
+            let recs = await this.poolREADONLY.query(sql);
+            if (recs.length > 0) {
+                let c = recs[0];
+                let archived = parseInt(c.archived);
+                let cnt = parseInt(c.cnt);
+                if (archived == cnt) {
+                    // we have no work to do!
+                    console.log("NO WORK TO DO", bn0, bn1, c);
+                    continue;
+                } else {
+                    console.log("... workload: ", bn0, bn1, "archived", c.archived, "cnt", cnt);
+                }
+            }
 
 
             let start = paraTool.blockNumberToHex(bn0);
@@ -2014,7 +2014,7 @@ from chain where chainID = '${chainID}' limit 1`);
                 start: start,
                 end: end
             });
-	    let out = [];
+            let out = [];
             for (const row of rows) {
                 let blockNumber = parseInt(row.id.substr(2), 16);
                 let r = this.build_block_from_row(row);
@@ -2039,27 +2039,28 @@ from chain where chainID = '${chainID}' limit 1`);
                         writeStream.on('error', reject);
                     });
                     console.log(`gs://${bucketName}/${fileName}`);
-		    out.push(`(${blockNumber}, 1)`)
+                    out.push(`(${blockNumber}, 1)`)
                 } else {
                     console.log("PROBLEM", r);
                 }
             }
-	    if ( out.length > 0 ) {
-		await this.upsertSQL({
-		    "table": `block${chainID}`,
-		    "keys": ["blockNumber"],
-		    "vals": ["archived"],
-		    "data": out,
-		    "replace": ["archived"]
-		});
-	    }
+            if (out.length > 0) {
+                await this.upsertSQL({
+                    "table": `block${chainID}`,
+                    "keys": ["blockNumber"],
+                    "vals": ["archived"],
+                    "data": out,
+                    "replace": ["archived"]
+                });
+            }
         }
     }
 
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
-        if ( ( chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513 ) || ( (chainID <= 2) && blockNumber < 35000 ) ) { // fetch { blockraw, events, feed } from GS storage
+        if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) || ((chainID <= 2) && blockNumber < 35000)) { // fetch { blockraw, events, feed } from GS storage
             try {
                 let r = await this.fetch_block_gs(chainID, blockNumber);
+                console.log("fetch_block", r);
                 return r;
             } catch (e) {
                 console.log("ERR", e);
@@ -2081,7 +2082,7 @@ from chain where chainID = '${chainID}' limit 1`);
         } catch (e) {
 
         }
-	return null
+        return null
     }
 
     async fetch_block_row(chain, blockNumber, families = ["blockraw", "trace", "events", "feed", "n", "finalized", "feed", "autotrace"], feedOnly = false, blockHash = false) {
