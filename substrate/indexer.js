@@ -4950,6 +4950,7 @@ module.exports = class Indexer extends AssetManager {
             let reserved_balance = 0;
             let miscFrozen_balance = 0;
             let feeFrozen_balance = 0;
+            let flags_balance = 0;
             try {
                 let query = await this.api.query.system.account(address);
                 let balance = query.data;
@@ -4958,6 +4959,8 @@ module.exports = class Indexer extends AssetManager {
                 if (balance.reserved) reserved_balance = balance.reserved.toString() / 10 ** decimals;
                 if (balance.miscFrozen) miscFrozen_balance = balance.miscFrozen.toString() / 10 ** decimals;
                 if (balance.feeFrozen) feeFrozen_balance = balance.feeFrozen.toString() / 10 ** decimals;
+                if (balance.frozen) feeFrozen_balance = balance.frozen.toString() / 10 ** decimals; //polkadot/kusama/assethub fix
+                if (balance.flags) flags_balance = balance.flags.toString() / 10 ** decimals;       //polkadot/kusama/assethub fix
             } catch (err) {
                 this.logger.error({
                     "op": "dump_addressBalanceRequest",
