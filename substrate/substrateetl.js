@@ -158,7 +158,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async get_archiver_chain_sector() {
-        let sql = `select chainID, sector from archiver where  archived < cnt order by rand() limit 1`;
+        let sql = `select chainID, sector from archiver where  archived < cnt and lastDT < date_sub(Now(), interval 30 DAY) order by rand() limit 1`;
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 1) {
             let r = recs[0];

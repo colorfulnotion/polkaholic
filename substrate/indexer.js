@@ -708,7 +708,7 @@ module.exports = class Indexer extends AssetManager {
         let immediateFlushStartTS = new Date().getTime();
         await this.immediateFlushBlockAndAddressExtrinsics(isTip)
         let immediateFlushTS = (new Date().getTime() - immediateFlushStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(f): immediate Flush Block&AddressExtrinsics", immediateFlushTS);
+
         this.timeStat.flush_f_TS += immediateFlushTS
         this.timeStat.immediateFlushTS += immediateFlushTS
 
@@ -719,38 +719,36 @@ module.exports = class Indexer extends AssetManager {
             this.log_indexing_error(err, "flush");
         }
         let addressStorageTS = (new Date().getTime() - addressStorageStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(a): AddressStorage", addressStorageTS);
+
         this.timeStat.flush_a_TS += addressStorageTS
 
         let assetStartTS = new Date().getTime();
         await this.flush_assets(ts, lastBlockNumber, isFullPeriod, isTip);
 
         let assetTS = (new Date().getTime() - assetStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(b): Assets", assetTS);
+
         this.timeStat.flush_b_TS += assetTS
 
         let multisigListStartTS = new Date().getTime();
         await this.flushMultisig();
         let multisigListTS = (new Date().getTime() - multisigListStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(+): Multisig", multisigListTS);
+
 
         // writes to mysql
         let assetHolderStartTS = new Date().getTime();
         this.assetholder = {};
         let assetHolderTS = (new Date().getTime() - assetHolderStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(c): Assets Holder", assetHolderTS);
+
         this.timeStat.flush_c_TS += assetHolderTS
 
         let batchedSQLStartTS = new Date().getTime();
         await this.update_batchedSQL()
         let batchedSQLTS = (new Date().getTime() - batchedSQLStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(e): update_batchedSQL", batchedSQLTS);
 
         let xcmMetaStartTS = new Date().getTime();
         if (this.isRelayChain) await this.flushXCMMeta(isFullPeriod);
 
         let xcmMetaTS = (new Date().getTime() - xcmMetaStartTS) / 1000
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(g): flush_xcmMeta", xcmMetaTS);
 
         await this.dump_xcm_messages()
 
@@ -763,7 +761,6 @@ module.exports = class Indexer extends AssetManager {
             if (this.debugLevel >= paraTool.debugInfo) console.log(`unhandledTraceMap`, this.unhandledTraceMap)
             this.unhandledTraceMap = {}
         }
-        if (this.debugLevel >= paraTool.debugVerbose) console.log("flush(h): done")
         //removes address state after flushing
         this.resetAddressStats()
     }
@@ -833,7 +830,7 @@ module.exports = class Indexer extends AssetManager {
             let r = `('${m.multisigAddress}','${m.threshold}', '${m.signatories.join('|')}', '${m.signatorycnt}')`
             multisigAccounts.push(r)
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushMultisig recs`, multisigAccounts)
+
         this.multisigMap = {};
         // --- multiaccount no update
         await this.upsertSQL({
@@ -890,8 +887,6 @@ module.exports = class Indexer extends AssetManager {
             this.add_index_metadata(u);
             this.push_rows_related_keys("wasmcontract", w.chainID.toString(), btRealtime_rows, w.contractAddress, u)
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushWasmContracts wasmCodes`, wasmCodes)
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushWasmContracts wasmContracts`, wasmContracts)
         this.wasmContractMap = {};
 
         // --- multiaccount no update
@@ -934,7 +929,7 @@ module.exports = class Indexer extends AssetManager {
             let r = `('${p.chainID}', '${p.address}', '${p.delegate}', '${p.proxyType}', '${p.delay}', '${isRemoved}', '${p.blockNumber}', '${p.blockNumber}')`
             proxyAccounts.push(r)
         }
-        if (this.debugLevel >= paraTool.debugInfo) console.log(`flushProxy recs`, proxyAccounts)
+
         this.proxyMap = {};
         // --- multiaccount no update
         await this.upsertSQL({
@@ -4950,6 +4945,7 @@ module.exports = class Indexer extends AssetManager {
             let reserved_balance = 0;
             let miscFrozen_balance = 0;
             let feeFrozen_balance = 0;
+            let flags_balance = 0;
             try {
                 let query = await this.api.query.system.account(address);
                 let balance = query.data;
@@ -4958,6 +4954,8 @@ module.exports = class Indexer extends AssetManager {
                 if (balance.reserved) reserved_balance = balance.reserved.toString() / 10 ** decimals;
                 if (balance.miscFrozen) miscFrozen_balance = balance.miscFrozen.toString() / 10 ** decimals;
                 if (balance.feeFrozen) feeFrozen_balance = balance.feeFrozen.toString() / 10 ** decimals;
+                if (balance.frozen) feeFrozen_balance = balance.frozen.toString() / 10 ** decimals; //polkadot/kusama/assethub fix
+                if (balance.flags) flags_balance = balance.flags.toString() / 10 ** decimals;       //polkadot/kusama/assethub fix
             } catch (err) {
                 this.logger.error({
                     "op": "dump_addressBalanceRequest",
@@ -5205,7 +5203,7 @@ module.exports = class Indexer extends AssetManager {
                     feed["transfers"] = this.map_feedTransfers_to_transfers(feedTransfers);
                 }
 
-                console.log("rExtrinsic", rExtrinsic)
+
                 if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
                     this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
                 }

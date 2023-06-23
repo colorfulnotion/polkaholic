@@ -2041,7 +2041,9 @@ from chain where chainID = '${chainID}' limit 1`);
                     console.log(`gs://${bucketName}/${fileName}`);
                     out.push(`(${blockNumber}, 1)`)
                 } else {
-                    console.log("PROBLEM", r);
+                    if ( ! result["blockraw"] ) console.log("PROBLEM - blockraw", blockNumber);
+                    if ( ! result["events"] ) console.log("PROBLEM - events", blockNumber);
+                    if ( ! result["feed"] ) console.log("PROBLEM - feed", blockNumber);
                 }
             }
             if (out.length > 0) {
@@ -2057,7 +2059,8 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
-        if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) || ((chainID <= 2) && blockNumber < 35000)) { // fetch { blockraw, events, feed } from GS storage
+        if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) ||
+	    ((chainID == 0) && blockNumber < 16000000) || ((chainID == 2) && blockNumber < 18300000)) { // fetch { blockraw, events, feed } from GS storage
             try {
                 let r = await this.fetch_block_gs(chainID, blockNumber);
                 console.log("fetch_block", r);

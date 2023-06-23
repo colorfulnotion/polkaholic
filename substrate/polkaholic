@@ -139,7 +139,7 @@ async function main() {
         .usage("22007 195623")
         .argument('<chainID>', 'ChainID', myParseInt)
         .argument('<blockNumbers>', 'Block Numbers')
-        .option('-f, --force', `Force crawl`, false)
+        .option('-f, --force', `Force crawl`, true)
         .option('-e, --endBlock <endBlock>', `End Block`, myParseInt)
         .action(async (chainID, blockNumbers, opt) => {
             let crawler = new Crawler();
@@ -150,8 +150,7 @@ async function main() {
             let evmChainIDList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
                 paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
                 paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
-            ]
-
+				 ]
             if (evmChainIDList.includes(blockchainID)) {
                 console.log(`evmchain no longer supported`)
                 process.exit(1)
@@ -159,9 +158,19 @@ async function main() {
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();
                 await crawler.setupChainAndAPI(chainID);
-                blockNumber = parseInt(blockNumber, 10);
-                let endBlock = opt.endBlock ? opt.endBlock : blockNumber;
-                for (let bn = blockNumber; bn <= endBlock; bn++) {
+		let bns = []
+		if ( opt.endBlock ) {
+                    let endBlock = opt.endBlock ? opt.endBlock : blockNumber;
+                    for (let bn = blockNumber; bn <= endBlock; bn++) {
+			bns.push(bn);
+		    }
+		} else {
+		    bns = blockNumbers.split(",").map( x => parseInt(x, 10) );
+		}
+                for (const bn of bns) {
+		    if ( force ) {
+			await crawler.nukeBlock(chainID, bn);
+		    } 
                     let t2 = {
                         chainID,
                         blockNumber: bn,
@@ -170,17 +179,11 @@ async function main() {
                         crawlTraceEVM: 0,
                         crawlTrace: 1,
                     }
-                    console.log(`crawl_block_trace`, t2)
                     let x = await crawler.crawl_block_trace(chain, t2)
                     let blockHash = x.blockHash;
-                    console.log("blockHash: ", blockHash, blockNumber, x);
+                    console.log("blockHash: ", blockHash, bn);
                     await crawler.index_block(chain, bn, blockHash);
                 }
-
-                let x = await crawler.crawl_block_trace(chain, t2)
-                let blockHash = x.blockHash;
-
-                await crawler.index_block(chain, blockNumber, blockHash);
             }
 
             process.exit(0);
@@ -313,7 +316,9 @@ async function main() {
             var manager = new Manager();
             await manager.mapChains((c) => {
                 //console.log(`./substrate-etl audit_fix -m -c ${c.chainID}`);
-                console.log(`./substrate-etl setupsubstrate -c ${c.chainID}`);
+                //console.log(`./substrate-etl setupsubstrate -c ${c.chainID}`);
+		let chainID = c.chainID;
+		console.log(`insert into archiver ( chainID, sector, archived, cnt, lastDT ) select ${chainID} as chainID, floor(blockNumber/10000) as sector, sum(archived) archived, count(*), max(blockDT) from block${chainID} group by sector on duplicate key update archived = values(archived), cnt = values(cnt), lastDT = values(lastDT);`);
             });
             process.exit(0);
         })

@@ -1662,6 +1662,15 @@ module.exports = class Crawler extends Indexer {
         }
     }
 
+    async nukeBlock(chainID, bn) {
+	let rowId = paraTool.blockNumberToHex(bn);
+	let cmd = `cbt deleterow chain${chainID} ${rowId}`
+	console.log(cmd);
+	await exec(cmd, {
+            maxBuffer: 1024 * 64000
+        });
+    }
+    
     async crawl_parachains(chainID = 2) {
         let allEndPoints = Endpoints.getAllEndpoints();
         //console.log(`allEndPoints len=${Object.keys(allEndPoints).length}`, allEndPoints)
