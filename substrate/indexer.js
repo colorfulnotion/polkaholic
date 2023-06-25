@@ -4955,7 +4955,7 @@ module.exports = class Indexer extends AssetManager {
                 if (balance.miscFrozen) miscFrozen_balance = balance.miscFrozen.toString() / 10 ** decimals;
                 if (balance.feeFrozen) feeFrozen_balance = balance.feeFrozen.toString() / 10 ** decimals;
                 if (balance.frozen) feeFrozen_balance = balance.frozen.toString() / 10 ** decimals; //polkadot/kusama/assethub fix
-                if (balance.flags) flags_balance = balance.flags.toString() / 10 ** decimals;       //polkadot/kusama/assethub fix
+                if (balance.flags) flags_balance = balance.flags.toString() / 10 ** decimals; //polkadot/kusama/assethub fix
             } catch (err) {
                 this.logger.error({
                     "op": "dump_addressBalanceRequest",
@@ -7244,7 +7244,6 @@ module.exports = class Indexer extends AssetManager {
         for (let index = 0; index < block.extrinsics.length; index++) {
             let extrinsicRaw = block.extrinsics[index];
             let ext = await this.process_extrinsic(api, extrinsicRaw, eventsIndexed[index], block, index, finalized, isTip, tracesPresent);
-            console.log(ext)
 
             if (ext) {
                 extrinsics.push(ext);
