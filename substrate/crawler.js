@@ -168,7 +168,7 @@ module.exports = class Crawler extends Indexer {
         return (chain);
     }
 
-    async crawlTrace(chain, blockHash, timeoutMS = 20000) {
+    async crawlTrace(chain, blockHash, blockNumber, timeoutMS = 20000) {
         try {
             let headers = {
                 "Content-Type": "application/json"
@@ -208,6 +208,7 @@ module.exports = class Crawler extends Indexer {
                 console.log("eventsRaw empty");
                 return [];
             }
+            await this.store_stateTraceBlock_gs(chain.chainID, blockNumber, traceData.result.blockTrace);
             let events = [];
             eventsRaw.forEach((e) => {
                 let sv = this.canonicalize_trace_stringValues(e.data.stringValues);
@@ -225,6 +226,7 @@ module.exports = class Crawler extends Indexer {
         }
         return false;
     }
+
 
     canonicalize_trace_stringValues(x) {
         let k = "0x" + x.key;
@@ -354,7 +356,7 @@ module.exports = class Crawler extends Indexer {
             let trace = false
             let crawlTrace = parseInt(t.crawlTrace, 10) > 0;
             if (crawlTrace && chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
-                trace = await this.crawlTrace(chain, blockHash, 60000 * (t.attempted + 1));
+                trace = await this.crawlTrace(chain, blockHash, block.number, 60000 * (t.attempted + 1));
                 console.log("crawl_block_trace trace", trace.length);
             } else {
                 console.log(`[crawlTrace=${crawlTrace}] crawl_block_trace chain.RPCBackfill NOT OK`, chain.RPCBackfill);
@@ -1663,14 +1665,14 @@ module.exports = class Crawler extends Indexer {
     }
 
     async nukeBlock(chainID, bn) {
-	let rowId = paraTool.blockNumberToHex(bn);
-	let cmd = `cbt deleterow chain${chainID} ${rowId}`
-	console.log(cmd);
-	await exec(cmd, {
+        let rowId = paraTool.blockNumberToHex(bn);
+        let cmd = `cbt deleterow chain${chainID} ${rowId}`
+        console.log(cmd);
+        await exec(cmd, {
             maxBuffer: 1024 * 64000
         });
     }
-    
+
     async crawl_parachains(chainID = 2) {
         let allEndPoints = Endpoints.getAllEndpoints();
         //console.log(`allEndPoints len=${Object.keys(allEndPoints).length}`, allEndPoints)
@@ -1865,7 +1867,7 @@ module.exports = class Crawler extends Indexer {
             // if we didn't get a trace, or if we are using onfinality endpoint
             if ((chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) || (chain.WSEndpointSelfHosted)) &&
                 ((trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality")))) {
-                let trace2 = await this.crawlTrace(chain, finalizedHash);
+                let trace2 = await this.crawlTrace(chain, finalizedHash, bn);
                 if (trace2.length > 0) {
                     trace = trace2;
                 }
@@ -2233,6 +2235,7 @@ module.exports = class Crawler extends Indexer {
                         let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
                         let traceBlockJSON = traceBlock.toJSON();
                         if (traceBlockJSON) {
+                            await this.store_stateTraceBlock_gs(chain.chainID, blockNumber, traceBlockJSON);
                             if (traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events) {
                                 let events = []
                                 let changes = traceBlockJSON.blockTrace.events.forEach((e) => {

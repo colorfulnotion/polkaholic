@@ -1919,6 +1919,42 @@ from chain where chainID = '${chainID}' limit 1`);
         return `${relayChain}/${paraID}/${folder}/${blockNumber}.json.gz`
     }
 
+    async store_stateTraceBlock_gs(chainID, blockNumber, blockTrace) {
+        const bucketName = 'crypto_substrate_traces';
+        const storage = new Storage();
+        const bucket = storage.bucket(bucketName);
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        let fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber)
+        const file = bucket.file(fileName);
+        const writeStream = file.createWriteStream({
+            contentType: 'application/json',
+            gzip: true
+        });
+        writeStream.write(JSON.stringify(blockTrace));
+        writeStream.end();
+
+        // Wait for the write stream to finish writing
+        await new Promise((resolve, reject) => {
+            writeStream.on('finish', resolve);
+            writeStream.on('error', reject);
+        });
+        console.log(`gs://${bucketName}/${fileName}`);
+    }
+
+    async fetch_stateTraceBlock_gs(chainID, blockNumber) {
+        const bucketName = 'crypto_substrate_traces';
+        const storage = new Storage();
+        const bucket = storage.bucket(bucketName);
+        let relayChain = paraTool.getRelayChainByChainID(chainID)
+        let paraID = paraTool.getParaIDfromChainID(chainID)
+        let fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber)
+        const file = bucket.file(fileName);
+        const buffer = await file.download();
+        const r = JSON.parse(buffer[0]);
+        return r
+    }
+
     async fetch_evm_block_gs(chainID, blockNumber) {
         // TODO: shift back to substrate model
         let sql = `select UNIX_TIMESTAMP(blockDT) blockTS from block${chainID} where blockNumber = '${blockNumber}' limit 1`
@@ -2041,9 +2077,9 @@ from chain where chainID = '${chainID}' limit 1`);
                     console.log(`gs://${bucketName}/${fileName}`);
                     out.push(`(${blockNumber}, 1)`)
                 } else {
-                    if ( ! result["blockraw"] ) console.log("PROBLEM - blockraw", blockNumber);
-                    if ( ! result["events"] ) console.log("PROBLEM - events", blockNumber);
-                    if ( ! result["feed"] ) console.log("PROBLEM - feed", blockNumber);
+                    if (!result["blockraw"]) console.log("PROBLEM - blockraw", blockNumber);
+                    if (!result["events"]) console.log("PROBLEM - events", blockNumber);
+                    if (!result["feed"]) console.log("PROBLEM - feed", blockNumber);
                 }
             }
             if (out.length > 0) {
@@ -2060,7 +2096,7 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
         if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) ||
-	    ((chainID == 0) && blockNumber < 16000000) || ((chainID == 2) && blockNumber < 18300000)) { // fetch { blockraw, events, feed } from GS storage
+            ((chainID == 0) && blockNumber < 16000000) || ((chainID == 2) && blockNumber < 18300000)) { // fetch { blockraw, events, feed } from GS storage
             try {
                 let r = await this.fetch_block_gs(chainID, blockNumber);
                 console.log("fetch_block", r);
