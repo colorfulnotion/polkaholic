@@ -2040,7 +2040,7 @@ async function txUIRedirect(req, res) {
         let tx = await query.getTransaction(txHash, decorate, decorateExtra);
         if (tx) {
             let txview = 'tx';
-            if (tx.transactionHash) {
+            if (tx.transactionHash || tx.gasPrice) {
                 txview = 'evmtx';
             }
             let chain = await query.getChain(tx.chainID);
@@ -2055,6 +2055,7 @@ async function txUIRedirect(req, res) {
             });
         }
     } catch (err) {
+        console.log(err)
         if (err instanceof paraTool.NotFoundError) {
             res.render('notfound', {
                 recordtype: "transaction",

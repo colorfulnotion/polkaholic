@@ -23,7 +23,6 @@ const {
     Transaction
 } = require('@ethereumjs/tx')
 
-const abiDecoder = require('abi-decoder');
 const exec = util.promisify(require("child_process").exec);
 const {
     ethers
@@ -138,6 +137,83 @@ function getABIByAssetType(assetType) {
         default:
             return null;
     }
+}
+
+function recoveredABIToMap(recoveredAbi) {
+    let fldTypeMap = {}
+    // Function to process inputs (including nested components)
+    const processInputs = (inputs) => {
+        for (const input of inputs) {
+            fldTypeMap[input.name] = input.type;
+            if (input.components) {
+                processInputs(input.components);
+            }
+        }
+    };
+    // Process top-level inputs
+    processInputs(recoveredAbi.inputs);
+    return fldTypeMap;
+}
+
+function processEthersDecoded(v, fldTypeMap = {}) {
+    let events = []
+    let keyList = Object.keys(v);
+    let keyListLen = Object.keys(v).length
+    let fLen = v.length
+    const half = Math.ceil(keyList.length / 2);
+    const firstHalf = keyList.slice(0, half);
+    const secondHalf = keyList.slice(half);
+    var targetSlice = keyList.slice(half);
+    if (keyListLen == fLen) {
+        //console.log(`v ${keyList} has same length, keyListLen=${keyListLen}, fLen=${fLen}`, v)
+    } else {
+        //console.log(`v ${keyList} has different length!! keyListLen=${keyListLen}, fLen=${fLen}`, v)
+    }
+    for (const s of targetSlice) {
+        let f = v[s];
+        let fType = null;
+        if (fldTypeMap[s] != undefined) {
+            fType = fldTypeMap[s];
+        }
+        if (f && f._isBigNumber) {
+            f = f.toString();
+        }
+
+        // Check if the field is an array and has named fields
+        if (Array.isArray(f) && Object.keys(f).length > f.length) {
+            let nestedObj = {};
+            const nestedKeys = Object.keys(f).slice(f.length); // get the keys from the second half
+            for (let i = 0; i < f.length; i++) {
+                nestedObj[nestedKeys[i]] = f[i];
+            }
+            f = processEthersDecoded(nestedObj, fldTypeMap);
+        }
+
+        // Check if the field is an array and the keys match the length (indicating it is a typed array).
+        else if (Array.isArray(f) && Object.keys(f).length === f.length && f.length > 0 && !Array.isArray(f[0])) {
+            //console.log(`case aa Object.keys(f)=${Object.keys(f)}, f.length=${f.length}`, f)
+            let bigNumberArray = f.map(item => item._isBigNumber ? item.toString() : item);
+            f = bigNumberArray;
+        }
+
+        // Check if the field is an array and has nested objects.
+        else if (Array.isArray(f) && f.length > 0 && typeof f[0] === 'object' && f[0] !== null) {
+            let nestedEvents = [];
+            //console.log(`case bb`, f)
+            for (const nestedObj of f) {
+                nestedEvents.push(processEthersDecoded(nestedObj, fldTypeMap));
+            }
+            f = nestedEvents;
+        }
+
+        let r = {
+            name: s,
+            type: fType,
+            value: f,
+        };
+        events.push(r);
+    }
+    return events;
 }
 
 function computeSelector(signature, byteLen = 4) {
@@ -631,6 +707,7 @@ async function getNativeChainBalances(web3Api, holders, bn = 'latest') {
         }
         //console.log(`holderBalance[${i}]`, holderBalance)
         if (holderBalance['status'] == 'fulfilled') {
+            holderRes.balance_raw = holderBalance['value'];
             holderRes.balance = holderBalance['value'] / ether
         } else {
             holderRes.error = holderBalance['reason']
@@ -740,13 +817,13 @@ async function detect_proxy_address(web3Api, address) {
 
 // this function decorates and generate a "full" txn using decodedTxn and decodedReceipts
 function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
+    let transactionHash = (dTxn.hash) ? dTxn.hash : dTxn.transactionHash
     if (!dReceipt || dReceipt.transactionHash === undefined) {
         console.log(`decorateTxn: missing receipts`, dReceipt)
         return;
     }
-    let dTxnTxHash = (dTxn.hash) ? dTxn.hash : dTxn.transactionHash
-    if (dTxnTxHash != dReceipt.transactionHash) {
-        console.log(`decorateTxn: txnHash mismatch (tx:${dTxnTxHash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
+    if (transactionHash != dReceipt.transactionHash) {
+        console.log(`decorateTxn: txnHash mismatch (tx:${transactionHash}) vs (receipt: ${dReceipt.transactionHash})`, dTxn)
         return
     }
     //todo: how to detect reverted but successful case?
@@ -791,7 +868,7 @@ function decorateTxn(dTxn, dReceipt, dInternal, blockTS = false, chainID = false
     }
     let fTxn = {
         chainID: (chainID) ? chainID : paraTool.dechexToInt(dTxn.chainId),
-        transactionHash: (dTxn.hash) ? dTxn.hash : dTxn.transactionHash,
+        transactionHash: transactionHash,
         substrate: null,
         status: dReceipt.status,
         blockHash: dTxn.blockHash,
@@ -898,274 +975,73 @@ async function sendSignedRLPTx(web3Api, rlpTx) {
     return isError
 }
 
-function decodedTxnInputRaw(txInput = '0x13ead5620000000000000000000000005283d291dbcf85356a21ba090e6db59121208b44000000000000000000000000c02aaa39b223fe8d0a0e5c4f27ead9083c756cc200000000000000000000000000000000000000000000000000000000000001f40000000000000000000000000000000000000000049456c01b13e8b05bf22f1a', contractABIs, contractABISignatures) {
-    //etherscan is marking native case as "Transfer"
-    let contractcreationAddress = false
-    let methodID = '0x';
-    let decodedTxnInput = {};
+function processEthersDecodedRaw(inp, v, depth = 0) {
 
-    if (!contractcreationAddress) {
-        if (txInput.length >= 10) {
-            methodID = txInput.slice(0, 10)
-        } else if (txInput >= '0x') {
-            // TODO: check weird case
-            // console.log(`check txhash ${txn.hash}`)
-            methodID = txInput
-        }
-    }
-
-    if (methodID != '0x') {
-        let foundApi = fetchABI(methodID, contractABIs, contractABISignatures)
-        if (foundApi) {
-            let methodSignature = foundApi.signature
-            //console.log(`${methodID} -> ${methodSignature}`)
-            let methodABIStr = foundApi.abi
-            let cachedDecoder = foundApi.decoder
-            let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input_raw(txInput, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder)
-            if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
-                decodedTxnInput.decodeStatus = decodedInput.name
-                decodedTxnInput.methodID = methodID
-                decodedTxnInput.txInput = txInput
+    if (inp.anonymous) delete inp.anonymous;
+    if (inp.inputs) {
+        let x = inp.inputs.map((e) => {
+            if (e.internalType && e.internalType == e.type) {
+                delete e.internalType;
+            }
+            if (e.indexed !== undefined && e.indexed === false) {
+                delete e.indexed;
+            }
+            return processEthersDecodedRaw(e, v, depth + 1);
+        })
+        return x;
+    } else if (inp.components) {
+        if (inp.type == "tuple[]") {
+            // v[inp.name] is an array, each of which follow inp.components
+            if (v[inp.name]) {
+                return {
+                    name: inp.name,
+                    type: inp.type,
+                    value: v[inp.name].map((v2, idx) => {
+                        //console.log("COMPONENT in tuple[]", idx, inp.name, inp.type, v2);
+                        let obj = {}
+                        inp.components.forEach((c) => {
+                            obj[c.name] = processEthersDecodedRaw(c, v2, depth + 1);
+                        });
+                        return obj
+                    })
+                };
             } else {
-                //sucessfully decoded, dropping txInput
-                decodedTxnInput.decodeStatus = 'success'
-                decodedTxnInput.methodID = methodID
-                decodedTxnInput.signature = methodSignature
-                decodedTxnInput.params = decodedInput.params
+                console.log("COMPONENT missing name", inp.name, inp.type);
+            }
+        } else if (inp.type == "tuple") {
+            // v[inp.name] is an object, which follows inp.components -- so, take element c of inp.components and make an attribute of object 
+            let obj = {}
+            inp.components.forEach((c) => {
+                obj[c.name] = processEthersDecodedRaw(c, v[inp.name], depth + 1);
+            });
+            return obj
+        } else {
+            return {
+                name: inp.name,
+                type: inp.type,
+                value: "TODO"
+            }
+        }
+    } else if (inp) {
+        if (inp.name && v[inp.name]) {
+            let value = v[inp.name];
+            let val = value._isBigNumber ? value.toString() : value;
+            return {
+                name: inp.name,
+                type: inp.type,
+                value: val
             }
         } else {
-            //methodID not found
-            decodedTxnInput.decodeStatus = 'unknown'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.txInput = txInput
+            return {
+                name: inp.name,
+                type: inp.type,
+                value: null
+            }
         }
-    } else {
-        //native transfer case or contract creation
-        if (contractcreationAddress) {
-            //contract creation
-            decodedTxnInput.decodeStatus = 'contractCreation'
-            decodedTxnInput.contractAddress = contractcreationAddress
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.signature = `contractCreation`
-        } else {
-            //native transfer
-            decodedTxnInput.decodeStatus = 'success'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.signature = `nativeTransfer`
-            decodedTxnInput.params = []
-        }
-    }
-    return decodedTxnInput
-}
 
-function decode_txn_input_raw(txInput, methodABIStr, methodSignature, abiDecoder, etherjsDecoder) {
-    //const abiDecoder = require('abi-decoder');
-    //abiDecoder.addABI(methodABIStr)
-    //abiDecoder.addABI(JSON.parse(methodABIStr));
-    try {
-        let decodeNull = {
-            decodeStatus: 'null'
-        }
-        let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder)
-        if (isSuccess) {
-            decodedData = {}
-            decodedData.params = decodedDataEtherJS
-            decodedData.decodeStatus = 'success'
-            //console.log(`** decodedData`, decodedData)
-            return decodedData
-        }
-        return decodeNull
-    } catch (e) {
-        //error decoding inputs
-        console.log(`decodeErr methodSignature=${methodSignature}`)
-        console.log(`decodeErr`, e)
-        let decodeErr = {
-            decodeStatus: 'error'
-        }
-        return decodeErr
     }
 }
 
-function decode_txn_input_etherjs_raw(txInput, methodABIStr, methodSignature, etherjsDecoder) {
-    try {
-        let methodID = txInput.slice(0, 10)
-        //console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
-        //var iface = new ethers.utils.Interface(methodABIStr)
-        var txn_input_stub = build_txn_input_stub(methodSignature)
-        var res = etherjsDecoder.decodeFunctionData(methodID, txInput)
-        let combinedTxnInputs = []
-        for (const t of txn_input_stub) {
-            let fld = t.name
-            let val = res[fld]
-            val = JSON.parse(JSON.stringify(val))
-            if (val != undefined) {
-                //console.log(`val!!`, val)
-                t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
-            }
-            combinedTxnInputs.push(t)
-        }
-        //console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
-        return [combinedTxnInputs, true]
-    } catch (e) {
-        console.log(`decode_txn_input_etherjs err`, e)
-        return [false, false]
-    }
-}
-
-function decodeTransactionInput(txn, contractABIs, contractABISignatures) {
-    //etherscan is marking native case as "Transfer"
-    let contractcreationAddress = false
-    let txInput = txn.input
-    let methodID = '0x';
-    let decodedTxnInput = {};
-
-    if (!contractcreationAddress) {
-        if (txInput.length >= 10) {
-            methodID = txInput.slice(0, 10)
-        } else if (txInput >= '0x') {
-            // TODO: check weird case
-            // console.log(`check txhash ${txn.hash}`)
-            methodID = txInput
-        }
-    }
-
-    if (methodID != '0x') {
-        let foundApi = fetchABI(methodID, contractABIs, contractABISignatures)
-        if (foundApi) {
-            let methodSignature = foundApi.signature
-            //console.log(`${methodID} -> ${methodSignature}`)
-            let methodABIStr = foundApi.abi
-            let cachedDecoder = foundApi.decoder
-            let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder, contractABIs, contractABISignatures)
-            if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
-                decodedTxnInput.decodeStatus = decodedInput.name
-                decodedTxnInput.methodID = methodID
-                decodedTxnInput.txInput = txInput
-            } else {
-                //sucessfully decoded, dropping txInput
-                decodedTxnInput.decodeStatus = 'success'
-                decodedTxnInput.methodID = methodID
-                decodedTxnInput.signature = methodSignature
-                decodedTxnInput.params = decodedInput.params
-            }
-        } else {
-            //methodID not found
-            decodedTxnInput.decodeStatus = 'unknown'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.txInput = txInput
-        }
-    } else {
-        //native transfer case or contract creation
-        if (contractcreationAddress) {
-            //contract creation
-            decodedTxnInput.decodeStatus = 'contractCreation'
-            decodedTxnInput.contractAddress = null
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.signature = `contractCreation`
-        } else {
-            //native transfer
-            decodedTxnInput.decodeStatus = 'success'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.signature = `nativeTransfer`
-            decodedTxnInput.params = []
-        }
-    }
-    return decodedTxnInput
-}
-
-function decodeTransaction(txn, contractABIs, contractABISignatures, chainID) {
-    //etherscan is marking native case as "Trafer"
-    //let contractcreationAddress = (txn.creates != undefined) ? txn.creates : false
-    let isTxContractCreate = (txn.to == undefined) ? true : false
-    let txInput = txn.input
-    let methodID = '0x';
-    let decodedTxnInput = {};
-    let output = txn
-    //TODO: need to handle both RPC and WS format
-
-    if (!isTxContractCreate) {
-        if (txInput.length >= 10) {
-            methodID = txInput.slice(0, 10)
-        } else if (txInput >= '0x') {
-            // TODO: check weird case
-            // console.log(`check txhash ${txn.hash}`)
-            methodID = txInput
-        }
-    }
-
-    if (methodID != '0x') {
-        let foundApi = fetchABI(methodID, contractABIs, contractABISignatures)
-        if (foundApi) {
-            let methodSignature = foundApi.signature
-            //console.log(`${methodID} -> ${methodSignature}`)
-            let methodABIStr = foundApi.abi
-            let cachedDecoder = foundApi.decoder
-            let cachedEtherjsDecoder = foundApi.etherjsDecoder
-            let decodedInput = decode_txn_input(txn, methodABIStr, methodSignature, cachedDecoder, cachedEtherjsDecoder, contractABIs, contractABISignatures)
-            if (decodedInput.decodeStatus == 'null' || decodedInput.decodeStatus == 'error') {
-                decodedTxnInput.decodeStatus = decodedInput.name
-                decodedTxnInput.methodID = methodID
-                decodedTxnInput.txInput = txInput
-            } else {
-                //sucessfully decoded, dropping txInput
-                decodedTxnInput.decodeStatus = 'success'
-                decodedTxnInput.methodID = methodID
-                decodedTxnInput.signature = methodSignature
-                decodedTxnInput.params = decodedInput.params
-            }
-        } else {
-            //methodID not found
-            decodedTxnInput.decodeStatus = 'unknown'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.txInput = txInput
-        }
-    } else {
-        //native transfer case or contract creation
-        if (isTxContractCreate) {
-            //contract creation
-            decodedTxnInput.decodeStatus = 'contractCreation'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.signature = `contractCreation`
-            //decodedTxnInput.contractAddress = contractcreationAddress
-            decodedTxnInput.contractAddress = null
-        } else {
-            //native transfer
-            decodedTxnInput.decodeStatus = 'success'
-            decodedTxnInput.methodID = methodID
-            decodedTxnInput.signature = `nativeTransfer`
-            decodedTxnInput.params = []
-        }
-    }
-    output.chainID = (chainID) ? chainID : paraTool.dechexToInt(txn.chainId)
-    output.decodedInput = decodedTxnInput
-    output.signature = {
-        r: txn.r,
-        s: txn.s,
-        v: txn.v
-    }
-    try {
-        let validateRSV = false
-        if (txn.r != undefined && txn.s != undefined) {
-            //console.log(`txn=${txn.hash} (${txn.raw}) rsv, r=${txn.r.length}, s=${txn.s.length}, v=${txn.v.length}, signature`, output.signature)
-            if (txn.r.length == 66 && txn.s.length == 66) {
-                return output // let's not validate irrelevant tx
-            } else if (validateRSV) {
-                //r,s is problematic here - skip validation
-                console.log(`txn`, txn)
-                let derivedTx = decodeRLPTx(txn.raw)
-                if (derivedTx.errorDesc != undefined || txn.hash != derivedTx.txHash) console.log(`!!!! Mismatch txHash: ${txn.hash}, derived=${derivedTx.txHash}, raw=${txn.raw}`)
-                if (derivedTx.tx != undefined && derivedTx.tx.r.length != 66 && derivedTx.tx.s.length != 66) {
-                    output.isConnectedCall = 1
-                }
-            }
-        }
-    } catch (e) {
-        console.log(`decodeTransaction err`, e)
-    }
-    return output
-}
 
 function keccak256(hex) {
     return web3.utils.keccak256(hex)
@@ -1353,163 +1229,10 @@ function buildSchemaInfoFromSig(methodSignature = 'PoolCreated(index_topic_1 add
     return schemaInfo
 }
 
-function convertBigNumberStruct(val) {
-    let value = val
-    if (val._hex != undefined) {
-        if (val._isBigNumber != undefined) {
-            let bigIntStr = paraTool.toIntegerStr(val._hex)
-            value = bigIntStr
-        } else {
-            value = val._hex
-        }
-    } else if (val.type != undefined && val.type == 'BigNumber') {
-        if (val.hex != undefined) {
-            let bigIntStr = paraTool.toIntegerStr(val.hex)
-            value = bigIntStr
-        }
-    } else {
-        //console.log(`convertBigNumberStruct val`, val)
-    }
-    return value
-}
-
-function convertBigNumber(val) {
-    let value = val
-    if (Array.isArray(val)) {
-        //console.log(`convertBigNumber valLen=${value.length}`)
-        for (let i = 0; i < value.length; i++) {
-            if (Array.isArray(value[i])) {
-                //console.log(`convertBigNumber val[${i}]Len=${value[i].length}`)
-                val[i] = convertBigNumber(value[i])
-            } else {
-                //console.log(`convertBigNumberStruct *** value[${i}]`, value[i])
-                let value_i = convertBigNumberStruct(val[i])
-                //console.log(`convertBigNumberStruct *** value_i[${i}]`, value_i)
-                value[i] = value_i
-                //console.log(`convertBigNumberStruct *** value[${i}] updated`, value[i])
-            }
-        }
-    } else {
-        return convertBigNumberStruct(val)
-    }
-    //console.log(`convertBigNumber ** val`, val)
-    return value
-}
-
-function decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder) {
-    try {
-        let txInput = txn.input
-        let methodID = txn.input.slice(0, 10)
-        //console.log(`decode_txn_input_etherjs methodABIStr`, methodABIStr)
-        //var iface = new ethers.utils.Interface(methodABIStr)
-        var txn_input_stub = build_txn_input_stub(methodSignature)
-        var res = etherjsDecoder.decodeFunctionData(methodID, txInput)
-        let combinedTxnInputs = []
-        for (const t of txn_input_stub) {
-            let fld = t.name
-            let val = res[fld]
-            if (val instanceof Function) {
-                /* do something */
-                console.log(`TODO*** res[${fld}] is function`, val)
-                val = []
-            } else if (val != undefined) {
-                try {
-                    val = JSON.parse(JSON.stringify(val))
-                } catch (e1) {
-                    console.log(`e1 res[${fld}] val!!`, res[fld])
-                    console.log(`e1+++`, e1)
-                }
-            }
-            if (val != undefined) {
-                //console.log(`val!!`, val)
-                t.value = convertBigNumber(JSON.parse(JSON.stringify(val)))
-            }
-            combinedTxnInputs.push(t)
-        }
-        //console.log(`decode_txn_input_etherjs`, combinedTxnInputs)
-        return [combinedTxnInputs, true]
-    } catch (e) {
-        console.log(`[${txn.hash}] txn_input_stub`, txn_input_stub)
-        console.log(`[${txn.hash}] res`, res)
-        console.log(`[${txn.hash}] decode_txn_input_etherjs err`, e)
-        return [false, false]
-    }
-}
-
-
-//'0x38ed1739'
-//decodeMethod
-function decode_txn_input(txn, methodABIStr, methodSignature, abiDecoder, etherjsDecoder, contractABIs, contractABISignatures) {
-    //const abiDecoder = require('abi-decoder');
-    //abiDecoder.addABI(methodABIStr)
-    //abiDecoder.addABI(JSON.parse(methodABIStr));
-    if (txn.hash == undefined) txn.hash = null
-    try {
-        let [decodedDataEtherJS, isSuccess] = decode_txn_input_etherjs(txn, methodABIStr, methodSignature, etherjsDecoder)
-        if (isSuccess) {
-            decodedData = {}
-            decodedData.params = decodedDataEtherJS
-            decodedData.decodeStatus = 'success'
-            decodedData = recursive_params(decodedData, contractABIs, contractABISignatures)
-            //console.log(`** decodedData`, decodedData)
-            return decodedData
-        }
-        let decodeNull = {
-            decodeStatus: 'null'
-        }
-        return decodeNull
-    } catch (e) {
-        //error decoding inputs
-        console.log(`decodeErr txHash=${txn.hash}`)
-        console.log(`decodeErr methodSignature=${methodSignature}`)
-        console.log(`decodeErr input=${txn.input}`)
-        console.log(`decodeErr`, e)
-        let decodeErr = {
-            decodeStatus: 'error'
-        }
-        return decodeErr
-    }
-}
-
-function recursive_params(decodedData, contractABIs, contractABISignatures) {
-    let isRecursive = false
-    if (Array.isArray(decodedData.params)) {
-        for (let i = 0; i < decodedData.params.length; i++) {
-            let p = decodedData.params[i]
-            if (p.type == 'bytes[]' && Array.isArray(p.value)) {
-                p.valueDecoded = []
-                let decodeSuccesscnt = 0
-                for (let t = 0; t < p.value.length; t++) {
-                    let pVal = p.value[t]
-                    if (pVal.length >= 10) {
-                        try {
-                            let decodedTxnInput = decodedTxnInputRaw(pVal, contractABIs, contractABISignatures)
-                            p.valueDecoded[t] = decodedTxnInput
-                            if (decodedTxnInput.decodeStatus == 'success') {
-                                decodeSuccesscnt++
-                            }
-                        } catch (e) {
-                            console.log(`recursive_params err`, e)
-                        }
-                    }
-                    if (decodeSuccesscnt) {
-                        isRecursive = true
-                        decodedData.params[i] = p
-                    }
-                }
-            }
-
-        }
-    }
-    if (isRecursive) {
-        //console.log(`recursive_params`, JSON.stringify(decodedData, null, 4))
-    }
-    return decodedData
-}
 
 //return function signature like transferFrom(address sender, address recipient, uint256 amount) from abi
 //Deposit(index_topic_1 address dst, uint256 wad) -- added index_topic for events
-function getMethodSignature(e) {
+function getMethodSignatureOLD(e) {
     var inputs = []
     var indexedCnt = 0 //topic0 is signatureID
     for (const inp of e.inputs) {
@@ -1542,6 +1265,61 @@ function getMethodSignature(e) {
     }
     let topicLen = (e.type == 'event') ? indexedCnt + 1 : 0
     return [`${e.name}(${inputs.join(', ')})`, topicLen]
+}
+
+function getMethodSignature(e) {
+    var inputs = []
+    var indexedCnt = 0 //topic0 is signatureID
+    for (const inp of e.inputs) {
+        let isIndexed = false
+        if (inp.indexed != undefined) {
+            isIndexed = inp.indexed
+        }
+        let typeName;
+        if (Array.isArray(inp.components)) {
+            let t = []
+            let tupleType = inp.type
+            for (const c of inp.components) {
+                let cTypeName = parseType(c)
+                t.push(cTypeName)
+            }
+            let componentsType = `(${t.join(', ')})`
+            if (tupleType == 'tuple[]') {
+                componentsType += `[]`
+            }
+            typeName = `${componentsType} ${inp.name}`
+        } else {
+            typeName = `${inp.type} ${inp.name}`.trim()
+        }
+        if (isIndexed) {
+            indexedCnt++
+            inputs.push(`index_topic_${indexedCnt} ${typeName}`)
+        } else {
+            inputs.push(typeName)
+        }
+    }
+    let topicLen = (e.type == 'event') ? indexedCnt + 1 : 0
+    return [`${e.name}(${inputs.join(', ')})`, topicLen]
+}
+
+function parseType(c) {
+    let cTypeName;
+    if (Array.isArray(c.components)) {
+        let t = []
+        let tupleType = c.type
+        for (const component of c.components) {
+            let typeName = parseType(component)
+            t.push(typeName)
+        }
+        let componentsType = `(${t.join(', ')})`
+        if (tupleType == 'tuple[]') {
+            componentsType += `[]`
+        }
+        cTypeName = `${componentsType} ${c.name}`
+    } else {
+        cTypeName = `${c.type} ${c.name}`.trim()
+    }
+    return cTypeName;
 }
 
 function getMethodSignatureFlds(e) {
@@ -1612,16 +1390,6 @@ function getMethodFingureprint(e) {
     return `${e.name}(${inputs.join(',')})`
 }
 
-
-
-function getMethodSignatureRawOld(e) {
-    let inputRaw = `${e.name}(${e.inputs.map(e => e.type)})`
-    return inputRaw
-}
-
-//return raw function signature like transferFrom(address,address,uint256) from abi, which is then used to compute methodID using keccak256(raw_func_sig)
-//encodeSelector('transfer(address,uint256,(uint8,bytes[]),uint64)', 10)
-//0xb9f813ff
 function getMethodSignatureRaw(e) {
     let inputRaw = `${e.name}`
     let inputs = []
@@ -1630,7 +1398,7 @@ function getMethodSignatureRaw(e) {
             let tupleType = inp.type
             let t = []
             for (const c of inp.components) {
-                t.push(c.type)
+                t.push(parseTypeRaw(c))
             }
             let rawTuple = `(${t.join(',')})`
             if (tupleType == 'tuple[]') {
@@ -1645,6 +1413,205 @@ function getMethodSignatureRaw(e) {
     return finalRaw
 }
 
+function parseTypeRaw(c) {
+    let cTypeName;
+    if (Array.isArray(c.components)) {
+        let t = []
+        let tupleType = c.type
+        for (const component of c.components) {
+            let typeName = parseTypeRaw(component)
+            t.push(typeName)
+        }
+        let componentsType = `(${t.join(',')})`
+        if (tupleType == 'tuple[]') {
+            componentsType += `[]`
+        }
+        cTypeName = componentsType;
+    } else {
+        cTypeName = c.type;
+    }
+    return cTypeName;
+}
+
+function generateFunctionABI(signature) {
+    let paramCount = 0;
+
+    const processType = (typeStr) => {
+        const name = `f${paramCount++}`;
+        if (typeStr.startsWith('(')) {
+            // This is a tuple, process its components
+            const tupleTypes = processSignature(typeStr.slice(1, -1));
+            return {
+                components: postProcessTupleComponents(tupleTypes),
+                internalType: 'tuple',
+                name: name,
+                type: 'tuple'
+            };
+        } else {
+            // This is a simple type
+            return {
+                internalType: typeStr,
+                name: name,
+                type: typeStr
+            };
+        }
+    };
+
+    const processSignature = (signatureStr) => {
+        let stack = [];
+        let params = [];
+
+        for (let i = 0; i < signatureStr.length; i++) {
+            if (signatureStr[i] === '(') {
+                stack.push(i);
+            } else if (signatureStr[i] === ')') {
+                const startIndex = stack.pop();
+                if (stack.length === 0) { // We finished processing a tuple
+                    const tupleStr = signatureStr.slice(startIndex, i + 1);
+                    signatureStr = signatureStr.slice(i + 1);
+                    params.push(tupleStr);
+                    i = startIndex - 1; // Reset the counter to the start of the tuple
+                }
+            } else if (stack.length === 0 && signatureStr[i] === ',') { // We finished processing a simple type
+                const typeStr = signatureStr.slice(0, i);
+                signatureStr = signatureStr.slice(i + 1);
+                params.push(typeStr);
+                i = -1; // Reset the counter
+            }
+        }
+        if (stack.length !== 0) {
+            throw 'Invalid signature';
+        }
+        if (signatureStr) {
+            params.push(signatureStr);
+        }
+        return params.map(processType);
+    };
+
+    // Post-processing to handle 'tuple' followed by '[]'
+    const postProcessTupleComponents = (components) => {
+        return components.reduce((acc, cur, i, src) => {
+            if (cur.components) {
+                // Recursively post-process nested tuple components
+                cur.components = postProcessTupleComponents(cur.components);
+            }
+            if (cur.type === 'tuple' && src[i + 1] && src[i + 1].type === '[]') {
+                cur.type = 'tuple[]';
+                src.splice(i + 1, 1); // Remove the following '[]'
+            }
+            acc.push(cur);
+            return acc;
+        }, []);
+    };
+
+    const firstParenIndex = signature.indexOf('(');
+    const functionName = signature.slice(0, firstParenIndex);
+    const functionParamsSignature = signature.slice(firstParenIndex + 1, -1);
+    let inputs = processSignature(functionParamsSignature);
+
+    // Post-processing for top-level inputs
+    inputs = postProcessTupleComponents(inputs);
+
+    return {
+        name: functionName,
+        inputs: inputs,
+        type: "function",
+        stateMutability: "nonpayable", // default value, modify according to your needs
+    };
+}
+
+//console.log(JSON.stringify(generateFunctionABI('fulfillBasicOrder_efficient_6GL6yc((address,uint256,uint256,address,address,address,uint256,uint256,uint8,uint256,uint256,bytes32,uint256,bytes32,bytes32,uint256,(uint256,address)[],bytes))'), null, 2));
+
+function generateEventABI(signature) {
+    let paramCount = 0;
+
+    const processType = (typeStr, isIndexed) => {
+        const name = `f${paramCount++}`;
+        if (typeStr.startsWith('(')) {
+            // This is a tuple, process its components
+            const tupleTypes = processSignature(typeStr.slice(1, -1));
+            return {
+                components: tupleTypes,
+                indexed: isIndexed,
+                internalType: 'tuple',
+                name: name,
+                type: 'tuple'
+            };
+        } else {
+            // This is a simple type
+            return {
+                indexed: isIndexed,
+                internalType: typeStr.replace('*', ''),
+                name: name,
+                type: typeStr.replace('*', '')
+            };
+        }
+    };
+
+    const processSignature = (signatureStr) => {
+        let stack = [];
+        let params = [];
+
+        for (let i = 0; i < signatureStr.length; i++) {
+            if (signatureStr[i] === '(') {
+                stack.push(i);
+            } else if (signatureStr[i] === ')') {
+                const startIndex = stack.pop();
+                if (stack.length === 0) { // We finished processing a tuple
+                    const tupleStr = signatureStr.slice(startIndex, i + 1);
+                    signatureStr = signatureStr.slice(i + 1);
+                    params.push(tupleStr);
+                    i = startIndex - 1; // Reset the counter to the start of the tuple
+                }
+            } else if (stack.length === 0 && signatureStr[i] === ',') { // We finished processing a simple type
+                const typeStr = signatureStr.slice(0, i);
+                signatureStr = signatureStr.slice(i + 1);
+                params.push(typeStr);
+                i = -1; // Reset the counter
+            }
+        }
+        if (stack.length !== 0) {
+            throw 'Invalid signature';
+        }
+        if (signatureStr) {
+            params.push(signatureStr);
+        }
+        return params.map((type) => processType(type, type.includes('*')));
+    };
+
+    // Post-processing to handle 'tuple' followed by '[]'
+    const postProcessTupleComponents = (components) => {
+        return components.reduce((acc, cur, i, src) => {
+            if (cur.components) {
+                // Recursively post-process nested tuple components
+                cur.components = postProcessTupleComponents(cur.components);
+            }
+            if (cur.type === 'tuple' && src[i + 1] && src[i + 1].type === '[]') {
+                cur.type = 'tuple[]';
+                src.splice(i + 1, 1); // Remove the following '[]'
+            }
+            acc.push(cur);
+            return acc;
+        }, []);
+    };
+
+    const firstParenIndex = signature.indexOf('(');
+    const eventName = signature.slice(0, firstParenIndex);
+    const eventParamsSignature = signature.slice(firstParenIndex + 1, -1);
+    let inputs = processSignature(eventParamsSignature);
+
+    // Post-processing for top-level inputs
+    inputs = postProcessTupleComponents(inputs);
+
+    return {
+        anonymous: false,
+        inputs: inputs,
+        name: eventName,
+        type: "event"
+    };
+}
+
+//console.log(JSON.stringify(generateEventABI('OrderFulfilled(bytes32,address*,address*,address,(uint8,address,uint256,uint256)[],(uint8,address,uint256,uint256,address)[])'), null, 2));
 // keccak256 input to certain length
 function encodeSelector(f, encodeLen = false) {
     let k = web3.utils.sha3(f)
@@ -1662,11 +1629,11 @@ function parseAbiSignature(abiStrArr) {
         inputs.forEach(function(e) {
             let stateMutability = e.stateMutability
             let abiType = e.type
-            let [signature, topicLen] = getMethodSignature(e)
+            let [signature, topicLen] = getMethodSignatureOLD(e)
             let signatureRaw = getMethodSignatureRaw(e)
             let signatureID = (abiType == 'function') ? encodeSelector(signatureRaw, 10) : encodeSelector(signatureRaw, false)
             let fingerprint = getMethodFingureprint(e)
-            let flds = getMethodSignatureFlds(e)
+            let flds = getMethodSignatureFlds(e) // TODO: might need recursive
             /*
             previous fingerprintID is now secondaryID, which is NOT unique
             New fingerprintID: signatureID-encodeSelector(signature, 10) is guaranteed to be unique
@@ -1695,30 +1662,6 @@ function parseAbiSignature(abiStrArr) {
     return output
 }
 
-/*
-{
-  blockHash: '0x98e4197c2675d6d87df6ef9051ed56319f10a79841d21afc8920c80f5c2b2c89',
-  blockNumber: 506717,
-  contractAddress: null,
-  cumulativeGasUsed: 953597,
-  effectiveGasPrice: 100000000000,
-  from: '0x44cdc2d3f73c76c9cbb097fff3bbb261ae850f6e',
-  gasUsed: 198200,
-  logs: [
-    [Object], [Object],
-    [Object], [Object],
-    [Object], [Object],
-    [Object], [Object],
-    [Object], [Object]
-  ],
-  logsBloom: '0x0020000000800000000000008000400000000000000000800000000000000000000000000000000000000000000002000000000000200800000000000000000000000000000400000000004800000020020000000000000000000000400000000000000000000000000008000000000000000000000000010000011000000000000000000000000100000000000000010000000000008008000000c000000000000000000000000000000000000000000000000000000000000000000000000000000002000000000000000000002000001000000000001100000000000002000020080000000000000000100000000100000080010000000004400000000002',
-  status: true,
-  to: '0xdfdb4de0801ef57969a9e368654b391812d23fb8',
-  transactionHash: '0x4e43e2aa5cfed7669048dc435a555dabe0e3f9a624a5d45ab9c8748375700597',
-  transactionIndex: 6
-}
-*/
-
 async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID) {
     let fBlk = evmBlk
     let blockTS = fBlk.timestamp
@@ -1734,33 +1677,6 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces,
     let feedcreates = []
     let feedtraceMap = {};
     let traceCreateMap = {};
-    /*
-    if (dTrace) {
-        process_evm_trace(dTrace, feedtrace, 0, [0], dTxns);
-        console.log(`*** start process_evm_trace_creates`)
-        process_evm_trace_creates(dTrace, feedcreates, 0, [], dTxns);
-        console.log(`*** done process_evm_trace_creates`, feedcreates)
-    }
-
-    if (feedtrace.length > 0) {
-        for (let t = 0; t < feedtrace.length; t++) {
-            let internalTx = feedtrace[t];
-            if (feedtraceMap[internalTx.transactionHash] == undefined) {
-                feedtraceMap[internalTx.transactionHash] = [];
-            }
-            feedtraceMap[internalTx.transactionHash].push(internalTx);
-        }
-    }
-    if (feedcreates.length > 0) {
-        for (let t = 0; t < feedcreates.length; t++) {
-            let createTx = feedcreates[t];
-            if (traceCreateMap[createTx.transactionHash] == undefined) {
-                traceCreateMap[createTx.transactionHash] = [];
-            }
-            traceCreateMap[createTx.transactionHash].push(createTx.to);
-        }
-    }
-    */
     if (flatTraces) {
         for (const t of flatTraces) {
             //check for create/create2
@@ -1804,164 +1720,13 @@ async function fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces,
             }
         }
     }
-    /*
-    if (creates.length > 0){
-        console.log(`****** creates Len=${creates.length}`, creates)
-        fBlk.creates = creates
-    }
-    */
     fBlk.transactions = fTxns
     fBlk.transactionsInternal = fTxnsInternal
     fBlk.transactionsConnected = fTxnsConnected
     return fBlk
 }
 
-async function decorateEvmBlock(chainID, r) {
-    console.log('decorate_evm_block', r)
-    let contractABIs = this.contractABIs;
-    let contractABISignatures = this.contractABISignatures;
-    //let evmRPCInternalApi = this.evmRPCInternal
 
-    let blkNum = false
-    let blkHash = false
-    let blockTS = false
-    let blockAvailable = false
-    let traceAvailable = false
-    let receiptsAvailable = false
-    let rpcBlock = r.block
-    let rpcReceipts = r.receipts
-    //let chainID = r.chain_id
-    let evmReceipts = []
-    let evmTrace = false
-    let blk = false
-    let stream_bq = false
-    let write_bt = false
-
-    if (rpcBlock) {
-        blockAvailable = true
-        blk = standardizeRPCBlock(rpcBlock)
-        console.log(`evmBlk++`, blk)
-        blkNum = blk.number;
-        blkHash = blk.hash;
-        blockTS = blk.timestamp;
-    } else {
-        console.log(`r.block missing`, r)
-    }
-    if (r.traces) {
-        traceAvailable = true
-        evmTrace = r.traces
-    }
-    if (rpcReceipts) {
-        receiptsAvailable = true
-        evmReceipts = standardizeRPCReceiptLogs(rpcReceipts)
-    } else {
-        console.log(`r.rpcReceipts missing`, r)
-    }
-    //console.log(`blk.transactions`, blk.transactions)
-    console.log(`decorate_evm_block [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , blockTS=${blockTS}`)
-    var statusesPromise = Promise.all([
-        processTransactions(blk.transactions, contractABIs, contractABISignatures),
-        processReceipts(evmReceipts, contractABIs, contractABISignatures)
-    ])
-    let [dTxns, dReceipts] = await statusesPromise
-    //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
-    //console.log(`[#${blkNum} ${blkHash}] dReceipts`, dReceipts)
-    let flatTraces = debugTraceToFlatTraces(evmTrace, dTxns)
-    //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
-    let evmFullBlock = await fuseBlockTransactionReceipt(blk, dTxns, dReceipts, flatTraces, chainID)
-    return evmFullBlock;
-}
-
-async function processTransactions(txns, contractABIs, contractABISignatures) {
-    let decodeTxns = []
-    let txnsAsync = await txns.map(async (txn) => {
-        try {
-            return decodeTransaction(txn, contractABIs, contractABISignatures)
-        } catch (err) {
-            console.log(`processTransactions ${txns}`, err)
-            return false
-        }
-    });
-    let decodeTxnsRes = await Promise.all(txnsAsync);
-    for (const dTxn of decodeTxnsRes) {
-        decodeTxns.push(dTxn)
-    }
-    return decodeTxns
-}
-
-async function processReceipts(evmReceipts, contractABIs, contractABISignatures) {
-    let decodedReceipts = []
-    // add logIndex to receipts
-    let logIndexCnt = 0
-    for (let i = 0; i < evmReceipts.length; i++) {
-        let evmReceipt = evmReceipts[i]
-        for (let j = 0; j < evmReceipt.logs; i++) {
-            evmReceipt.logs[j].logIndex = logIndexCnt
-            logIndexCnt++
-        }
-        evmReceipts[i] = evmReceipt
-    }
-    let recptAsync = await evmReceipts.map(async (receipt) => {
-        try {
-            return decodeReceipt(receipt, contractABIs, contractABISignatures)
-        } catch (err) {
-            console.log(`processReceipts ${receipt}`, err)
-            return false
-        }
-    });
-    let decodedReceiptsRes = await Promise.all(recptAsync);
-    for (const dReceipt of decodedReceiptsRes) {
-        let decodedLogs = dReceipt.decodedLogs
-        decodedReceipts.push(dReceipt)
-    }
-    //console.log(`decodeReceipts`, decodedReceipts)
-    return decodedReceipts
-}
-
-
-function decodeReceipt(r, contractABIs, contractABISignatures) {
-    // shallow copy throws error here... not sure why?
-    //let res = JSON.parse(JSON.stringify(r))
-    //console.log(`decodeReceipt r`, r)
-    var res = Object.assign({}, r);
-    if (!res) return;
-    let decodedLogs = []
-    if (res.logs) {
-        for (const log of res.logs) {
-            let logIndex = log.logIndex
-            //console.log(`+++ decode_log before logIndex=${logIndex}`, log)
-            let decodedRes = decode_log(log, contractABIs, contractABISignatures)
-            //console.log(`+++ decode_log after logIndex=${logIndex}`)
-            decodedLogs.push(decodedRes)
-        }
-        delete res.logs
-    }
-    res.decodedLogs = decodedLogs
-    let transfers = []
-    let swaps = []
-    let syncs = []
-    let transferActions = [] //todo
-    for (let i = 0; i < decodedLogs.length; i++) {
-        let dLog = decodedLogs[i]
-        if (dLog.decodeStatus == "success") {
-            let transfer = categorizeTokenTransfers(dLog)
-            if (transfer) {
-                transfers.push(transfer)
-                continue
-            }
-            let swap = categorizeTokenSwaps(dLog)
-            if (swap) {
-                swaps.push(swap)
-                continue
-            }
-        }
-    }
-    res.transfers = transfers
-    res.swaps = swaps
-    //res.syncs = syncs
-    res.contractAddress = r.contractAddress
-    return res
-}
 
 function categorizeTokenSync(dLog) {
     if (dLog.decodeStatus == "success") {
@@ -2156,6 +1921,7 @@ function debugTraceToFlatTraces(rpcTraces, txns) {
     }
     for (let tx_index = 0; tx_index < rpcTraces.length; tx_index++) {
         let tx = txns[tx_index]
+        //console.log(`debugTraceToFlatTraces tx`, tx)
         let tx_transaction_hash = (tx.hash) ? tx.hash : tx.transactionHash
         let tx_trace = (rpcTraces[tx_index].result) ? rpcTraces[tx_index].result : rpcTraces[tx_index];
         traces.push(...iterate_transaction_trace(
@@ -2229,9 +1995,11 @@ function categorizeTokenTransfers(dLog) {
     if (dLog.decodeStatus == "success") {
         let dSig = dLog.signature
         let dEvents = dLog.events
+        let fingerprintID = dLog.fingerprintID
         switch (dSig) {
             case 'Transfer(index_topic_1 address from, index_topic_2 address to, uint256 value)':
             case 'Transfer(index_topic_1 address from, index_topic_2 address to, uint256 amount)':
+                //console.log(`** dLog`, dLog)
                 //ERC20
                 let erc20Transfer = {
                     type: 'ERC20',
@@ -2322,119 +2090,83 @@ function categorizeTokenTransfers(dLog) {
     return false
 }
 
-//more expensive decode when cached decoder fails..
-function decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature) {
-    var abiDecoder = require('abi-decoder');
-    abiDecoder.addABI(eventAbIStr)
-    let transactionLogIndex = (log.transactionLogIndex != undefined) ? log.transactionLogIndex : log.transactionIndex
-    try {
-        let decodedLogs = abiDecoder.decodeLogs([log])
-        let decodedLog = decodedLogs[0] //successful result should have name, events, address
-        //console.log(`decodedLog`, decodedLog)
-        if (decodedLog) {
-            let res = {
-                decodeStatus: 'success',
-                address: decodedLog.address,
-                transactionLogIndex: transactionLogIndex,
-                logIndex: log.logIndex,
-                data: log.data,
-                topics: log.topics,
-                signature: eventSignature,
-                fingerprintID: fingerprintID,
-                events: decodedLog.events
+function analyzeABIInput(e) {
+    var inputs = []
+    var inputsAnon = []
+    var flds = [];
+    var types_indexed = null;
+    var types_non_indexed = null;
+    var indexedCnt = 0 //topic0 is signatureID
+    let len = e.type == "function" ? 10 : false;
+    let idx = 0;
+
+    addABINames(e);
+    for (const inp of e.inputs) {
+        let isIndexed = false
+        if (inp.indexed != undefined) {
+            isIndexed = inp.indexed
+        }
+        let typeName;
+
+        if (Array.isArray(inp.components)) {
+            let t = []
+            let tupleType = inp.type
+            for (const c of inp.components) {
+                let cTypeName = `${c.type} ${c.name}`.trim()
+                t.push(parseTypeRaw(c))
             }
-            return res
-        }
-    } catch (e) {
-        let topic0 = log.topics[0]
-        let topicLen = log.topics.length
-        console.log(`decodeErr txHash=${log.transactionHash} LogIndex=${transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
-        console.log(`decodeErr signatureID=${topic0} eventSignature=${eventSignature}`)
-        console.log(`decodeErr`, e)
-    }
-    //console.log(`log`, log)
-    abiDecoder.discardNonDecodedLogs()
-    let unknownLog = {
-        decodeStatus: 'error',
-        address: log.address,
-        transactionLogIndex: transactionLogIndex,
-        logIndex: log.logIndex,
-        data: log.data,
-        topics: log.topics,
-        fingerprintID: fingerprintID,
-    }
-    console.log(`decode_event_fresh unknownLog`, unknownLog)
-    return unknownLog
-}
 
-// for a transfer event the "address" is the contract address
-// minimum requirement topics, data, address + abi
-function decode_event(log, fingerprintID, eventAbIStr, eventSignature, abiDecoder) {
-    //var abiDecoder = require('abi-decoder');
-    //abiDecoder.addABI(eventAbIStr)
-    let transactionLogIndex = (log.transactionLogIndex != undefined) ? log.transactionLogIndex : log.transactionIndex
-    try {
-        let decodedLogs = abiDecoder.decodeLogs([log])
-        let decodedLog = decodedLogs[0] //successful result should have name, events, address
-        //console.log(`decodedLog`, JSON.stringify(decodedLog,null, 2))
-        let res = {
-            decodeStatus: 'success',
-            address: decodedLog.address,
-            transactionLogIndex: transactionLogIndex,
-            logIndex: log.logIndex,
-            data: log.data,
-            topics: log.topics,
-            signature: eventSignature,
-            fingerprintID: fingerprintID,
-            events: decodedLog.events
-        }
-        return res
-    } catch (e) {
-        abiDecoder.discardNonDecodedLogs()
-        let topic0 = log.topics[0]
-        let topicLen = log.topics.length
-        console.log(`fallback decode txHash=${log.transactionHash} transactionLogIndex=${transactionLogIndex} fingerprintID=${topic0}-${topicLen}`)
-        return decode_event_fresh(log, fingerprintID, eventAbIStr, eventSignature)
-    }
-}
-
-function fetchABI(fingerprintID, contractABIs, contractABISignatures) {
-    try {
-        let signatureID = fingerprintID.split('-')[0]
-        let matchedABI = contractABIs[fingerprintID]
-        let cachedFingerprintID = contractABISignatures[signatureID]
-        if (matchedABI != undefined) {
-            if (matchedABI.decoder == undefined) {
-                if (cachedFingerprintID != undefined && cachedFingerprintID != fingerprintID) {
-                    //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
-                }
-                const abiDecoder = require('abi-decoder');
-                abiDecoder.addABI(matchedABI.abi)
-                matchedABI.decoder = abiDecoder
-                const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
-                matchedABI.etherjsDecoder = etherjsDecoder
-                contractABIs[fingerprintID] = matchedABI
-                contractABISignatures[signatureID] = fingerprintID
-                //console.log(`cache decoder -> ${fingerprintID}`)
-                //console.log(`cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
-            } else if (cachedFingerprintID != fingerprintID) {
-                //console.log(`fingerprintID changed!! ${cachedFingerprintID}(cached) -> ${fingerprintID}(current)`)
-                const abiDecoder = require('abi-decoder');
-                abiDecoder.addABI(matchedABI.abi)
-                matchedABI.decoder = abiDecoder
-                const etherjsDecoder = new ethers.utils.Interface(matchedABI.abi)
-                matchedABI.etherjsDecoder = etherjsDecoder
-                contractABISignatures[signatureID] = fingerprintID
-                //console.log(`re-cache decoder -> ${fingerprintID}`)
-                //console.log(`re-cache decoder ${fingerprintID} -> ${JSON.stringify(matchedABI.abi)}`)
+            let componentsType = `(${t.join(',')})`
+            if (tupleType == 'tuple[]') {
+                componentsType += `[]`
             }
-            return matchedABI
+            typeName = `${componentsType}`
+            //console.log("RESULT", typeName, inp.type);
+        } else {
+            typeName = `${inp.type}`.trim()
         }
-    } catch (err) {
-        console.log(`fetchABI fingerprintID=${fingerprintID}`, err)
+        let fld = inp.name && inp.name.length > 0 ? inp.name : `_f${idx}`;
+        if (isIndexed) {
+            indexedCnt++
+            inputs.push(`${typeName}*`)
+            inputsAnon.push(inp.type);
+            flds.push(`${fld}*`)
+            if (types_indexed == null) types_indexed = [];
+            types_indexed.push(inp.type);
+        } else {
+            inputs.push(typeName);
+            inputsAnon.push(typeName);
+            flds.push(`${fld}`)
+            if (types_non_indexed == null) types_non_indexed = [];
+            types_non_indexed.push(typeName);
+        }
+        idx++;
     }
+    let text_signature_full = `${e.name}(${inputs.join(',')})`;
+    let text_signature = `${e.name}(${inputsAnon.join(',')})`
 
-    return false
+
+    const crypto = require('crypto');
+    const hash = crypto.createHash('md5');
+    hash.update(text_signature);
+    let text_signature_md5 = hash.digest('hex');
+
+    const hash2 = crypto.createHash('md5');
+    hash2.update(text_signature_full);
+    let text_signature_full_md5 = hash2.digest('hex');
+
+    let hex_signature = encodeSelector(text_signature, len);
+    return {
+        text_signature_full,
+        text_signature,
+        text_signature_md5,
+        text_signature_full_md5,
+        hex_signature,
+        types_indexed,
+        types_non_indexed,
+        flds,
+        abiMaybe: e
+    };
 }
 
 //TODO standardize event_type recursively -- currently only handle one level deep
@@ -2504,47 +2236,19 @@ function standardizeDecodedEvnets(decodedEvents) {
     return decodedEvents
 }
 
-function decode_log(log, contractABIs, contractABISignatures) {
-    let topics = log.topics
-    let topicLen = log.topics.length
-    let topic0 = topics[0]
-    let fingerprintID = `${topic0}-${topicLen}`
-    let foundApi = fetchABI(fingerprintID, contractABIs, contractABISignatures)
-    if (foundApi) {
-        let eventSignature = foundApi.signature
-        //console.log(`${topic0} -> ${eventSignature}`)
-        let eventABIStr = foundApi.abi
-        let cachedDecoder = foundApi.decoder
-        let decodedRes = decode_event(log, fingerprintID, eventABIStr, eventSignature, cachedDecoder)
-        if (decodedRes.transactionLogIndex == undefined) {
-            console.log(`decodedRes transactionLogIndex missing`, decodedRes)
-            //process.exit(0)
-        }
-        let decodeStatus = decodedRes.decodeStatus
-        //console.log(`decodeStatus=[${decodeStatus}] fingerprintID=${fingerprintID}`, decodedRes)
-        let decodedEvents = decodedRes.events
-        //console.log(`decodeStatus=[${decodeStatus}] decodedEvents\n`, JSON.stringify(decodedEvents))
-        if (decodedEvents) {
-            //decodedRes.events = standardizeDecodedEvnets_old(decodedEvents)
-            decodedRes.events = standardizeDecodedEvnets(decodedEvents)
-        } else {
-            //console.log(`decodedEvents empty!`)
-        }
-        return decodedRes
-    }
-    //console.log(`[#${log.blockNumber}-${log.transactionIndex}] decode_log: topic not found ${topic0} (topicLen ${topicLen})`)
-    let unknown = {
-        decodeStatus: 'unknown',
-        address: log.address,
-        transactionLogIndex: log.transactionIndex,
-        logIndex: log.logIndex,
-        data: log.data,
-        topics: log.topics,
-        fingerprintID: fingerprintID,
-    }
-    //console.log(`unknown log`, unknown)
-    return unknown
+function asteriskToFront(signature) {
+    // Extract function name and arguments
+    let [funcName, args] = signature.split('(');
+    // Remove closing parenthesis from arguments string and split by comma
+    args = args.slice(0, -1).split(',');
+
+    // Iterate over args and move * to front if it exists
+    args = args.map(arg => arg.includes('*') ? `*${arg.replace('*', '')}` : arg);
+
+    // Join the modified args back into a string and return the final result
+    return `${funcName}(${args.join(',')})`;
 }
+
 
 async function crawl_evm_logs(web3Api, bn) {
     var queryOpt = {
@@ -2828,25 +2532,6 @@ function mapABITypeToBqType(typ) {
     }
 }
 
-function buildSchemaInfoFromFingerprintID(methodSignature, fingerprintID, contractABIs, contractABISignatures) {
-    let schemaInfo = false
-    let foundApi = fetchABI(fingerprintID, contractABIs, contractABISignatures)
-    if (foundApi) {
-        let methodSignature = foundApi.signature
-        //console.log(`${methodID} -> ${methodSignature}`)
-        let methodABIStr = foundApi.abi
-        let schema = createEvmSchema(methodABIStr, fingerprintID)
-        let schemaType = (fingerprintID && fingerprintID.length == 10) ? 'call' : 'evt'
-        let schemaInfo = {
-            fingerprintID: fingerprintID,
-            schemaType: schemaType,
-            schema: schema
-        }
-        return schemaInfo
-    }
-    return schemaInfo
-}
-
 function computeTableId(abiStruct, fingerprintID) {
     //console.log(`computeTableId abiStr`, abiStruct)
     let tableId = false
@@ -3064,7 +2749,7 @@ async function getContractByteCode(web3Api, contractAddress, bn = 'latest', RPCB
     try {
         code = web3Api.eth.getCode(contractAddress)
     } catch (e) {
-        console.log(`getContractByteCode error`, e)
+        console.log(`getContractByteCode contractAddress=${contractAddress}. error`, e)
         return false
     }
     return code
@@ -3097,10 +2782,18 @@ async function ProcessContractByteCode(web3Api, contractAddress, bn = 'latest', 
         //contractInfo.is_erc165 = detectERC165(codeHashInfo, bytecode)
         if (detectERC20(codeHashInfo, bytecode)) {
             contractInfo.is_erc20 = true
+            let tokenInfo = await getERC20TokenInfo(web3Api, contractAddress, bn, RPCBackfill);
+            if (tokenInfo) {
+                //console.log("FETCHED TOKENINFO", tokenInfo);
+                for (const k of Object.keys(tokenInfo)) {
+                    contractInfo[k] = tokenInfo[k];
+                }
+            }
             //console.log(`**** [ERC20] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
         } else if (detectERC721(codeHashInfo, bytecode)) {
             //console.log(`**** [ERC721] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
             contractInfo.is_erc721 = true
+            // TODO: copy values
         } else if (detectERC1155(codeHashInfo, bytecode)) {
             //console.log(`**** [ERC1155] contractAddress=${contractAddress}, codeHashInfo`, codeHashInfo)
             contractInfo.is_erc1155 = true
@@ -3469,20 +3162,11 @@ module.exports = {
     parseAbiSignature: function(abiStrArr) {
         return parseAbiSignature(abiStrArr)
     },
-    processReceipts: async function(evmReceipts, contractABIs, contractABISignatures) {
-        return processReceipts(evmReceipts, contractABIs, contractABISignatures)
-    },
-    processTransactions: async function(txns, contractABIs, contractABISignatures) {
-        return processTransactions(txns, contractABIs, contractABISignatures)
-    },
     fuseBlockTransactionReceipt: async function(evmBlk, dTxns, flatTraces, dTrace, chainID) {
         return fuseBlockTransactionReceipt(evmBlk, dTxns, flatTraces, dTrace, chainID)
     },
     decorateTxn: function(dTxn, dReceipt, dInternal, blockTS = false, chainID = false) {
         return decorateTxn(dTxn, dReceipt, dInternal, blockTS, chainID);
-    },
-    decodeTransactionInput: function(txn, contractABIs, contractABISignatures) {
-        return decodeTransactionInput(txn, contractABIs, contractABISignatures)
     },
     isTxContractCreate: function(tx) {
         return isTxContractCreate(tx);
@@ -3564,7 +3248,6 @@ module.exports = {
         return getABIByAssetType(assetType);
     },
     buildSchemaInfoFromSig: buildSchemaInfoFromSig,
-    buildSchemaInfoFromFingerprintID: buildSchemaInfoFromFingerprintID,
     mapABITypeToBqType: mapABITypeToBqType,
     computeTableId: computeTableId,
     createEvmSchema: createEvmSchema,
@@ -3579,5 +3262,22 @@ module.exports = {
     xc20AssetWithdrawBuilder: function(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest) {
         return xc20AssetWithdrawBuilder(web3Api, currencyAddress, amount, decimal, beneficiary, chainIDDest)
     },
-    decorateEvmBlock: decorateEvmBlock,
+    generateEventABI: generateEventABI,
+    generateFunctionABI: generateFunctionABI,
+    getMethodSignatureRaw: getMethodSignatureRaw,
+    analyzeABIInput: function(e) {
+        return analyzeABIInput(e)
+    },
+    processEthersDecodedRaw: function(inputs, decoded_raw) {
+        return processEthersDecodedRaw(inputs, decoded_raw)
+    },
+    addABINames: function(inp, prefix = "", idx = 0) {
+        addABINames(inp, prefix, idx)
+    },
+    initEtherJsDecoder: function(abi) {
+        var etherjsDecoder = new ethers.utils.Interface(abi)
+        return etherjsDecoder
+    },
+    categorizeTokenTransfers: categorizeTokenTransfers,
+    categorizeTokenSwaps: categorizeTokenSwaps,
 };

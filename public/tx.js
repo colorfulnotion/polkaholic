@@ -45,7 +45,7 @@ function showtxstatus(extrinsicHash) {
                 return response.json();
             })
             .then(function(info) {
-                //console.log("txstatus", info);
+                console.log("txstatus", url, info);
                 let finalized = false;
                 let msg = "No";
                 if (info.status == "finalized" || info.status == "finalizeddest") {

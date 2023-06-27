@@ -76,8 +76,6 @@ module.exports = class Indexer extends AssetManager {
     evmRPC = false; //
     evmRPCBlockReceipts = false; // api endpoint that supports eth_getBlockReceipts
     evmRPCInternal = false; // api endpoint that supports eth_getBlockReceipts
-    contractABIs = false;
-    contractABISignatures = {};
     chainID = false;
     chainName = false;
     relayChain = "";
@@ -4945,7 +4943,7 @@ module.exports = class Indexer extends AssetManager {
             let reserved_balance = 0;
             let miscFrozen_balance = 0;
             let feeFrozen_balance = 0;
-            let flags_balance = 0;
+            let flags_raw = null;
             try {
                 let query = await this.api.query.system.account(address);
                 let balance = query.data;
@@ -4955,7 +4953,7 @@ module.exports = class Indexer extends AssetManager {
                 if (balance.miscFrozen) miscFrozen_balance = balance.miscFrozen.toString() / 10 ** decimals;
                 if (balance.feeFrozen) feeFrozen_balance = balance.feeFrozen.toString() / 10 ** decimals;
                 if (balance.frozen) feeFrozen_balance = balance.frozen.toString() / 10 ** decimals; //polkadot/kusama/assethub fix
-                if (balance.flags) flags_balance = balance.flags.toString() / 10 ** decimals; //polkadot/kusama/assethub fix
+                if (balance.flags) flags_raw = balance.flags.toString(); //polkadot/kusama/assethub fix
             } catch (err) {
                 this.logger.error({
                     "op": "dump_addressBalanceRequest",
@@ -4964,7 +4962,6 @@ module.exports = class Indexer extends AssetManager {
                     err
                 })
             }
-
 
             let asset = this.getChainAsset(this.chainID);
             let assetChain = paraTool.makeAssetChain(asset, this.chainID);
@@ -4981,6 +4978,9 @@ module.exports = class Indexer extends AssetManager {
                 source: this.hostname,
                 genTS: this.currentTS()
             };
+            if (flags_raw) {
+                newState.flags_raw = flags_raw
+            }
             rec[encodedAssetChain] = {
                 value: JSON.stringify(newState),
                 timestamp: r.blockTS * 1000000
@@ -7373,8 +7373,6 @@ module.exports = class Indexer extends AssetManager {
 
         // (3) fuse block+receipt for evmchain, if both evmBlock and evmReceipts are available
         let web3Api = this.web3Api
-        let contractABIs = this.contractABIs
-        let contractABISignatures = this.contractABISignatures
         let evmFullBlock = false
         if (evmBlock && evmReceipts) {
             if (web3Api && contractABIs) {
@@ -7387,22 +7385,24 @@ module.exports = class Indexer extends AssetManager {
                 let processTransasctionStartTS = new Date().getTime()
                 let processReceiptStartTS = new Date().getTime()
                 var statusesPromise = Promise.all([
-                    ethTool.processTransactions(evmBlock.transactions, contractABIs, contractABISignatures),
-                    ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                    this.processTransactions(evmBlock.transactions),
+                    this.processReceipts(evmReceipts)
                 ])
                 let [dTxns, dReceipts] = await statusesPromise
                 //console.log(`[${blockNumber}] dReceipts`, JSON.stringify(dReceipts))
 
-                //let dTxns = await ethTool.processTransactions(evmBlock.transactions, contractABIs, contractABISignatures)
+                //let dTxns = await ethTool.processTransactions(evmBlock.transactions)
                 let processTransasctionTS = (new Date().getTime() - processTransasctionStartTS) / 1000
                 this.timeStat.processTransasctionTS += processTransasctionTS
 
-                //let dReceipts = await ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+                //let dReceipts = await ethTool.processReceipts(evmReceipts)
                 let processReceiptTS = (new Date().getTime() - processReceiptStartTS) / 1000
                 this.timeStat.processReceiptTS += processReceiptTS
 
                 let decorateTxnStartTS = new Date().getTime()
-                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, evmTrace, chainID)
+
+                let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
+                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, flatTraces, chainID)
                 if (evmFullBlock.transactionsConnected.length > 0) {
                     let connectedTxns = []
                     for (const connectedTxn of evmFullBlock.transactionsConnected) {
@@ -8311,8 +8311,6 @@ module.exports = class Indexer extends AssetManager {
     async index_evm_chain_block_row(r, write_bq_log = false, mode = 'store_evm') {
         //console.log('index_evm_chain_block_row', JSON.stringify(r))
 
-        let contractABIs = this.contractABIs;
-        let contractABISignatures = this.contractABISignatures;
         let evmRPCInternalApi = this.evmRPCInternal
 
         let log_retry_max = 10
@@ -8355,15 +8353,15 @@ module.exports = class Indexer extends AssetManager {
         }
         console.log(`index_evm_chain_block_row [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}, evmRPCInternalApi=${evmRPCInternalApi}`)
         var statusesPromise = Promise.all([
-            ethTool.processTransactions(blk.transactions, contractABIs, contractABISignatures),
-            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+            ethTool.processTransactions(blk.transactions),
+            ethTool.processReceipts(evmReceipts)
         ])
         let [dTxns, dReceipts] = await statusesPromise
         //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
         if (mode == "store_evm") {
-            await this.store_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures)
+            await this.store_evm(blk, dTxns, dReceipts, evmTrace, chainID)
         } else if (mode == "stream_evm") {
-            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, contractABIs, contractABISignatures, stream_bq, write_bt)
+            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, stream_bq, write_bt)
         }
         return r;
     }
@@ -8894,13 +8892,13 @@ module.exports = class Indexer extends AssetManager {
         return flds
     }
 
-    async setupEvmCallEventSchemaInfo(signature, fingerprintID, contractABIs, contractABISignatures) {
+    async setupEvmCallEventSchemaInfo(signature, fingerprintID) {
         //TODO: unknown fingerprintID is just ignore and we are not bothered to decode again - need refresh strategy
         if (this.evmUnknownFingerprintMap[fingerprintID]) {
             return false
         }
         console.log(`signature=${signature}, fingerprintID=${fingerprintID}`)
-        let schemaInfo = ethTool.buildSchemaInfoFromFingerprintID(signature, fingerprintID, contractABIs, contractABISignatures)
+        let schemaInfo = this.buildSchemaInfoFromFingerprintID(signature, fingerprintID)
         if (schemaInfo) {
             let schema = schemaInfo.schema
             let sch = schema.schema
@@ -9430,8 +9428,6 @@ module.exports = class Indexer extends AssetManager {
         }
         this.contractABIs = await this.getContractABI();
 
-        let contractABIs = this.contractABIs;
-        let contractABISignatures = this.contractABISignatures;
         this.topicFilters = await this.loadEventBloomFilter();
         await this.assetManagerInit()
 

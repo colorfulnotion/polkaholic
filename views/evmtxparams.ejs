@@ -1,4 +1,3 @@
-<table>
 <% if ( decoded ) {
     let funcDesc = (decoded.signature)? `${decoded.signature}` : ''
     let methodIDDesc = (decoded.methodID)?  `${decoded.methodID}` : ''
@@ -17,7 +16,10 @@
         })
     }
 %>
-<% } %>
+<% }
+
+if ( Array.isArray(params) ) {  %>
+<table>
 <% for ( let j=0; j< params.length; j++) {
      let e = params[j]; %>
   <tr>
@@ -32,6 +34,19 @@
    <%- uiTool.presentID(e.value); %>
    <% } else if ( e.type == "address[]" ) { %>
    <%- uiTool.presentIDs(e.value); %>
+   <% } else if ( e.type == "tuple" ) {  %>
+       <%- include("evmtxparams", {params: e.value, decoded: null}); %>
+   <% } else if ( e.type == "tuple[]" ) {
+         if ( Array.isArray(e.value) ) {  %>
+      <table>
+        <% for ( let i = 0; i < e.value.length; i++) {  %>
+         <tr style="width: 100px; border-top: 1px solid black;">
+          <td><code><%= e.name %>[<%= i %>]</code></td>
+          <td><%- include("evmtxparams", {params: e.value[i], decoded: null}); %></td>
+         </tr>
+        <% } %>
+      </table>
+      <% } %>
    <% } else { %>
    <%- e.value; %>
    <% } %>
@@ -39,3 +54,39 @@
   </tr>
 <% } %>
 </table>
+<% } else if ( typeof params === "object" ) { %>
+      <table>
+        <% for ( const j of Object.keys(params) ) { let e = params[j]; %>
+  <tr>
+   <th><%- e.name; %>
+       &ensp;
+   </th>
+   <td><%- e.type; %>
+       &emsp;
+   </td>
+   <td>
+   <% if ( e.type == "address" ) { %>
+   <%- uiTool.presentID(e.value); %>
+   <% } else if ( e.type == "address[]" ) { %>
+   <%- uiTool.presentIDs(e.value); %>
+   <% } else if ( e.type == "tuple" ) {  %>
+       <%- include("evmtxparams", {params: e.value, decoded: null}); %>
+   <% } else if ( e.type == "tuple[]" ) {
+         if ( Array.isArray(e.value) ) {  %>
+      <table>
+        <% for ( let i = 0; i < e.value.length; i++) {  %>
+         <tr style="width: 100px; border-top: 1px solid black;">
+          <td><code><%= e.name %>[<%= i %>]</code></td>
+          <td><%- include("evmtxparams", {params: e.value[i], decoded: null}); %></td>
+         </tr>
+        <% } %>
+      </table>
+      <% } %>
+   <% } else { %>
+   <%- e.value; %>
+   <% } %>
+   </td>
+  </tr>
+        <% } %>
+      </table>
+<% } %>
