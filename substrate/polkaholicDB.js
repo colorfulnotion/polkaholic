@@ -802,7 +802,7 @@ from chain where chainID = '${chainID}' limit 1`);
         // The split method splits the string into an array of substrings around each instance of '*'
         // So the length of the array will be one more than the number of '*' characters in the string
         // We subtract 1 to get the count of '*' characters
-        return text_signature_full.split('*').length - 1;
+        return text_signature_full.split('*').length;
     }
     async getContractABI() {
         let contractabis = await this.poolREADONLY.query(`select hex_signature, CONVERT(text_signature using utf8) text_signature, CONVERT(text_signature_full using utf8) text_signature_full, CONVERT(abiMaybe using utf8) abiMaybe, CONVERT(addresses using utf8) addresses from signaturescurated order by numContracts desc`);
