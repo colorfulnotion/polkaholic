@@ -46,7 +46,6 @@ module.exports = class XCMTransact extends AssetManager {
 
     // holds evmblocks of destination chain
     evmBlocks = {};
-    contractABISignatures = {};
 
     async init() {
         await cryptoWaitReady()
@@ -639,7 +638,7 @@ module.exports = class XCMTransact extends AssetManager {
                     evmTx = args.transaction.v2
                 }
                 if (evmTx) {
-                    let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                    let output = this.decodeTransactionInput(evmTx);
                     if (output != undefined) {
                         args.decodedEvmInput = output
                     }
@@ -652,7 +651,7 @@ module.exports = class XCMTransact extends AssetManager {
                 if (args.xcm_transaction.v1 != undefined) evmTx = args.xcm_transaction.v1
                 if (args.xcm_transaction.v2 != undefined) evmTx = args.xcm_transaction.v2
                 if (evmTx) {
-                    let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                    let output = this.decodeTransactionInput(evmTx);
                     if (output != undefined) {
                         args.decodedEvmInput = output
                     }

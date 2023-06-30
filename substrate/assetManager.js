@@ -29,9 +29,9 @@ const {
     ApiPromise
 } = require('@polkadot/api');
 const MAX_PRICEUSD = 100000.00;
+const EvmManager = require("./evmManager");
 
-module.exports = class AssetManager extends PolkaholicDB {
-
+module.exports = class AssetManager extends EvmManager {
     assetInfo = {};
     alternativeAssetInfo = {};
     xcmAssetInfo = {}; // xcmInteriorKey   ->
@@ -2318,6 +2318,10 @@ module.exports = class AssetManager extends PolkaholicDB {
     }
 
     async decorate_assetState(assetInfo, state, flds, ts) {
+        if (state.balanceUSD) {
+            return state.balanceUSD;
+        }
+
         let targetAsset = assetInfo.asset;
         let totalUSDVal = 0;
         for (const fld of flds) {

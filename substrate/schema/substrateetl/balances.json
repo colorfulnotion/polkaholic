@@ -101,6 +101,11 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "flags_raw",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "price_usd",
     "type": "FLOAT"
   },

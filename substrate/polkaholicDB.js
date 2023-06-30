@@ -798,30 +798,38 @@ from chain where chainID = '${chainID}' limit 1`);
         let tests = await this.poolREADONLY.query(`select * from testParseTraces where testGroup = '${testGroup}' order by chainID`);
         return (tests);
     }
-
+    countTopicLen(text_signature_full) {
+        // The split method splits the string into an array of substrings around each instance of '*'
+        // So the length of the array will be one more than the number of '*' characters in the string
+        // We subtract 1 to get the count of '*' characters
+        return text_signature_full.split('*').length - 1;
+    }
     async getContractABI() {
-        let contractabis = await this.poolREADONLY.query(`select fingerprintID, signatureID, signature, abi, abiType, topicLength from contractabi order by firstSeenDT`);
+        let contractabis = await this.poolREADONLY.query(`select hex_signature, CONVERT(text_signature using utf8) text_signature, CONVERT(text_signature_full using utf8) text_signature_full, CONVERT(abiMaybe using utf8) abiMaybe, CONVERT(addresses using utf8) addresses from signaturescurated order by numContracts desc`);
         let abis = {}
-        for (const abi of contractabis) {
-            let signatureID = abi.signatureID
-            let abiType = abi.abiType
-            let topicLen = abi.topicLength
-            let lookupID = (abiType == 'event') ? `${signatureID}-${topicLen}` : signatureID // this is ID that we use for lookup from indexing txInput/method (without verified abi)
-            let fingerprintID = abi.fingerprintID
-            let jsonABI = JSON.parse(abi.abi.toString('utf8'))
-            let r = {
-                fingerprintID: fingerprintID,
-                signatureID: signatureID,
-                signature: abi.signature.toString('utf8'),
-                abi: jsonABI,
-                abiType: abiType,
-                topicLength: topicLen
+        try {
+            for (const abi of contractabis) {
+                let abiType = (abi.hex_signature.length == 10) ? "function" : "event";
+                let hex_signature = abi.hex_signature;
+                let signature = abi.text_signature
+                let signature_full = abi.text_signature_full
+                let jsonABI = JSON.parse(abi.abiMaybe);
+                let topicLen = (abi.hex_signature.length == 10) ? "0" : this.countTopicLen(signature_full);
+                let lookupID = (abiType == 'function') ? `${hex_signature}` : `${hex_signature}-${topicLen}`
+                let r = {
+                    abi: jsonABI,
+                    abiType: abiType,
+                    signature: signature,
+                    signature_full: signature_full,
+                    topic_len: topicLen
+                }
+                if (abis[lookupID] == undefined) {
+                    abis[lookupID] = r
+                }
+                abis[lookupID].addresses = abi.addresses
             }
-            if (abis[lookupID] == undefined) {
-                abis[lookupID] = r
-            } else {
-                // console.log(`lookupID collision detected ${fingerprintID}`)
-            }
+        } catch (err) {
+            console.log(err)
         }
         return (abis);
     }
@@ -1920,7 +1928,7 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async store_stateTraceBlock_gs(chainID, blockNumber, blockTrace) {
-	return;
+        return;
         const bucketName = 'crypto_substrate_traces';
         const storage = new Storage();
         const bucket = storage.bucket(bucketName);
@@ -2001,7 +2009,8 @@ from chain where chainID = '${chainID}' limit 1`);
 
     async fetch_block_gs(chainID, blockNumber) {
         try {
-            if (chainID == 1 || chainID == 10 || chainID == 43114 || chainID == 42161) {
+            if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) ||
+                ((chainID == 0) && blockNumber < 16000000) || ((chainID == 2) && blockNumber < 18300000)) { // fetch { blockraw, events, feed } from GS storage
                 return this.fetch_evm_block_gs(chainID, blockNumber);
             } else {
                 return this.fetch_substrate_block_gs(chainID, blockNumber);
@@ -2078,9 +2087,7 @@ from chain where chainID = '${chainID}' limit 1`);
                     console.log(`gs://${bucketName}/${fileName}`);
                     out.push(`(${blockNumber}, 1)`)
                 } else {
-                    if (!result["blockraw"]) console.log("PROBLEM - blockraw", blockNumber);
-                    if (!result["events"]) console.log("PROBLEM - events", blockNumber);
-                    if (!result["feed"]) console.log("PROBLEM - feed", blockNumber);
+                    console.log("PROBLEM", r);
                 }
             }
             if (out.length > 0) {
@@ -2096,8 +2103,7 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
-        if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) ||
-            ((chainID == 0) && blockNumber < 16000000) || ((chainID == 2) && blockNumber < 18300000)) { // fetch { blockraw, events, feed } from GS storage
+        if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) || ((chainID <= 2) && blockNumber < 35000)) { // fetch { blockraw, events, feed } from GS storage
             try {
                 let r = await this.fetch_block_gs(chainID, blockNumber);
                 console.log("fetch_block", r);

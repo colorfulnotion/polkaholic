@@ -91,6 +91,74 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
       </td>
     </tr>
 <% } %>
+<%
+function hex2a(hexx) {
+    var hex = hexx.toString();//force conversion
+    var str = '';
+    for (var i = 0; i < hex.length; i += 2)
+        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
+    return str;
+}
+
+let txInput = tx.input
+let txInputStr = `${txInput}`
+let utf8Str = hex2a(txInputStr.substring(2));
+if ( tx.decodedInput ) {
+    let decodeStatus = tx.decodedInput.decodeStatus
+    let funcDesc = (tx.decodedInput.signature)? `Function: ${tx.decodedInput.signature}\n\n` : ''
+    let methodIDDesc = (tx.decodedInput.signature)?  `MethodID: ${tx.decodedInput.methodID}\n` : ''
+    if (tx.decodedInput.methodID != undefined) {
+        if (tx.decodedInput.methodID == '0x') {
+            methodIDDesc = ''
+            funcDesc = ''
+        }
+    }
+    %>
+    <tr>
+      <td><%- include("tooltip", {k: "evminputdata"}) %>Input Data</td>
+      <td>
+
+<% if ( decodeStatus == "success") { %>
+    <div id="txinputdata_default" style="display">
+    <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
+    </div>
+    </div>
+    <div id="txinputdata_utf8" style="display:none" >
+        <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
+    </div>
+    <div id="txinputdata_original" style="display:none" >
+        <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
+    </div>
+<% } else { %>
+    <div id="txinputdata_default" style="display:none">
+    <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
+    </div>
+    </div>
+    <div id="txinputdata_utf8" style="display:none" >
+        <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
+    </div>
+    <div id="txinputdata_original" style="display" >
+        <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
+    </div>
+<% } %>
+<div class="dropdown">
+  <button class="btn btn-tertiary dropdown-toggle" type="button" id="decodeInput" data-mdb-toggle="dropdown" aria-expanded="false">View Input As</button>
+  <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton2">
+      <% if ( decodeStatus == "success") { %>
+          <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
+      <% } else { %>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
+          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
+          <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
+      <% } %>
+
+  </ul>
+</div>
+      </td>
+    </tr>
+<% } %>
 <% if ( assetTransferFound && !xcmInfoFound) { %>
     <tr>
       <td><%- include("tooltip", {k: "tokenstransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
@@ -185,90 +253,22 @@ let errStr = (f.err != undefined)? f.err: false //by default tx result is true (
         <td><%= tx.transactionIndex; %></td>
     </tr>
 <% } %>
-<%
-function hex2a(hexx) {
-    var hex = hexx.toString();//force conversion
-    var str = '';
-    for (var i = 0; i < hex.length; i += 2)
-        str += String.fromCharCode(parseInt(hex.substr(i, 2), 16));
-    return str;
-}
-
-let txInput = tx.input
-let txInputStr = `${txInput}`
-let utf8Str = hex2a(txInputStr.substring(2));
-if ( tx.decodedInput ) {
-    let decodeStatus = tx.decodedInput.decodeStatus
-    let funcDesc = (tx.decodedInput.signature)? `Function: ${tx.decodedInput.signature}\n\n` : ''
-    let methodIDDesc = (tx.decodedInput.signature)?  `MethodID: ${tx.decodedInput.methodID}\n` : ''
-    if (tx.decodedInput.methodID != undefined) {
-        if (tx.decodedInput.methodID == '0x') {
-            methodIDDesc = ''
-            funcDesc = ''
-        }
-    }
-    %>
-    <tr>
-      <td><%- include("tooltip", {k: "evminputdata"}) %>Input Data</td>
-      <td>
-
-<% if ( decodeStatus == "success") { %>
-    <div id="txinputdata_default" style="display">
-    <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
-    </div>
-    </div>
-    <div id="txinputdata_utf8" style="display:none" >
-        <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
-    </div>
-    <div id="txinputdata_original" style="display:none" >
-        <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
-    </div>
-<% } else { %>
-    <div id="txinputdata_default" style="display:none">
-    <%- include("evmtxdecodedinput", {tx: tx.decodedInput, showParams: true}) %>
-    </div>
-    </div>
-    <div id="txinputdata_utf8" style="display:none" >
-        <textarea style="width: 800px; height:125px"><%= utf8Str; %></textarea>
-    </div>
-    <div id="txinputdata_original" style="display" >
-        <textarea style="width: 800px; height:125px"><%= txInputStr; %></textarea>
-    </div>
-<% } %>
-<div class="dropdown">
-  <button class="btn btn-tertiary dropdown-toggle" type="button" id="decodeInput" data-mdb-toggle="dropdown" aria-expanded="false">View Input As</button>
-  <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="dropdownMenuButton2">
-      <% if ( decodeStatus == "success") { %>
-          <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
-          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
-          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
-      <% } else { %>
-          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_default')">Default View</a></li>
-          <li><a class="dropdown-item" href="javascript:showtxinputdata('txinputdata_utf8')">UTF-8</a></li>
-          <li><a class="dropdown-item active" href="javascript:showtxinputdata('txinputdata_original')">Original</a></li>
-      <% } %>
-
-  </ul>
-</div>
-      </td>
-    </tr>
-<% } %>
     <tr>
       <td>Compare to</td>
       <td>
-        <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023 || f.chainID == 61000)) {
+        <% if ( f.chainID && (f.chainID == 2004 || f.chainID == 22023 || f.chainID == 1 || f.chainID == 1284)) {
             let externalURL;
             let imgURL;
-            if (f.chainID == 2004){
+            if (f.chainID == 2004 || f.chainID == 1284){
                 externalURL = `https://moonscan.io`
                 imgURL =  "https://cdn.polkaholic.io/moonscan.svg"
-            }else if (f.chainID == 22023){
+            }else if (f.chainID == 22023 || f.chainID == 1285){
                 externalURL = `https://moonriver.moonscan.io`
                 imgURL =  "https://cdn.polkaholic.io/moonriverscan.svg"
-            }else if (f.chainID == 61000){
-                externalURL = `https://moonbase.moonscan.io`
-                imgURL =  "https://polkadot.js.org/apps/static/moonbase_alpha.1299ae1a..png"
-            }
+ 	    }else if (f.chainID == 1){
+                externalURL = `https://etherscan.io`
+                imgURL =  "https://cdn.polkaholic.io/ethereum.png"
+	    }
            let txURL = `${externalURL}/tx/${f.transactionHash}`;
            %>
         <a href="<%= txURL; %>" target="_new"><img src="<%= imgURL; %>" width="16"></a>

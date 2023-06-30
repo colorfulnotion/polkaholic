@@ -26,9 +26,6 @@ const assetAndPriceFeedTTL = 300; // how long the data stays cached
 module.exports = class Query extends AssetManager {
     debugLevel = paraTool.debugNoLog;
 
-    contractABIs = false;
-    contractABISignatures = {};
-
     constructor(debugLevel = paraTool.debugNoLog) {
         super()
 
@@ -953,6 +950,12 @@ module.exports = class Query extends AssetManager {
                 } else if (rowData["feedxcmdest"]) {
                     data = rowData["feedxcmdest"]
                     res.status = 'finalizeddest'
+                } else if (rowData["evmtx"]) {
+                    data = rowData["evmtx"]
+                    res.status = 'finalized';
+                } else if (rowData["evmtxunfinalized"]) {
+                    data = rowData["evmtxunfinalized"]
+                    res.status = 'unfinalized';
                 } else if (rowData["feed"]) {
                     // finalized
                     data = rowData["feed"]
@@ -1612,6 +1615,36 @@ module.exports = class Query extends AssetManager {
         return false
     }
 
+    async get_tx_link(f, txHash, finalized = false) {
+        for (const hash of Object.keys(f)) {
+            const cell = f[hash][0];
+            let c = JSON.parse(cell.value);
+            try {
+                let chainID = c.chainID
+                let bn = c.bn
+                let r = await this.fetch_evm_block_gs(chainID, bn);
+                let [bl, targetTrace] = await this.decorate_block_transaction_trace(r, chainID, txHash)
+                //******* TODO: use targetTrace somehow!!! ******
+                if (bl && Array.isArray(bl.transactions)) {
+                    let tx = bl.transactions[0]
+                    tx.finalized = finalized;
+                    tx.status = finalized ? "finalized" : "unfinalized";
+                    //tx.chainID = c.chainID;
+                    tx.chainName = this.getChainName(c.chainID)
+                    //TODO: update txn.transactionsInternal to use new format
+                    tx.transactionsInternal = []
+                    return tx;
+                } else {
+                    return false
+                }
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        return null;
+    }
+
+
     async getTransaction(txHash, decorate = true, decorateExtra = ["usd", "address", "related", "data"], isRecursive = true) {
         //console.log(`getTransaction txHash=${txHash}, decorate=${decorate}, decorateExtra=${decorateExtra}`)
         let [decorateData, decorateAddr, decorateUSD, decorateRelated] = this.getDecorateOption(decorateExtra)
@@ -1628,6 +1661,7 @@ module.exports = class Query extends AssetManager {
             const [row] = await this.btHashes.row(txHash).get({
                 filter
             });
+
             let rowData = row.data;
             let feedData = false
             let feedTX = false
@@ -1650,7 +1684,11 @@ module.exports = class Query extends AssetManager {
                 status = "pending"
                 isPending = true
             }
-            if (feedData && feedData["tx"]) {
+            if (rowData["evmtx"]) {
+                return await this.get_tx_link(rowData["evmtx"], txHash, true);
+            } else if (rowData["evmtxunfinalized"]) {
+                return await this.get_tx_link(rowData["evmtxunfinalized"], txHash, false);
+            } else if (feedData && feedData["tx"]) {
                 feedTX = feedData["tx"]
             }
             if (rowData["xcminfofinalized"]) {
@@ -2604,10 +2642,90 @@ module.exports = class Query extends AssetManager {
         return trace
     }
 
+    async decorate_block_transaction_trace(r, chainID, txHash) {
+        //let tableIdDisabled = true
+        //await this.initEvmSchemaMap(tableIdDisabled)
+        console.log(`decorate_block_transaction_trace txHash=${txHash}`)
+        //console.log('decorate_evm_block', r)
+        //let evmRPCInternalApi = this.evmRPCInternal
+        let blkNum = false
+        let blkHash = false
+        let blockTS = false
+        let blockAvailable = false
+        let traceAvailable = false
+        let receiptsAvailable = false
+        let rpcBlock = r.block
+        let rpcReceipts = r.receipts
+        let rpcTraces = r.traces
+        let evmReceipts = []
+        let evmTrace = false
+        let blk = false
+        let stream_bq = false
+        let write_bt = false
+        let targetTrace = false;
+        let transactionIndex;
+        for (const txn of rpcBlock.transactions) {
+            if (txn.hash == txHash) {
+                transactionIndex = paraTool.dechexToInt(txn.transactionIndex)
+                console.log(`${txHash} txfound[${transactionIndex}]`)
+                break
+            }
+        }
+        if (transactionIndex == undefined) {
+            console.log(`lookup failed!`)
+            return [false, false]
+        }
+        if (rpcBlock) {
+            blockAvailable = true
+            let targetTxn = rpcBlock.transactions[transactionIndex]
+            rpcBlock.transactions = [targetTxn]
+            blk = ethTool.standardizeRPCBlock(rpcBlock)
+            blkNum = blk.number;
+            blkHash = blk.hash;
+            blockTS = blk.timestamp;
+        } else {
+            console.log(`rpcBlock missing`, r)
+        }
+        if (rpcTraces) {
+            targetTrace = rpcTraces[transactionIndex]
+            traceAvailable = true
+            evmTrace = [targetTrace]
+        } else {
+            console.log(`rpcTraces missing`, r)
+        }
+        if (rpcReceipts) {
+            receiptsAvailable = true
+            let targetReceipt = rpcReceipts[transactionIndex]
+            evmReceipts = ethTool.standardizeRPCReceiptLogs([targetReceipt])
+        } else {
+            console.log(`rpcReceipts missing`, r)
+        }
+        /*
+        console.log(`blk`, blk)
+        console.log(`evmReceipts`, evmReceipts)
+        console.log(`evmTrace`, evmTrace)
+        */
+        console.log(`decorate_block_transaction [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
+        var statusesPromise = Promise.all([
+            this.processTransactions(blk.transactions),
+            this.processReceipts(evmReceipts)
+        ])
+        let [dTxns, dReceipts] = await statusesPromise
+
+        // TODO: USE TRANSFORM BLOCK
+        console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
+        console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
+        let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
+        //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
+        //fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID)
+        let evmBlockTransaction = await ethTool.fuseBlockTransactionReceipt(blk, blk.transactions, dReceipts, flatTraces, chainID)
+        //console.log(`evmBlockTransaction`, evmBlockTransaction)
+        console.log(JSON.stringify(evmBlockTransaction))
+        return [evmBlockTransaction, targetTrace]
+    }
+
     async decorate_evm_block(chainID, r) {
         console.log('decorate_evm_block', r)
-        let contractABIs = this.contractABIs;
-        let contractABISignatures = this.contractABISignatures;
         //let evmRPCInternalApi = this.evmRPCInternal
 
         let blkNum = false
@@ -2648,17 +2766,18 @@ module.exports = class Query extends AssetManager {
         //console.log(`blk.transactions`, blk.transactions)
         console.log(`decorate_evm_block [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
         var statusesPromise = Promise.all([
-            ethTool.processTransactions(blk.transactions, contractABIs, contractABISignatures),
-            ethTool.processReceipts(evmReceipts, contractABIs, contractABISignatures)
+            this.processTransactions(blk.transactions),
+            this.processReceipts(evmReceipts)
         ])
         let [dTxns, dReceipts] = await statusesPromise
+
+        // TODO: USE TRANSFORM BLOCK
         console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
         console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
         let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
         //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
         //fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID)
         let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(blk, blk.transactions, dReceipts, flatTraces, chainID)
-        //let evmFullBlock = await ethTool.fuseBlockTransactionReceipt(blk, dTxns, dReceipts, flatTraces, chainID)
         return evmFullBlock;
     }
 
@@ -3621,7 +3740,33 @@ module.exports = class Query extends AssetManager {
                     try {
                         let assetInfo = this.assetInfo[assetChain];
                         if (assetInfo == undefined) {
-                            // console.log("NO ASSETINFO", assetChain, "asset", asset, "chainID", chainID, cell[0].value);
+                            try {
+                                let assetType = "Token"; // /ERC20/ERC20LP/...
+                                if (realtime[assetType] == undefined) {
+                                    realtime[assetType] = [];
+                                }
+                                let c = JSON.parse(cell[0].value);
+                                if (c.symbol && c.balance) {
+                                    let chainName = this.getChainName(chainID);
+                                    realtime[assetType].push({
+                                        assetChain,
+                                        assetInfo: {
+                                            asset,
+                                            chainName,
+                                            symbol: c.symbol,
+                                            chainID,
+                                            assetName: c.symbol,
+                                            assetType
+                                        },
+                                        state: {
+                                            free: c.balance,
+                                            balanceUSD: c.valueUSD
+                                        }
+                                    })
+                                }
+                            } catch (err) {
+                                console.log(err)
+                            }
                         } else {
                             let assetType = assetInfo.assetType;
                             if (realtime[assetType] == undefined) {
@@ -3643,7 +3788,6 @@ module.exports = class Query extends AssetManager {
                 }
             }
         }
-
         let totalUSDVal = await this.compute_holdings_USD(realtime);
 
         let current = [];
@@ -3663,6 +3807,7 @@ module.exports = class Query extends AssetManager {
                 }
             }
         }
+        console.log("REALTIME", realtime, "totalUSDVAL", totalUSDVal, "current", current);
 
         if (evmcontractData) {
             let lastCellTS = {};
@@ -4204,7 +4349,7 @@ module.exports = class Query extends AssetManager {
                 let rowData = row.data;
                 [realtime, contract, labels] = await this.get_account_realtime(address, rowData["realtime"], rowData["evmcontract"], rowData["wasmcontract"], rowData["label"], [])
             } catch (err) {
-
+                console.log(err);
             }
             let w = chainID ? `and asset.chainID = '${chainID}'` : ''
             let sql = `select asset.creator, asset.assetType, asset.createdAtTx, unix_timestamp(asset.createDT) as createTS, asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' ${w}`
@@ -4723,7 +4868,7 @@ module.exports = class Query extends AssetManager {
                         evmTx = args.transaction.v2
                     }
                     if (decorate && evmTx) {
-                        let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                        let output = this.decodeTransactionInput(evmTx)
                         if (output != undefined) {
                             args.decodedEvmInput = output
                         }
@@ -4737,7 +4882,7 @@ module.exports = class Query extends AssetManager {
                     if (args.xcm_transaction.v1 != undefined) evmTx = args.xcm_transaction.v1
                     if (args.xcm_transaction.v2 != undefined) evmTx = args.xcm_transaction.v2
                     if (decorate && evmTx) {
-                        let output = ethTool.decodeTransactionInput(evmTx, this.contractABIs, this.contractABISignatures)
+                        let output = this.decodeTransactionInput(evmTx)
                         if (output != undefined) {
                             args.decodedEvmInput = output
                         }

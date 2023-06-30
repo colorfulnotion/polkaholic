@@ -1011,6 +1011,7 @@ FROM
         free, reserved, misc_frozen, frozen,
         free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
         free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
+        flags_raw,
         blockTS, bn) {
         let newState = {
             ts: blockTS,
@@ -1050,6 +1051,10 @@ FROM
             if (frozen_usd > 0) {
                 newState.frozen_usd = frozen_usd;
             }
+        }
+
+        if (flags_raw) {
+            newState.flags_raw = flags_raw;
         }
 
         let rec = {};
@@ -1248,6 +1253,7 @@ FROM
                                         balance, 0, 0, 0,
                                         free_usd, 0, 0, 0,
                                         free_raw, "", "", "",
+                                        "",
                                         blockTS, bn));
                                     console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
                                 }
@@ -1385,6 +1391,7 @@ FROM
                                     free, reserved, misc_frozen, frozen,
                                     free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
                                     free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
+                                    "",
                                     blockTS, bn));
                             }
                         }
@@ -2143,6 +2150,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                 let reserved_raw = balance.reserved ? paraTool.dechexToIntStr(balance.reserved.toString()) : "";
                 let misc_frozen_raw = balance.miscFrozen ? paraTool.dechexToIntStr(balance.miscFrozen.toString()) : "";
                 let frozen_raw = balance.feeFrozen ? paraTool.dechexToIntStr(balance.feeFrozen.toString()) : "";
+                let flags_raw = balance.flags ? balance.flags.toString() : "";
 
                 let free = (free_raw.length > 0) ? free_raw / 10 ** decimals : 0;
                 let reserved = (reserved_raw.length > 0) ? reserved_raw / 10 ** decimals : 0;
@@ -2181,6 +2189,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                             reserved_usd,
                             misc_frozen_usd,
                             frozen_usd,
+                            flags_raw,
                             ts: blockTS,
                             price_usd: priceUSD,
                             nonce: nonce
@@ -2192,6 +2201,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                                 free, reserved, misc_frozen, frozen,
                                 free_usd, reserved_usd, misc_frozen_usd, frozen_usd,
                                 free_raw, reserved_raw, misc_frozen_raw, frozen_raw,
+                                flags_raw,
                                 blockTS, bn));
                         }
                     }
