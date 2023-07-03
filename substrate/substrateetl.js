@@ -4045,11 +4045,11 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             if (bn1 > bnEnd) bn1 = bnEnd;
             let start = paraTool.blockNumberToHex(bn0);
             let end = paraTool.blockNumberToHex(bn1);
-            console.log("FETCHING", bn0, bn1);
             let [rows] = await tableChain.getRows({
                 start: start,
                 end: end
             });
+            let problem = (bn1-bn0+1 != rows.length);
             for (const row of rows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
@@ -4059,13 +4059,21 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 let hdr = b.header;
                 if (r.fork || (!hdr || hdr.number == undefined) || (logDT != logDT0)) {
                     let rowId = paraTool.blockNumberToHex(bn);
-                    if (r.fork) console.log("FORK!!!! DELETE ", bn, rowId);
+                    if (r.fork) {
+			console.log("FORK!!!! DELETE ", bn, rowId);
+			await tableChain.row(rowId).delete();
+		    }
                     if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
-                    if (logDT != logDT0) console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
-                    //await tableChain.row(rowId).delete();
+                    if (logDT != logDT0) {
+			console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
+			let sql = `update block${chainID} set crawlBlock = 1 where blockNumber = '${bn}'`;
+			this.batchedSQL.push(sql);
+			await this.update_batchedSQL();
+		    }
                     continue;
-                }
-                found[hdr.number] = true;
+                } else {
+                    found[bn] = true;
+		}
 
                 let spec_version = this.getSpecVersionForBlockNumber(chainID, hdr.number);
 
@@ -4420,7 +4428,18 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     });
                 }
             }
+	    if ( problem ) {
+		for ( let c = bn0; c <= bn1; c++) {
+		    if ( found[c] == undefined ) {
+			let sql = `update block${chainID} set crawlBlock = 1 where blockNumber = '${c}'`;
+			console.log(sql);
+			this.batchedSQL.push(sql);
+			await this.update_batchedSQL();
+		    }
+		}
+	    }
         }
+	
         // optimization: don't load every day, only on days where there is an actually new specversion
         if (specversions && f["specversions"]) {
             specversions.forEach((s) => {

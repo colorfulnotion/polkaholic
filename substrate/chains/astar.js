@@ -14,7 +14,7 @@ module.exports = class AstarParser extends ChainParser {
     xcmTransferMethodList = ["0xecf766ff", "0x019054d0", "0x106d59fe", "0x400c0e8d"];
     xcmTransactorMethodList = ["0xf90eb212"];
 
-    processWasmContracts(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false) {
+    processWasmContracts(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false, depth = 0, idx = 0) {
         let module_section = section;
         let module_method = method
         if (section == false && section == false) {
@@ -33,7 +33,7 @@ module.exports = class AstarParser extends ChainParser {
                 let c_args = c.args
                 //console.log(`[${extrinsic.extrinsicID}] call`, i, call_section, call_method, c);
                 i++;
-                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args)
+                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args, depth+1, i)
             }
         } else if (args.call != undefined) {
             let call = args.call
@@ -44,7 +44,7 @@ module.exports = class AstarParser extends ChainParser {
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
             if (!isHexEncoded && call_args != undefined) {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
-                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args)
+                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args, depth+1)
             } else {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
             }
@@ -52,8 +52,10 @@ module.exports = class AstarParser extends ChainParser {
         switch (section_method) {
             case 'contracts:call': //contract write
                 //0xd4ffe56c661d718cd4ca6039c0d5519aa3d20b0f32d6b18dc4809d60dd7b3d03
-                let contactWrite = this.processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args)
-                //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contactWrite)
+                let callID = `${extrinsic.extrinsicID}-${depth}-${idx}`
+                let contractWrite = this.processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID)
+                if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contractWrite)
+                indexer.addWasmContractCall(contractWrite);
                 break;
             case 'contracts:instantiate': //contract deploy with available codehash
                 //0x7e020cd122a51d4f037f95a86761f6af33228d0a8c68f8f79fd1f27c17885914
@@ -84,20 +86,22 @@ module.exports = class AstarParser extends ChainParser {
     }
 
     processWasmDest(dest) {
-        let destAddress = false
-        if (dest == undefined) return destAddress
+        let address = null
+        let address_ss58
+
         try {
             let destK = Object.keys(dest)[0]
             let destV = dest[destK]
             if (destK == 'id' || destK == 'address20' || destK == 'address32') {
-                destAddress = paraTool.getPubKey(destV)
+                address = paraTool.getPubKey(destV);
+                address_ss58 = destV;
             } else {
                 //index, raw ??
             }
         } catch (e) {
             //console.log(`processWasmDest error=${e.toString()}`)
         }
-        return destAddress
+        return { address, address_ss58 }
     }
 
     contractsEventFilter(palletMethod) {
@@ -133,7 +137,7 @@ module.exports = class AstarParser extends ChainParser {
         return wasmContractsEvents
     }
 
-    processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args) {
+    processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID) {
         /*
         Makes a call to an account, optionally transferring some balance.
         # Parameters
@@ -167,26 +171,31 @@ module.exports = class AstarParser extends ChainParser {
           "data": "0xdb20f9f52c8feeab5bd9a317375e01adb6cb959f1fea78c751936d556fa2e36ede425a4740e2010000000000000000000000000000"
         }
         */
-        //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
+        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}] EXTINRIC`, extrinsic , `ARGS:`, args)
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
+        let { address, address_ss58 } = this.processWasmDest(args.dest)
         let r = {
+            callID: callID,
             chainID: indexer.chainID,
+            network: indexer.getIDByChainID(indexer.chainID),
             extrinsicHash: extrinsic.extrinsicHash,
             extrinsicID: extrinsic.extrinsicID,
             blockNumber: this.parserBlockNumber,
             blockTS: this.parserTS,
-            contractAddress: this.processWasmDest(args.dest), //???
+            contractAddress: address,
+            address_ss58,
             value: paraTool.dechexToInt(args.value),
-            gasLimit: paraTool.dechexToInt(args.gas_limit),
-            storageDepositLimit: args.storage_deposit_limit,
+            gasLimit: args.gas_limit ? JSON.stringify(args.gas_limit) : null,
+            storageDepositLimit: args.storage_deposit_limit ? args.storage_deposit_limit : null,
+            caller: paraTool.getPubKey(extrinsic.signer),
+            caller_ss58: extrinsic.signer,
             data: args.data,
-            events: wasmContractsEvents,
-            decodedInput: [], //stub
-            decodedEvents: [], //stub
+            events: wasmContractsEvents
         }
+        console.log(r);
         for (const ev of wasmContractsEvents) {
             let eventMethodSection = `${ev.section}(${ev.method})`
-            //console.log(`[${ev.eventID}] ${eventMethodSection}`, ev)
+            console.log(ev);
             if (eventMethodSection == 'contracts(ContractEmitted)') {
                 // WARNING: contract address here is not the same as called contract
                 /* contractAddr, encodedEvents ["anCpiHdWuGUiQbsrqsbmYyRzdG4zP8LzmnyDy9GZxQS28Yq","0x000001d2ae8d7ab7db366b2451da59e1af3eb2398315c512d0cc400a9d70566f76e96040420f00000000000000000000000000"]*/
@@ -212,6 +221,7 @@ module.exports = class AstarParser extends ChainParser {
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
+	    network: indexer.getIDByChainID(indexer.chainID),
             extrinsicHash: extrinsic.extrinsicHash,
             extrinsicID: extrinsic.extrinsicID,
             blockNumber: this.parserBlockNumber,
@@ -234,7 +244,9 @@ module.exports = class AstarParser extends ChainParser {
             if (eventMethodSection == 'contracts(Instantiated)') {
                 /* deployer, contract ["ZM24FujhBK3XaDsdkpYBf4QQAvRkoMq42aqrUQnxFo3qrAw","aCwSHJ6wyKHFrYBMFqEpNQ4xPzw7nm3jLv9u3fH7eWMPj6z"]*/
                 r.deployer = paraTool.getPubKey(ev.data[0])
+                r.deployer_ss58 = ev.data[0]
                 r.contractAddress = paraTool.getPubKey(ev.data[1])
+                r.address_ss58 = ev.data[1]
             }
         }
         return r
@@ -257,6 +269,7 @@ module.exports = class AstarParser extends ChainParser {
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
+	    network: indexer.getIDByChainID(indexer.chainID),
             extrinsicHash: extrinsic.extrinsicHash,
             extrinsicID: extrinsic.extrinsicID,
             blockNumber: this.parserBlockNumber,
@@ -277,13 +290,17 @@ module.exports = class AstarParser extends ChainParser {
             let eventMethodSection = `${ev.section}(${ev.method})`
             //console.log(`[${ev.eventID}] ${eventMethodSection}`, ev)
             if (eventMethodSection == 'contracts(CodeStored)') {
-                r.codeHash = ev.data[0] //eastablish mapping between code <-> codeHash
+                r.codeHash = ev.data[0] //establish mapping between code <-> codeHash
                 r.withCode = true
             }
             if (eventMethodSection == 'contracts(Instantiated)') {
                 /* deployer, contract ["ZM24FujhBK3XaDsdkpYBf4QQAvRkoMq42aqrUQnxFo3qrAw","aCwSHJ6wyKHFrYBMFqEpNQ4xPzw7nm3jLv9u3fH7eWMPj6z"]*/
+                r.storer = paraTool.getPubKey(ev.data[0])
+                r.storer_ss58 = ev.data[0]
                 r.deployer = paraTool.getPubKey(ev.data[0])
+                r.deployer_ss58 = ev.data[0]
                 r.contractAddress = paraTool.getPubKey(ev.data[1])
+                r.address_ss58 = ev.data[1]
             }
         }
         return r

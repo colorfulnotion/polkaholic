@@ -6536,7 +6536,7 @@ module.exports = class Query extends AssetManager {
     async getWASMCode(codeHash, chainID = null) {
         try {
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
-            let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, extrinsicID, extrinsicHash, language, compiler, storer, metadata, status, convert(srcURLs using utf8) srcURLs, verifier, convert(authors using utf8) authors, contractName, verifyDT from wasmCode where codeHash = '${codeHash}' ${w}`
+            let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, extrinsicID, extrinsicHash, language, compiler, storer, storer_ss58, CONVERT(metadata using utf8) metadata, status, convert(srcURLs using utf8) srcURLs, verifier, convert(authors using utf8) authors, contractName, verifyDT from wasmCode where codeHash = '${codeHash}' ${w}`
             let wasmCodes = await this.poolREADONLY.query(sql);
 
             if (wasmCodes.length == 0) {
@@ -6546,14 +6546,18 @@ module.exports = class Query extends AssetManager {
             }
             let wasmCode = wasmCodes[0];
             wasmCode.wasm = wasmCode.wasm.toString();
-            wasmCode.metadata = wasmCode.metadata ? wasmCode.metadata.toString() : null;
+            try {
+		wasmCode.metadata = JSON.parse(wasmCode.metadata);
+	    } catch (err) {
+		console.log(err);
+	    }
             let [_, id] = this.convertChainID(wasmCode.chainID)
             let chainName = this.getChainName(wasmCode.chainID);
             wasmCode.id = id;
             wasmCode.chainName = chainName;
 
             // fetch all the contracts
-            sql = `select chainID, address, extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer from contract where codeHash ='${codeHash}' and chainID = '${wasmCode.chainID}'`
+            sql = `select chainID, address, address_ss58, extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer, deployer_ss58 from contract where codeHash ='${codeHash}' and chainID = '${wasmCode.chainID}'`
             let contracts = await this.poolREADONLY.query(sql);
             for (const c of contracts) {
                 c.id = id;
@@ -6591,7 +6595,7 @@ module.exports = class Query extends AssetManager {
     async getWASMContract(address, chainID = null) {
         address = paraTool.getPubKey(address);
         let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
-        let sql = `select address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, authors, contractName, verifyDT, verifier from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
+        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, authors, contractName, verifyDT, verifier from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
         let contracts = await this.poolREADONLY.query(sql);
         if (contracts.length == 0) {
             // return not found error
@@ -6609,7 +6613,7 @@ module.exports = class Query extends AssetManager {
             contract.constructor = contract.constructor;
             contract.salt = contract.salt;
             contract.wasm = contract.wasm;
-            contract.metadata = contract.metadata;
+            contract.metadata = contract.metadata ? JSON.parse(contract.metadata) : null;
         } catch (e) {
             console.log(e)
         }
@@ -6620,7 +6624,7 @@ module.exports = class Query extends AssetManager {
     async getChainWASMContracts(chainID_or_chainName) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         let chainName = this.getChainName(chainID);
-        let sql = `select address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, blockTS, deployer, status, language, compiler
+        let sql = `select address, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, blockTS, deployer, deployer_ss58, status, language, compiler
  from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where contract.chainID = '${chainID}' order by blockTS desc`
         let contracts = await this.poolREADONLY.query(sql);
         for (let i = 0; i < contracts.length; i++) {
@@ -6639,7 +6643,7 @@ module.exports = class Query extends AssetManager {
     async getChainWASMCode(chainID_or_chainName) {
         let [chainID, id] = this.convertChainID(chainID_or_chainName)
         let chainName = this.getChainName(chainID);
-        let sql = `select chainID, extrinsicHash, extrinsicID, codeHash, codeStoredBN, storer, status, codeStoredTS, language, compiler from wasmCode where chainID = '${chainID}' order by codeStoredTS desc`
+        let sql = `select chainID, extrinsicHash, extrinsicID, codeHash, codeStoredBN, storer, storer_ss58, status, codeStoredTS, language, compiler from wasmCode where chainID = '${chainID}' order by codeStoredTS desc`
         let code = await this.poolREADONLY.query(sql);
         for (let i = 0; i < code.length; i++) {
             let c = code[i];
@@ -6736,7 +6740,8 @@ module.exports = class Query extends AssetManager {
                 "keys": ["codeHash", "chainID"],
                 "vals": vals,
                 "data": [`('${codeHash}', '${chainID}', ${mysql.escape(wasm)}, ${mysql.escape(metadata)}, '${status}', ${mysql.escape(language)}, ${mysql.escape(compiler)}, ${mysql.escape(contractName)}, ${mysql.escape(version)}, ${mysql.escape(authors)}, ${mysql.escape(JSON.stringify(srcURLs))}, Now(), ${mysql.escape(signature)}, ${mysql.escape(verifier)} )`],
-                "replaceIfNull": vals
+		"replace": ["status"],
+                "replaceIfNull": ["wasm", "metadata", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier"]
             });
             return (true)
         } catch (err) {

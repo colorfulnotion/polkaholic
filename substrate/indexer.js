@@ -109,6 +109,7 @@ module.exports = class Indexer extends AssetManager {
     isMarkedForExit = false;
 
     wasmContractMap = {};
+    wasmContractCallMap = {};
     ably_client = null;
     ably_channel_xcmindexer = null;
     ably_channel_xcminfo = null;
@@ -842,37 +843,56 @@ module.exports = class Indexer extends AssetManager {
 
     async flushWasmContracts() {
         let wasmCodes = []
-        let wasmContracts = []
+        let wasmContracts = [];
+        let wasmContractCalls = [];
         let btHashes_rows = [];
         let btRealtime_rows = [];
-        console.log(this.wasmContractMap);
+
+        for (const k of Object.keys(this.wasmContractCallMap)) {
+            let w = this.wasmContractCallMap[k]
+            let t = `('${w.callID}', '${w.chainID}', '${w.network}', '${w.contractAddress}', '${w.address_ss58}',  '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', ${mysql.escape(w.caller)}, ${mysql.escape(w.caller_ss58)}, ${mysql.escape(w.gasLimit)}, '${w.blockTS}', ${mysql.escape(w.storageDepositLimit)}, '${w.value}')`
+            wasmContractCalls.push(t)
+        }
+        this.wasmContractCallMap = {};
+        let sqlDebug = true
+        let contractsCallVal = ["network", "address", "address_ss58",  "extrinsicHash", "extrinsicID", "blockNumber", "caller", "caller_ss58", "gasLimit", "blockTS", "storageDepositLimit", "value"]
+        await this.upsertSQL({
+            "table": `contractsCall`,
+            "keys": ["callID", "chainID"],
+            "vals": contractsCallVal,
+            "data": wasmContractCalls,
+            "replace": contractsCallVal,
+        }, sqlDebug);
+
         for (const k of Object.keys(this.wasmContractMap)) {
             let w = this.wasmContractMap[k]
             if (w.withCode) {
-                //["codeHash", "chainID"] + ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
-                let c = `('${w.codeHash}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}', '${w.deployer}')`
+                //["codeHash", "chainID"] + ["network", "extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer", "storer_ss58"]
+                let c = `('${w.codeHash}', '${w.chainID}', '${w.network}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.code}', '${w.blockNumber}', '${w.blockTS}', ${mysql.escape(w.storer)}, ${mysql.escape(w.storer_ss58)})`
                 wasmCodes.push(c)
                 let d = {
                     codeHash: w.codeHash,
-                    // contractType: "TODO",
+                    network: w.network,
                     chainID: w.chainID,
                     extrinsicHash: w.extrinsicHash,
                     extrinsicID: w.extrinsicID,
                     codeStoredBN: w.blockNumber,
                     codeStoredTS: w.blockTS,
-                    deployer: w.deployer,
+                    storer: w.storer,
+                    storer_ss58: w.storer_ss58
                 }
                 this.add_index_metadata(d);
                 this.push_rows_related_keys("wasmcode", w.chainID.toString(), btHashes_rows, w.codeHash, d)
             }
             //["address", "chainID"] + ["extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer"]
-            let t = `('${w.contractAddress}', '${w.chainID}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', '${w.codeHash}', '${w.constructor}', '${w.salt}', '${w.blockTS}', '${w.deployer}')`
+            let t = `('${w.contractAddress}', '${w.chainID}', '${w.network}', '${w.address_ss58}', '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', '${w.codeHash}', '${w.constructor}', '${w.salt}', '${w.blockTS}', '${w.deployer}', '${w.deployer_ss58}')`
             wasmContracts.push(t)
 
             // write u = { address, chainID, codeHash, blockTS, deployer, ... }  to btRealtime wasmcontract:${chainID}
             let u = {
                 address: w.contractAddress,
                 chainID: w.chainID,
+                network: w.network,
                 extrinsicHash: w.extrinsicHash,
                 extrinsicID: w.extrinsicID,
                 instantiateBN: w.blockNumber,
@@ -881,15 +901,14 @@ module.exports = class Indexer extends AssetManager {
                 salt: w.salt,
                 blockTS: w.blockTS,
                 deployer: w.deployer,
+                deployer_ss58: w.deployer_ss58
             }
             this.add_index_metadata(u);
             this.push_rows_related_keys("wasmcontract", w.chainID.toString(), btRealtime_rows, w.contractAddress, u)
         }
         this.wasmContractMap = {};
 
-        // --- multiaccount no update
-        let sqlDebug = true
-        let wasmCodeVal = ["extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer"]
+        let wasmCodeVal = ["network", "extrinsicHash", "extrinsicID", "wasm", "codeStoredBN", "codeStoredTS", "storer", "storer_ss58"]
         await this.upsertSQL({
             "table": `wasmCode`,
             "keys": ["codeHash", "chainID"],
@@ -898,7 +917,7 @@ module.exports = class Indexer extends AssetManager {
             "replace": wasmCodeVal,
         }, sqlDebug);
 
-        let wasmContractVal = ["extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer"]
+        let wasmContractVal = ["network", "address_ss58", "extrinsicHash", "extrinsicID", "instantiateBN", "codeHash", "constructor", "salt", "blockTS", "deployer", "deployer_ss58"]
         await this.upsertSQL({
             "table": `contract`,
             "keys": ["address", "chainID"],
@@ -1402,6 +1421,11 @@ module.exports = class Indexer extends AssetManager {
             }
         }
     }
+    addWasmContractCall(contractWrite) {
+        //if (this.debugLevel >= paraTool.debugInfo) console.log(`addWasmContractCall withCode=${withCode}`)
+        this.wasmContractCallMap[contractWrite.callID] = contractWrite
+    }
+
 
     addWasmContract(wasmContract, withCode = false) {
         //if (this.debugLevel >= paraTool.debugInfo) console.log(`addWasmContract withCode=${withCode}`)
@@ -9487,8 +9511,6 @@ module.exports = class Indexer extends AssetManager {
             let indexTS = Math.floor(blockTS / 3600) * 3600;
             if (typeof blockTS === "undefined" || blockTS === false) {
                 blockTS = this.synthetic_blockTS(this.chainID, blockNumber);
-            } else {
-                console.log("***!*$!*$*!*$*@#", blockTS);
             }
             if (!parentHash) {
                 console.log(`missing parentHash! bn=${blockNumber}`, r.block, r.block.header);

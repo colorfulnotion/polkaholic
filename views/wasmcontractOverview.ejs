@@ -17,12 +17,11 @@ let f = contract;
     </tr>
 
     <tr>
-      <td>Created</td>
+      <td>Instantiated</td>
       <td>
-	<%= uiTool.presentTS(f.blockTS); %>
+	<%= uiTool.presentTS(f.blockTS); %> @ <a href='/blocks/<%= f.chainID; %>'><%= f.chainName; %></a> <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.instantiateBN}); %>
       </td>
     </tr>
-
     <tr>
       <td>Salt</td>
       <td><%= f.salt %></td>
@@ -30,23 +29,7 @@ let f = contract;
 
     <tr>
       <td>Deployer</td>
-      <td><%- uiTool.presentID(f.deployer) %></td>
-    </tr>
-
-    <tr>
-      <td>Chain</td>
-      <td>
-        <a href='/blocks/<%= f.chainID; %>'><%= f.chainName; %></a>
-        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.sourceBlocknumber}); %>
-      </td>
-    </tr>
-
-    <tr>
-      <td>Instantiated At</td>
-      <td>
-        <a href='/blocks/<%= f.id; %>'><%= uiTool.capitalizeFirstLetter(f.chainName); %></a>
-        <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.instantiateBN}); %>
-      </td>
+      <td><%- uiTool.presentID(f.deployer_ss58) %></td>
     </tr>
 
     <tr>
@@ -57,16 +40,9 @@ let f = contract;
     </tr>
 
     <tr>
-       <td>WASM Contract Metadata</td>
-       <td>
-       <%- include("decode", {id: "metadata", obj: JSON.parse(contract.metadata), verify: null, size: [] }); %>
-       </td>
-    </tr>
-
-    <tr>
       <td>WASM</td>
       <td>
-          <textarea style='width: 800px; height: 400px'><%- contract.wasm %></textarea>
+          <textarea style='width: 800px; height: 200px' disabled><%- contract.wasm %></textarea>
       </td>
     </tr>
   </tbody>

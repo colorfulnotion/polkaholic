@@ -31,7 +31,7 @@ function showcodecontracts(codeHash) {
             [3, "desc"]
         ],
         columns: [{
-            data: 'address',
+            data: 'address_ss58',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     return presentWASMContract(data);
@@ -70,7 +70,7 @@ function showcodecontracts(codeHash) {
                 }
             }
         }, {
-            data: 'deployer',
+            data: 'deployer_ss58',
             render: function(data, type, row, meta) {
                 if (type == 'display') {
                     return presentIDwithIdenticon(data)

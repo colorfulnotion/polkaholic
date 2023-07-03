@@ -174,12 +174,6 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
        <script>function decodeWASM() { decodeWASMContractsCall('<%= f.chainID %>', <%- JSON.stringify(f.params); %>, <%- JSON.stringify(f.metadata); %>, "decodedWASM"); }</script>
        </td>
     </tr>
-    <tr>
-       <td><%- include("tooltip", {k: "wasmcontractmetadata"}) %>WASM Contract Metadata</td>
-       <td>
-       <%- include("decode", {id: "metadata", obj: JSON.parse(f.metadata), verify: null, size: [] }); %>
-       </td>
-    </tr>
 <% } %>
     <tr>
 <% if ( f.xcmdest == undefined && false) { %>
