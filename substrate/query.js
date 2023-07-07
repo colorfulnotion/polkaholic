@@ -1644,6 +1644,15 @@ module.exports = class Query extends AssetManager {
         return null;
     }
 
+    async getContractsCall(extrinsicHash) {
+        let sql = `select identifier, CONVERT(decodedCall using utf8) as decodedCall from contractsCall where extrinsicHash = '${extrinsicHash}' order by blockTS desc limit 1`;
+        console.log(sql);
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length > 0) {
+            return recs[0];
+        }
+        return null;
+    }
 
     async getTransaction(txHash, decorate = true, decorateExtra = ["usd", "address", "related", "data"], isRecursive = true) {
         //console.log(`getTransaction txHash=${txHash}, decorate=${decorate}, decorateExtra=${decorateExtra}`)
@@ -1702,6 +1711,7 @@ module.exports = class Query extends AssetManager {
                 if (!paraTool.auditHashesTx(c)) {
                     console.log(`Audit Failed`, txHash)
                 }
+
                 if (c.transactionHash) {
                     // this is an EVM tx
                     let assetChain = c.to ? paraTool.makeAssetChain(c.to.toLowerCase(), c.chainID) : null;
@@ -5034,20 +5044,17 @@ module.exports = class Query extends AssetManager {
                 if (section == "contracts" && method == "call") {
                     let args = ext.params
                     if (args.dest != undefined && args.dest.id != undefined) {
-                        try {
-                            // decode the call data using in the browser
-                            let wasmContract = await this.getWASMContract(args.dest.id, chainID)
-                            if (wasmContract && wasmContract.metadata) {
-                                decoratedExt.metadata = wasmContract.metadata;
+                        // we could decode on the fly here but we need more ABIs!!!
+                        let contractsCall = await this.getContractsCall(ext.extrinsicHash);
+                        if (contractsCall) {
+                            if (contractsCall.identifier) {
+                                decoratedExt.identifier = contractsCall.identifier;
                             }
-                        } catch (err) {
-                            console.log(err);
-                            this.logger.error({
-                                "op": "query.decorateParams - contract call",
-                                args,
-                                err
-                            });
+                            if (contractsCall.decodedCall) {
+                                decoratedExt.decodedCall = contractsCall.decodedCall;
+                            }
                         }
+
                     }
                 }
 
@@ -6544,10 +6551,10 @@ module.exports = class Query extends AssetManager {
             let wasmCode = wasmCodes[0];
             wasmCode.wasm = wasmCode.wasm.toString();
             try {
-		wasmCode.metadata = JSON.parse(wasmCode.metadata);
-	    } catch (err) {
-		console.log(err);
-	    }
+                wasmCode.metadata = JSON.parse(wasmCode.metadata);
+            } catch (err) {
+                console.log(err);
+            }
             let [_, id] = this.convertChainID(wasmCode.chainID)
             let chainName = this.getChainName(wasmCode.chainID);
             wasmCode.id = id;
@@ -6592,7 +6599,7 @@ module.exports = class Query extends AssetManager {
     async getWASMContract(address, chainID = null) {
         address = paraTool.getPubKey(address);
         let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
-        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, authors, contractName, verifyDT, verifier from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
+        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, authors, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
         let contracts = await this.poolREADONLY.query(sql);
         if (contracts.length == 0) {
             // return not found error
@@ -6607,9 +6614,6 @@ module.exports = class Query extends AssetManager {
             let chain = await this.getChain(contract.chainID);
             contract.addressPubKey = contract.address
             contract.address = paraTool.getAddress(contract.addressPubKey, chain.ss58Format);
-            contract.constructor = contract.constructor;
-            contract.salt = contract.salt;
-            contract.wasm = contract.wasm;
             contract.metadata = contract.metadata ? JSON.parse(contract.metadata) : null;
         } catch (e) {
             console.log(e)
@@ -6737,7 +6741,7 @@ module.exports = class Query extends AssetManager {
                 "keys": ["codeHash", "chainID"],
                 "vals": vals,
                 "data": [`('${codeHash}', '${chainID}', ${mysql.escape(wasm)}, ${mysql.escape(metadata)}, '${status}', ${mysql.escape(language)}, ${mysql.escape(compiler)}, ${mysql.escape(contractName)}, ${mysql.escape(version)}, ${mysql.escape(authors)}, ${mysql.escape(JSON.stringify(srcURLs))}, Now(), ${mysql.escape(signature)}, ${mysql.escape(verifier)} )`],
-		"replace": ["status"],
+                "replace": ["status"],
                 "replaceIfNull": ["wasm", "metadata", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier"]
             });
             return (true)

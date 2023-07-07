@@ -44,17 +44,7 @@ let cls2 = ( expanded ) ? "show" : "";
     <B>(<%= a.assetName; %>)</B>
   <% } %>
   Balance:<br>
-<% if ( false ) { %>
-  <a id="verifyaccount-<%= chainassets.id %>" class="btn btn-link">Verify</a>
- <script>
-  $("#verifyaccount-<%= chainassets.id %>").on('click', function (e) {
-     verifyExec("<%= chainassets.id %>", {"verification": "account", "id": "<%= chainassets.id %>", "address": "<%= chainassets.ss58Address; %>"}, <%- JSON.stringify(a.state); %>);
-   });
- </script>
-<form id="verifyForm<%= chainassets.id; %>" method="POST" action="/verify" target="VW<%= chainassets.id %>"><input type="hidden" name="verify" value=""/><input type="hidden" name="obj" value=""/></form>
-<% } else { %>
 <%- include("assetinfobutton", {asset: a}); %>
-<% } %>
  </td>
  <td width="60%" align=right>
   <%= uiTool.presentFloat(a.state.balance) %> <%= a.symbol; %><br/>

@@ -1358,12 +1358,12 @@ function encodeNetwork(relayChain = 'kusama') {
 // polkadot-here -> [{"network":"polkadot"},"here"]
 function convertXcmInteriorKeyV1toV2(xcmInteriorKeyV1 = '[{"parachain":2000},{"generalKey":"0x02f4c723e61709d90f89939c1852f516e373d418a8"}]~polkadot') {
     var [xcmInteriorKey, relayChain] = parseXcmInteriorKeyV1(xcmInteriorKeyV1)
-    if ( xcmInteriorKey ) {
-	let network = encodeNetwork(relayChain)
-	if (xcmInteriorKey == 'here') {
+    if (xcmInteriorKey) {
+        let network = encodeNetwork(relayChain)
+        if (xcmInteriorKey == 'here') {
             xcmInteriorKey = '"here"'
-	}
-	return makeXcmInteriorKeyV2(xcmInteriorKey, network)
+        }
+        return makeXcmInteriorKeyV2(xcmInteriorKey, network)
     }
     return null;
 }
@@ -1424,11 +1424,11 @@ function makeXcmInteriorKeyV1(interior, relayChain = 'kusama') {
 }
 
 function parseXcmInteriorKeyV1(xcmInteriorKey = '[{"parachain":2023},{"palletInstance":10}]~kusama') {
-    if ( xcmInteriorKey == typeof "string" ) {
-	let pieces = xcmInteriorKey.split(assetChainSeparator);
-	let assetUnparsed = pieces[0];
-	let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
-	return [assetUnparsed, relayChain];
+    if (xcmInteriorKey == typeof "string") {
+        let pieces = xcmInteriorKey.split(assetChainSeparator);
+        let assetUnparsed = pieces[0];
+        let relayChain = (pieces.length > 1) ? pieces[1] : undefined;
+        return [assetUnparsed, relayChain];
     } else return [null, null]
 }
 

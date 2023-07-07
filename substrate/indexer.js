@@ -850,12 +850,14 @@ module.exports = class Indexer extends AssetManager {
 
         for (const k of Object.keys(this.wasmContractCallMap)) {
             let w = this.wasmContractCallMap[k]
-            let t = `('${w.callID}', '${w.chainID}', '${w.network}', '${w.contractAddress}', '${w.address_ss58}',  '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', ${mysql.escape(w.caller)}, ${mysql.escape(w.caller_ss58)}, ${mysql.escape(w.gasLimit)}, '${w.blockTS}', ${mysql.escape(w.storageDepositLimit)}, '${w.value}')`
+            let decodedCall = w.decodedCall ? JSON.stringify(w.decodedCall) : null;
+            let t = `('${w.callID}', '${w.chainID}', '${w.network}', '${w.contractAddress}', '${w.address_ss58}',  '${w.extrinsicHash}', '${w.extrinsicID}', '${w.blockNumber}', ${mysql.escape(w.caller)}, ${mysql.escape(w.caller_ss58)}, ${mysql.escape(w.gasLimit)}, '${w.blockTS}', ${mysql.escape(w.storageDepositLimit)}, '${w.value}', ${mysql.escape(w.identifier)}, ${mysql.escape(decodedCall)} )`
             wasmContractCalls.push(t)
         }
         this.wasmContractCallMap = {};
         let sqlDebug = true
-        let contractsCallVal = ["network", "address", "address_ss58",  "extrinsicHash", "extrinsicID", "blockNumber", "caller", "caller_ss58", "gasLimit", "blockTS", "storageDepositLimit", "value"]
+        let contractsCallVal = ["network", "address", "address_ss58", "extrinsicHash", "extrinsicID", "blockNumber", "caller", "caller_ss58", "gasLimit", "blockTS", "storageDepositLimit", "value", "identifier", "decodedCall"]
+
         await this.upsertSQL({
             "table": `contractsCall`,
             "keys": ["callID", "chainID"],
@@ -5229,7 +5231,7 @@ module.exports = class Indexer extends AssetManager {
 
 
                 if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
-                    this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
+                    await this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
                 }
 
                 //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet

@@ -1,5 +1,5 @@
 <%- include('header', {chainInfo: chainInfo, title: `${tx.chainName} Extrinsic`}); %>
-<h4>Transaction #<%=`${tx.extrinsicID}`%></h4>
+<h4>Extrinsic #<%=`${tx.extrinsicID}`%></h4>
 <%
 let f = tx;
 let xcmInfoFound = ( f.xcmInfo != undefined &&
@@ -25,11 +25,6 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td><%- include("tooltip", {k: "extrinsictimestamp"}) %>Timestamp</td>
       <td class='date'>
         <%= uiTool.presentTS(f.ts); %>
-      </td>
-    </tr>
-    <tr>
-      <td><%- include("tooltip", {k: "blocktimestamp"}) %>Block Time</td>
-      <td>
         <%= uiTool.presentSecondsAgoTS(f.ts); %>
       </td>
     </tr>
@@ -73,6 +68,58 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td><%- include("tooltip", {k: "finalized"}) %>Finalized</td>
       <td><span id="status"><%- include("finalized", {finalized: (f.status=="finalized" || f.status == "finalizeddest")}); %></span></td>
     </tr>
+    <tr>
+      <td><%- include("tooltip", {k: "result"}) %>Result</td>
+      <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
+    </tr>
+    <tr>
+      <td><%- include("tooltip", {k: "block"}) %>Block</td>
+      <td>
+        <a href='/blocks/<%= f.id; %>'><%= f.chainName; %></a>
+        <%- include("blockNumber", {chainID: f.id, blockNumber: f.blockNumber}); %>
+      </td>
+    </tr>
+
+    <tr>
+      <td><%- include("tooltip", {k: "account"}) %>Sender</td>
+      <td>
+        <% if (f.signer){  %>
+	  <%- uiTool.presentBlockiesOrIdenticon(f.signer, 25) %>
+          <a href='/account/<%= paraTool.getPubKey(f.signer) %>'>
+            <code><%= f.signer; %></code>
+          </a>
+	         <%- uiTool.showAccountInfo(f, "fromAddress") %>
+        <% } else {%>
+          <%- `-`; %>
+        <% } %>
+      </td>
+    </tr>
+
+    <% if ( !xcmInfoFound && assetTransferFound) { %>
+    <tr>
+        <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
+        <td><%- include("assettransferred", {transfers: f.transfers}); %></td>
+    </tr>
+    <% } %>
+    <tr>
+      <td><%- include("tooltip", {k: "module"}) %>Module</td>
+      <td><%- include("module", {chainID: f.id, section: f.section, method: f.method}); %></td>
+    </tr>
+<%  if ( f.section == "contracts" && f.method == "call" && f.identifier ) { %>
+    <tr>
+       <td><%- include("tooltip", {k: "decodedwasm"}) %>Decoded WASM Call Data</td>
+       <td>
+       <button type="button" class="btn-lg btn-primary"><%= f.identifier %></button>
+       <% if ( f.decodedCall ) { %>
+       <code><%- f.decodedCall; %></code>
+       <% } %>
+       </td>
+    </tr>
+<% } %>
+    <tr>
+      <td><%- include("tooltip", {k: "params"}) %>Params</td>
+      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID },  size: []  }); %></td>
+    </tr>
     <% if ( f.lifetime ) { %>
     <tr>
       <td><%- include("tooltip", {k: "lifetime"}) %>Life Time</td>
@@ -86,33 +133,6 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       </td>
     </tr>
     <% } %>
-    <tr>
-      <td><%- include("tooltip", {k: "chain"}) %>Chain</td>
-      <td>
-        <a href='/blocks/<%= f.id; %>'><%= f.chainName; %></a>
-      </td>
-    </tr>
-    <tr>
-      <td><%- include("tooltip", {k: "block"}) %>Block</td>
-      <td>
-        <%- include("blockNumber", {chainID: f.id, blockNumber: f.blockNumber}); %>
-      </td>
-    </tr>
-
-    <tr>
-      <td><%- include("tooltip", {k: "account"}) %>Account</td>
-      <td>
-        <% if (f.signer){  %>
-	  <%- uiTool.presentBlockiesOrIdenticon(f.signer, 25) %>
-          <a href='/account/<%= paraTool.getPubKey(f.signer) %>'>
-            <code><%= f.signer; %></code>
-          </a>
-	         <%- uiTool.showAccountInfo(f, "fromAddress") %>
-        <% } else {%>
-          <%- `-`; %>
-        <% } %>
-      </td>
-    </tr>
     <tr>
       <td><%- include("tooltip", {k: "nonce"}) %>Nonce</td>
       <td><%= f.nonce; %></td>
@@ -131,26 +151,11 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td><%- tx.weight %></td>
     </tr>
 <% } %>
-    <tr>
-      <td><%- include("tooltip", {k: "result"}) %>Result</td>
-      <td><%- include("txResult", {success: txResult, errorMsg: errStr}); %></td>
-    </tr>
 
       <td><%- include("tooltip", {k: "specversion"}) %>Spec Version</td>
       <td>
         <%- uiTool.presentSpecVersion(f.id, f.specVersion); %>
       </td>
-    </tr>
-    <tr>
-
-    <% if ( !xcmInfoFound && assetTransferFound) { %>
-    <tr>
-        <td><%- include("tooltip", {k: "assettransferred"}) %>Tokens Transferred <B><%-`[${tx.transfers.length }]`%></B></td>
-        <td><%- include("assettransferred", {transfers: f.transfers}); %></td>
-    </tr>
-    <% } %>
-      <td><%- include("tooltip", {k: "module"}) %>Module</td>
-      <td><%- include("module", {chainID: f.id, section: f.section, method: f.method}); %></td>
     </tr>
     <% if ( typeof tx.signature === 'object' && tx.signature !== null ) {
         let signType = Object.keys(tx.signature)
@@ -161,32 +166,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
           <td><%- signature; %></td>
         </tr>
     <% } %>
-    <tr>
-      <td><%- include("tooltip", {k: "params"}) %>Params</td>
-      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID },  size: []  }); %></td>
-    </tr>
-<% let decodeWASM = false;
-    if ( f.section == "contracts" && f.method == "call"  && f.metadata ) {  decodeWASM = true; %>
-    <tr>
-       <td><%- include("tooltip", {k: "decodedwasm"}) %>Decoded WASM Call Data</td>
-       <td>
-       <div id="decodedWASM"></div>
-       <script>function decodeWASM() { decodeWASMContractsCall('<%= f.chainID %>', <%- JSON.stringify(f.params); %>, <%- JSON.stringify(f.metadata); %>, "decodedWASM"); }</script>
-       </td>
-    </tr>
-<% } %>
-    <tr>
-<% if ( f.xcmdest == undefined && false) { %>
-    <td>Compare to</td>
-    <td>
-      <% if ( chain.subscanURL && false ) {
-         let subscanURL = (f.signer)? `${chain.subscanURL}/extrinsic/${f.extrinsicHash}` : `${chain.subscanURL}/extrinsic/${f.extrinsicID}`;
-         %>
-      <a href="<%= subscanURL; %>" target="_new"><img src="https://cdn.polkaholic.io/subscan.svg" width="16"></a>
-      <% }%>
-    </td>
-<% } %>
-    </tr>
+
     <tr>
       <td><%- include("tooltip", {k: "events"}) %>Events</td>
       <td>
@@ -207,9 +187,6 @@ let chainID = '<%= f.chainID; %>';
 let defHash = "#overview";
 $(document).ready(function() {
   showtxstatus("<%= tx.extrinsicHash %>");
-  <% if ( decodeWASM ) { %>
-    decodeWASM();
-  <% } %>
 });
 </script>
 

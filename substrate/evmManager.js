@@ -44,11 +44,11 @@ module.exports = class EvmManager extends PolkaholicDB {
             let methodSignature = foundApi.signature
             let methodSignatureFull = foundApi.signature_full
             let methodABIStr = foundApi.abi
-            if (methodABIStr == undefined || methodABIStr == null){
+            if (methodABIStr == undefined || methodABIStr == null) {
                 let abiType = (fingerprintID && fingerprintID.length == 10) ? 'function' : 'event'
-                if (abiType == 'function'){
+                if (abiType == 'function') {
                     methodABIStr = ethTool.generateFunctionABI(abiType)
-                }else{
+                } else {
                     methodABIStr = ethTool.generateEventABI(abiType)
                 }
             }
@@ -164,9 +164,9 @@ module.exports = class EvmManager extends PolkaholicDB {
                 res.decodeError = null
                 return res
             } catch (err) {
-                if (isSynthetic){
+                if (isSynthetic) {
                     res.decodeError = `[synthetic] ${signatureFull} ${err.toString()}`
-                }else{
+                } else {
                     res.decodeError = `${signatureFull} ${err.toString()}`
                 }
             }
@@ -187,7 +187,7 @@ module.exports = class EvmManager extends PolkaholicDB {
         if (methodID) {
             let r = this.contractABIs[methodID]
             if (r) {
-                if (debugMethodIDs.includes(methodID)){
+                if (debugMethodIDs.includes(methodID)) {
                     console.log(`debugMethodIDs methodID=${methodID}`, r)
                 }
                 res.signature = r.signature
@@ -208,9 +208,9 @@ module.exports = class EvmManager extends PolkaholicDB {
                     return res;
                 } catch (err) {
                     res.decodeStatus = "error"
-                    if (isSynthetic){
+                    if (isSynthetic) {
                         res.decodeError = `[synthetic] ${signatureFull} ${err.toString()}`
-                    }else{
+                    } else {
                         res.decodeError = `${signatureFull} ${err.toString()}`
                     }
                     console.log(`++++ ERROR ${txn.hash}`, res)
