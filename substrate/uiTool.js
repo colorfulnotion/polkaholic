@@ -15,6 +15,7 @@
 // along with Polkaholic.  If not, see <http://www.gnu.org/licenses/>.
 
 const paraTool = require('./paraTool');
+const jsonld = require('./jsonld');
 const {
     u8aToHex,
 } = require("@polkadot/util");
@@ -756,5 +757,19 @@ module.exports = {
             canvas
         );
         return ('<img class="circularImage" src="' + canvas.toDataURL() + `" ${cl} />`)
+    },
+    txToJSONLD: function(tx) {
+	try {
+	    return jsonld.txToJSONLD(tx);
+	} catch {
+	    return null;
+	}
+    },
+    accountToJSONLD: function(account, nm = null) {
+	try {
+	    return jsonld.accountToJSONLD(address, nm);
+	} catch {
+	    return null;
+	}
     }
 };

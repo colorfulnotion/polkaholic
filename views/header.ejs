@@ -43,6 +43,11 @@ function getHostChain() {
 <html lang="en">
   <head>
     <title><% if ( title != undefined ) { %> <%= title; %><% } %> - <%= siteName %></title>
+    <% if ( typeof tx !== 'undefined' ) { %>
+    <script style="application/ld+json">
+    <%- JSON.stringify(tx, null, 4); %>
+    </script>
+    <% } %>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <!-- Polkaholic Style / UI Helpers -->
