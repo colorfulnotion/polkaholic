@@ -1,20 +1,16 @@
 #!/usr/bin/env node
- // Usage:  getAccount chainID
 const Query = require("../query");
+const jsonld = require("../jsonld");
 
 async function main() {
     let debugLevel = 0
     var query = new Query(debugLevel);
     await query.init();
-
-    let txHash = "0x02e86275ad0f6129077b557042aca2fea5fad97c02fa75230ad17e08fd2b2eec";
-    process.argv.forEach(function(val, index, array) {
-        if (index == 2 && val.length > 0) {
-            txHash = val;
-        }
-    });
+    let txHash = "0x5046ac7118473201cf0a7baee51ad9c0f085ec8cdfeeffd6a1430197d9b21e1f";
     var a = await query.getTransaction(txHash);
     console.log(JSON.stringify(a));
+    
+    console.log(JSON.stringify(jsonld.txToJSONLD(a)));
 }
 
 main()

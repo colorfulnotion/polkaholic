@@ -2645,7 +2645,7 @@ module.exports = class Query extends AssetManager {
     async decorate_block_transaction_trace(r, chainID, txHash) {
         //let tableIdDisabled = true
         //await this.initEvmSchemaMap(tableIdDisabled)
-        console.log(`decorate_block_transaction_trace txHash=${txHash}`)
+        //console.log(`decorate_block_transaction_trace txHash=${txHash}`)
         //console.log('decorate_evm_block', r)
         //let evmRPCInternalApi = this.evmRPCInternal
         let blkNum = false
@@ -2667,7 +2667,6 @@ module.exports = class Query extends AssetManager {
         for (const txn of rpcBlock.transactions) {
             if (txn.hash == txHash) {
                 transactionIndex = paraTool.dechexToInt(txn.transactionIndex)
-                console.log(`${txHash} txfound[${transactionIndex}]`)
                 break
             }
         }
@@ -2705,22 +2704,21 @@ module.exports = class Query extends AssetManager {
         console.log(`evmReceipts`, evmReceipts)
         console.log(`evmTrace`, evmTrace)
         */
-        console.log(`decorate_block_transaction [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
+        //console.log(`decorate_block_transaction [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}`)
         var statusesPromise = Promise.all([
             this.processTransactions(blk.transactions),
             this.processReceipts(evmReceipts)
         ])
         let [dTxns, dReceipts] = await statusesPromise
 
-        // TODO: USE TRANSFORM BLOCK
-        console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
-        console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
+        //console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
+        //console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
         let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
         //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
         //fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID)
         let evmBlockTransaction = await ethTool.fuseBlockTransactionReceipt(blk, blk.transactions, dReceipts, flatTraces, chainID)
         //console.log(`evmBlockTransaction`, evmBlockTransaction)
-        console.log(JSON.stringify(evmBlockTransaction))
+        //console.log(JSON.stringify(evmBlockTransaction))
         return [evmBlockTransaction, targetTrace]
     }
 
@@ -2771,9 +2769,8 @@ module.exports = class Query extends AssetManager {
         ])
         let [dTxns, dReceipts] = await statusesPromise
 
-        // TODO: USE TRANSFORM BLOCK
-        console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
-        console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
+        //console.log(`++++ [#${blkNum} ${blkHash}] dTxns len=${dTxns.length}`, dTxns)
+        //console.log(`[#${blkNum} ${blkHash}] dReceipts len=${dReceipts.length}`, dReceipts)
         let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
         //console.log(`flatTraces[${flatTraces.length}]`, flatTraces)
         //fuseBlockTransactionReceipt(evmBlk, dTxns, dReceipts, flatTraces, chainID)
