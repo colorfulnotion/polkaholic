@@ -1,35 +1,64 @@
 <%
-let f = contract;
+let c = contract;
 %>
 <table class="table table-hover table-bordered">
   <tbody>
     <tr>
       <td width="200">Contract Address</td>
-      <td><code><%- uiTool.getShortHash(f.address, false) %></code>
+      <td><code><%- uiTool.getShortHash(c.address, false) %></code>
       </td>
     </tr>
 
     <tr>
       <td width="200">Code Hash</td>
       <td>
-        <a href='/wasmcode/<%= f.codeHash %>'><%- uiTool.getShortHash(f.codeHash, false) %></a>
+        <a href='/wasmcode/<%= c.codeHash %>'><%- uiTool.getShortHash(c.codeHash, false) %></a>
       </td>
     </tr>
 
     <tr>
       <td>Instantiated</td>
       <td>
-	<%= uiTool.presentTS(f.blockTS); %> @ <a href='/blocks/<%= f.chainID; %>'><%= f.chainName; %></a> <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.instantiateBN}); %>
+	<%= uiTool.presentTS(c.blockTS); %> @ <a href='/blocks/<%= c.chainID; %>'><%= c.chainName; %></a> <%- include("blockNumber", {chainID: c.chainID, blockNumber: c.instantiateBN}); %>
       </td>
     </tr>
     <tr>
       <td>Salt</td>
-      <td><%= f.salt %></td>
+      <td><%= c.salt %></td>
     </tr>
+
+<%   if ( c && c.contractName ) { %>
+    <tr>
+      <th>Contract Name</th>
+      <td><%= c.contractName %></td>
+    </tr>
+<%   } %>
+<%  if ( c && c.version ) { %>
+    <tr>
+      <th>Version</th>
+      <td><%= c.version %></td>
+    </tr>
+<%   } %>
+<%   if ( c && c.authors ) { %>
+    <tr>
+      <th>Authors</th>
+      <td><%= c.authors.join(",") %></td>
+    </tr>
+<%   } %>
+
+
+<% if ( c.verifier == "0x58E0fB1aAB0B04Bd095AbcdF34484DA47Fe9fF77" ) { %>
+    <tr>
+      <td>Verified?</td>
+      <td>
+<div><button class="btn-success">Verified by <img src="https://cdn.polkaholic.io/chainide_logo.svg" width="100"/></button></div>
+      </td>
+    </tr>
+<% } %>
 
     <tr>
       <td>Deployer</td>
-      <td><%- uiTool.presentID(f.deployer_ss58) %></td>
+      <td><%- uiTool.presentID(c.deployer_ss58) %></td>
     </tr>
 
     <tr>

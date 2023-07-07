@@ -165,13 +165,14 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
       <td><%- include("tooltip", {k: "params"}) %>Params</td>
       <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID },  size: []  }); %></td>
     </tr>
-<% let decodeWASM = false;
-    if ( f.section == "contracts" && f.method == "call"  && f.metadata ) {  decodeWASM = true; %>
+<%  if ( f.section == "contracts" && f.method == "call" && f.identifier ) { %>
     <tr>
        <td><%- include("tooltip", {k: "decodedwasm"}) %>Decoded WASM Call Data</td>
        <td>
-       <div id="decodedWASM"></div>
-       <script>function decodeWASM() { decodeWASMContractsCall('<%= f.chainID %>', <%- JSON.stringify(f.params); %>, <%- JSON.stringify(f.metadata); %>, "decodedWASM"); }</script>
+       <button type="button" class="btn-lg btn-primary"><%= f.identifier %></button>
+       <% if ( f.decodedCall ) { %>
+       <code><%- f.decodedCall; %></code>
+       <% } %>
        </td>
     </tr>
 <% } %>
@@ -207,9 +208,6 @@ let chainID = '<%= f.chainID; %>';
 let defHash = "#overview";
 $(document).ready(function() {
   showtxstatus("<%= tx.extrinsicHash %>");
-  <% if ( decodeWASM ) { %>
-    decodeWASM();
-  <% } %>
 });
 </script>
 

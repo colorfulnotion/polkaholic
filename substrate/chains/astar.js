@@ -1,6 +1,16 @@
 const paraTool = require("../paraTool");
 const ethTool = require("../ethTool");
 const wasmTool = require("../wasmTool");
+const {
+    CodePromise,
+    ContractPromise
+} = require('@polkadot/api-contract');
+const {
+    u8aToU8a,
+    hexToU8a,
+    u8aToHex,
+    compactAddLength
+} = require('@polkadot/util');
 
 const ChainParser = require("./chainparser");
 
@@ -14,7 +24,7 @@ module.exports = class AstarParser extends ChainParser {
     xcmTransferMethodList = ["0xecf766ff", "0x019054d0", "0x106d59fe", "0x400c0e8d"];
     xcmTransactorMethodList = ["0xf90eb212"];
 
-    processWasmContracts(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false, depth = 0, idx = 0) {
+    async processWasmContracts(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false, depth = 0, idx = 0) {
         let module_section = section;
         let module_method = method
         if (section == false && section == false) {
@@ -33,7 +43,7 @@ module.exports = class AstarParser extends ChainParser {
                 let c_args = c.args
                 //console.log(`[${extrinsic.extrinsicID}] call`, i, call_section, call_method, c);
                 i++;
-                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args, depth+1, i)
+                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args, depth + 1, i)
             }
         } else if (args.call != undefined) {
             let call = args.call
@@ -44,7 +54,7 @@ module.exports = class AstarParser extends ChainParser {
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
             if (!isHexEncoded && call_args != undefined) {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
-                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args, depth+1)
+                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args, depth + 1)
             } else {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
             }
@@ -53,7 +63,7 @@ module.exports = class AstarParser extends ChainParser {
             case 'contracts:call': //contract write
                 //0xd4ffe56c661d718cd4ca6039c0d5519aa3d20b0f32d6b18dc4809d60dd7b3d03
                 let callID = `${extrinsic.extrinsicID}-${depth}-${idx}`
-                let contractWrite = this.processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID)
+                let contractWrite = await this.processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID)
                 if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:call`, contractWrite)
                 indexer.addWasmContractCall(contractWrite);
                 break;
@@ -101,7 +111,10 @@ module.exports = class AstarParser extends ChainParser {
         } catch (e) {
             //console.log(`processWasmDest error=${e.toString()}`)
         }
-        return { address, address_ss58 }
+        return {
+            address,
+            address_ss58
+        }
     }
 
     contractsEventFilter(palletMethod) {
@@ -116,9 +129,11 @@ module.exports = class AstarParser extends ChainParser {
             case "contracts(Instantiated)":
                 //this contract event
                 return true
+            case "contracts(Called)":
+                return true;
             default:
                 if (palletMethod.includes('contracts(')) {
-                    //console.log(`Uncovered contracts case: ${palletMethod}`)
+                    console.log(`********************************  Uncovered contracts case: ${palletMethod}`)
                     return true
                 } else {
                     return false
@@ -137,43 +152,13 @@ module.exports = class AstarParser extends ChainParser {
         return wasmContractsEvents
     }
 
-    processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID) {
-        /*
-        Makes a call to an account, optionally transferring some balance.
-        # Parameters
-        * `dest`: Address of the contract to call.
-        * `value`: The balance to transfer from the `origin` to `dest`.
-        * `gas_limit`: The gas limit enforced when executing the constructor.
-        * `storage_deposit_limit`: The maximum amount of balance that can be charged from the
-          caller to pay for the storage consumed.
-        * `data`: The input data to pass to the contract.
-
-        * If the account is a smart-contract account, the associated code will be
-        executed and any value will be transferred.
-        * If the account is a regular account, any value will be transferred.
-        * If no account exists and the call value is not less than `existential_deposit`,
-        a regular account will be created and any value will be transferred.
-        */
-
-        //contract write
-        //0xd4ffe56c661d718cd4ca6039c0d5519aa3d20b0f32d6b18dc4809d60dd7b3d03 //indexPeriods 22007 2022-08-25 22
-        //0xa0c23aa9bbb27e18bf48d7df1b51d83fb8be73ed111bd375b40f2ab02f281554 //indexPeriods 22007 2022-08-18 23
-        //0x89efa3f036dbbc545a9f748a18e7c1b07bbad459f31becbd259dfcea5e7b230c //indexPeriods 22007 2022-06-27 14
-        /*
-        //Sending 1.23456e-13 WLK (decimals 18) from Z4wzSczja5Va2wAsVJEoiLK9i882FUjWWdDnZDrtPzxYp8z to WwjA4NLgbAKgapEvKf86LNk7gcqSQhsNUTN2AXSc6JPjQf4
-        {
-          "dest": {
-            "id": "Xd87RRvCB7JuF3LUYvhNRwgV9WfhkhUJApj45EP5dcDrSi1"
-          },
-          "value": 0,
-          "gas_limit": 9375000000,
-          "storage_deposit_limit": null,
-          "data": "0xdb20f9f52c8feeab5bd9a317375e01adb6cb959f1fea78c751936d556fa2e36ede425a4740e2010000000000000000000000000000"
-        }
-        */
-        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}] EXTINRIC`, extrinsic , `ARGS:`, args)
+    async processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID) {
+        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}] EXTINRIC`, extrinsic, `ARGS:`, args)
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
-        let { address, address_ss58 } = this.processWasmDest(args.dest)
+        let {
+            address,
+            address_ss58
+        } = this.processWasmDest(args.dest)
         let r = {
             callID: callID,
             chainID: indexer.chainID,
@@ -190,9 +175,32 @@ module.exports = class AstarParser extends ChainParser {
             caller: paraTool.getPubKey(extrinsic.signer),
             caller_ss58: extrinsic.signer,
             data: args.data,
-            events: wasmContractsEvents
+            events: wasmContractsEvents,
+            identifier: null,
+            decodedCall: null
         }
-        console.log(r);
+        try {
+            let sql = `select CONVERT(metadata using utf8) metadata from wasmCode, contract where address_ss58 = '${address_ss58}' and wasmCode.codeHash = contract.codeHash`
+            let recs = await indexer.poolREADONLY.query(sql)
+            if (recs.length > 0) {
+                let metadata = recs[0].metadata;
+                console.log("FOUND METADATA", sql, metadata);
+                const contract = new ContractPromise(indexer.api, metadata, address_ss58);
+                const bytes = hexToU8a(args.data);
+                let result = contract.abi.decodeMessage(compactAddLength(bytes));
+                r.decodedCall = result.args.map((a) => {
+                    return a.toHuman();
+                })
+                let message = result.message
+                r.identifier = message.identifier;
+                console.log("DECODED", r.identifier, r.decodedCall);
+            } else {
+                console.log("NOT FOUND", sql);
+            }
+        } catch (err) {
+            console.log("processContractsCall", err);
+        }
+
         for (const ev of wasmContractsEvents) {
             let eventMethodSection = `${ev.section}(${ev.method})`
             console.log(ev);
@@ -221,7 +229,7 @@ module.exports = class AstarParser extends ChainParser {
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
-	    network: indexer.getIDByChainID(indexer.chainID),
+            network: indexer.getIDByChainID(indexer.chainID),
             extrinsicHash: extrinsic.extrinsicHash,
             extrinsicID: extrinsic.extrinsicID,
             blockNumber: this.parserBlockNumber,
@@ -269,7 +277,7 @@ module.exports = class AstarParser extends ChainParser {
         let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
-	    network: indexer.getIDByChainID(indexer.chainID),
+            network: indexer.getIDByChainID(indexer.chainID),
             extrinsicHash: extrinsic.extrinsicHash,
             extrinsicID: extrinsic.extrinsicID,
             blockNumber: this.parserBlockNumber,
