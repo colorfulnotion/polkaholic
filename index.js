@@ -532,6 +532,34 @@ app.get('/', async (req, res) => {
     }
 })
 
+app.get('/dotswap', async (req, res) => {
+    let accounts = [];
+    let addresses = getHomeAddresses(req);
+    try {
+        if (addresses) {
+            accounts = await query.getMultiAccount(addresses);
+        }
+    } catch (err) {
+        // errors should not matter here
+    }
+    try {
+        var relaychain = req.params.relaychain ? req.params.relaychain : "";
+        var chains = await query.getChains();
+        res.render('dotswap', {
+            chains: chains,
+            chainInfo: query.getChainInfo(),
+            relaychain: relaychain,
+            accounts: accounts,
+            apiUrl: '/chains',
+            docsSection: "get-all-chains"
+        });
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 app.get('/addresstopn', async (req, res) => {
     try {
         var chains = await query.getChains();
