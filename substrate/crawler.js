@@ -1642,7 +1642,7 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
                 if (txs.length) {
-                    txs = await this.processTransactions(txs);
+                    txs = await crawler.processTransactions(txs);
                     for (let i = 0; i < txs.length; i++) {
                         let tx = txs[i];
                         tx.blockHash = ""; // if ( tx.blockHash != undefined) delete tx.blockHash;
