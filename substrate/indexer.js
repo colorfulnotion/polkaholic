@@ -7401,7 +7401,7 @@ module.exports = class Indexer extends AssetManager {
         let web3Api = this.web3Api
         let evmFullBlock = false
         if (evmBlock && evmReceipts) {
-            if (web3Api && contractABIs) {
+            if (web3Api) {
                 // processBlockEvents is async, so can put await here ...
                 let processBlockAndReceiptStartTS = new Date().getTime();
 
@@ -7428,7 +7428,7 @@ module.exports = class Indexer extends AssetManager {
                 let decorateTxnStartTS = new Date().getTime()
 
                 let flatTraces = ethTool.debugTraceToFlatTraces(evmTrace, dTxns)
-                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmlBlock, dTxns, dReceipts, flatTraces, chainID)
+                evmFullBlock = await ethTool.fuseBlockTransactionReceipt(evmBlock, dTxns, dReceipts, flatTraces, chainID)
                 if (evmFullBlock.transactionsConnected.length > 0) {
                     let connectedTxns = []
                     for (const connectedTxn of evmFullBlock.transactionsConnected) {
@@ -7464,7 +7464,7 @@ module.exports = class Indexer extends AssetManager {
                 this.timeStat.processEVMFullBlock++
 
             } else {
-                console.log(`chainID=${chainID} missing web3Api or contractABIs. web3Api(set? ${!web3Api == false}) contractABIs(set? ${!contractABIs == false})`)
+                console.log(`chainID=${chainID} missing web3Api. web3Api(set? ${!web3Api == false})`)
             }
         }
 
@@ -8330,134 +8330,6 @@ module.exports = class Indexer extends AssetManager {
         // for any new unknown assets, set them up with names, decimals
 
         await this.chainParser.getSystemProperties(this, chain);
-    }
-
-
-    // given a row r fetched with "build_evm_block_from_row", processes the block, events + trace
-    async index_evm_chain_block_row(r, write_bq_log = false, mode = 'store_evm') {
-        //console.log('index_evm_chain_block_row', JSON.stringify(r))
-
-        let evmRPCInternalApi = this.evmRPCInternal
-
-        let log_retry_max = 10
-        let log_retry_ms = 2000
-        let log_timeout_ms = 5000
-
-        let autoTraces = false
-        let blkNum = false
-        let blkHash = false
-        let blockTS = false
-        let blockAvailable = false
-        let traceAvailable = false
-        let receiptsAvailable = false
-        let blk = r.block
-        let chainID = r.chain_id
-        let evmReceipts = []
-        let evmTrace = false
-        let stream_bq = false
-        let write_bt = false
-
-        if (r.block) {
-            blockAvailable = true
-            blkNum = blk.number;
-            blkHash = r.blockHash;
-            blockTS = r.blockTS;
-        }
-        if (r.trace) {
-            traceAvailable = true
-            evmTrace = r.trace
-        }
-        if (r.evmReceipts) {
-            receiptsAvailable = true
-            evmReceipts = r.evmReceipts
-        }
-        if (!traceAvailable) {
-            //MK: need to figure out btTrace -> rpcTrace translation
-            if (evmRPCInternalApi) {
-                evmTrace = await this.crawlEvmBlockTracesWithRetry(evmRPCInternalApi, blkNum, log_timeout_ms, log_retry_max, log_retry_ms)
-            }
-        }
-        console.log(`index_evm_chain_block_row [${blkNum}] [${blkHash}] Trace=${traceAvailable}, Receipts=${receiptsAvailable} , currTS=${this.getCurrentTS()}, blockTS=${blockTS}, evmRPCInternalApi=${evmRPCInternalApi}`)
-        var statusesPromise = Promise.all([
-            ethTool.processTransactions(blk.transactions),
-            ethTool.processReceipts(evmReceipts)
-        ])
-        let [dTxns, dReceipts] = await statusesPromise
-        //console.log(`[#${blkNum} ${blkHash}] dTxns`, dTxns)
-        if (mode == "store_evm") {
-            await this.store_evm(blk, dTxns, dReceipts, evmTrace, chainID)
-        } else if (mode == "stream_evm") {
-            await this.stream_evm(blk, dTxns, dReceipts, evmTrace, chainID, stream_bq, write_bt)
-        }
-        return r;
-    }
-
-    async deleteFilesFromPath(basePath) {
-        // Check if path exists
-        if (fs.existsSync(basePath)) {
-            try {
-                // Delete the directory and all its contents
-                fs.rmSync(basePath, {
-                    recursive: true,
-                    force: true
-                });
-                console.log(`Path deleted: ${basePath}`);
-            } catch (err) {
-                console.error(`Error deleting path: ${basePath}`, err);
-            }
-        }
-        try {
-            // Create the directory
-            fs.mkdirSync(basePath, {
-                recursive: true
-            });
-            console.log(`Path created: ${basePath}`);
-        } catch (err) {
-            console.error(`Error creating path: ${basePath}`, err);
-        }
-    }
-
-    async deleteFilesWithChainID(basePath, chainID) {
-        // Helper function to delete a file
-        console.log(`basePath: ${basePath}`)
-        const deleteFile = (filePath) => {
-            try {
-                fs.unlinkSync(filePath);
-                console.log(`Deleted file: ${filePath}`);
-            } catch (error) {
-                console.error(`Error deleting file: ${filePath}`, error);
-            }
-        };
-
-        // Helper function to recursively search and delete files
-        const searchAndDelete = (dirPath) => {
-            // Check if directory exists
-            if (!fs.existsSync(dirPath)) {
-                try {
-                    fs.mkdirSync(dirPath, {
-                        recursive: true
-                    });
-                    console.log(`Directory created: ${dirPath}`);
-                } catch (err) {
-                    console.error(`Error creating directory: ${dirPath}`, err);
-                }
-            }
-
-            const entries = fs.readdirSync(dirPath, {
-                withFileTypes: true
-            });
-            for (const entry of entries) {
-                const entryPath = path.join(dirPath, entry.name);
-                if (entry.isFile() && entry.name.endsWith(`${chainID}.json`)) {
-                    deleteFile(entryPath);
-                } else if (entry.isDirectory()) {
-                    searchAndDelete(entryPath);
-                }
-            }
-        };
-
-        // Start the search and delete process
-        searchAndDelete(basePath);
     }
 
     async streamWrite(fn, JSONNLArray, isReplace = false) {
