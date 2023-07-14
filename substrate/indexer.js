@@ -705,6 +705,7 @@ module.exports = class Indexer extends AssetManager {
         }
         await this.flushWSProviderQueue();
         let immediateFlushStartTS = new Date().getTime();
+
         await this.immediateFlushBlockAndAddressExtrinsics(isTip)
         let immediateFlushTS = (new Date().getTime() - immediateFlushStartTS) / 1000
 
@@ -5233,7 +5234,6 @@ module.exports = class Indexer extends AssetManager {
                 if (this.chainID == paraTool.chainIDAstar || this.chainID == paraTool.chainIDShiden || this.chainID == paraTool.chainIDShibuya) {
                     await this.chainParser.processWasmContracts(this, rExtrinsic, feed, fromAddress, false, false, false);
                 }
-
                 //check the "missed" xcm case - see if it contains xTokens event not triggered by pallet
                 this.chainParser.processOutgoingXCMFromXTokensEvent(this, rExtrinsic, feed, fromAddress, false, false, false);
                 if (rExtrinsic.xcms == undefined) {
@@ -6566,6 +6566,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     generate_call_rows(c) {
+	return null;
         let row = {
             chain_id: c.id,
             block_time: c.block_time,
@@ -9394,6 +9395,7 @@ module.exports = class Indexer extends AssetManager {
             }
             this.dump_update_block_stats(chain.chainID, statRows, indexTS)
             let elapsedTS = (new Date().getTime() - elapsedStartTS) / 1000
+
             await this.flush(indexTS, blockNumber, false, false); //ts, bn, isFullPeriod, isTip
 
             // errors, warns within this block ..

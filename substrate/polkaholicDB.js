@@ -963,6 +963,7 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async load_calls_events(datasetId = "substrate") {
+	return;
         const bigquery = this.get_big_query()
         let sql = `select table_name, column_name, data_type, ordinal_position, is_nullable from substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS where ( table_name like 'call_%' or table_name like 'evt_%' ) and column_name not in ("block_time", "relay_chain", "para_id", "extrinsic_id", "extrinsic_hash", "call_id", "signer_ss58", "signer_pub_key") limit 1000000`;
         let columns = await this.execute_bqJob(sql);

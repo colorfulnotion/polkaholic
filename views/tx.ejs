@@ -115,10 +115,16 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
        <% } %>
        </td>
     </tr>
+    <% if ( f.decodedEvents && f.decodedEvents.length > 0 ) { %>
+    <tr>
+      <td><%- include("tooltip", {k: "params"}) %>Decoded WASM Events</td>
+      <td><%- include("decode", {id: "events" + f.extrinsicHash, obj: f.decodedEvents, verify: null,  size: [] }); %></td>
+    </tr>
+    <% } %>
 <% } %>
     <tr>
       <td><%- include("tooltip", {k: "params"}) %>Params</td>
-      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: { verification: "extrinsic", blockNumber: f.blockNumber, extrinsicHash: f.extrinsicHash, extrinsicID: f.extrinsicID },  size: []  }); %></td>
+      <td><%- include("decode", {id: f.extrinsicHash, obj: f.params, verify: null,  size: []  }); %></td>
     </tr>
     <% if ( f.lifetime ) { %>
     <tr>

@@ -5018,6 +5018,16 @@ module.exports = class Query extends AssetManager {
                 decoratedExt.callIndex = ext.callIndex
             }
 
+            if (ext.decodedEvents != undefined) {
+                decoratedExt.decodedEvents = ext.decodedEvents;
+            }
+            if (ext.identifier != undefined) {
+                decoratedExt.identifier = ext.identifier;
+            }
+            if (ext.decodedCall != undefined) {
+                decoratedExt.decodedCall = ext.decodedCall;
+            }
+
             if (ext.events != undefined) {
                 decoratedExt.events = []
                 for (const evt of ext.events) {
