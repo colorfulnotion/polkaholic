@@ -43,7 +43,7 @@ module.exports = class AstarParser extends ChainParser {
                 let c_args = c.args
                 //console.log(`[${extrinsic.extrinsicID}] call`, i, call_section, call_method, c);
                 i++;
-                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args, depth + 1, i)
+                await this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, c_args, depth + 1, i)
             }
         } else if (args.call != undefined) {
             let call = args.call
@@ -54,7 +54,7 @@ module.exports = class AstarParser extends ChainParser {
             //console.log(`[${extrinsic.extrinsicID}] descend into call`, call)
             if (!isHexEncoded && call_args != undefined) {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] descend into call=${call}, call_section=${call_section}, call_method=${call_method}, call_args`, call_args)
-                this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args, depth + 1)
+                await this.processWasmContracts(indexer, extrinsic, feed, fromAddress, call_section, call_method, call_args, depth + 1)
             } else {
                 //if (this.debugLevel >= paraTool.debugTracing) console.log(`[${extrinsic.extrinsicID}] skip call=${call}, call_section=${call_section}, call_method=${call_method}, call.args`, call_args)
             }
@@ -69,13 +69,13 @@ module.exports = class AstarParser extends ChainParser {
                 break;
             case 'contracts:instantiate': //contract deploy with available codehash
                 //0x7e020cd122a51d4f037f95a86761f6af33228d0a8c68f8f79fd1f27c17885914
-                let wasmWithoutCode = this.processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args)
+                let wasmWithoutCode = await this.processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args)
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiate`, wasmWithoutCode)
                 indexer.addWasmContract(wasmWithoutCode, wasmWithoutCode.withCode);
                 break;
             case 'contracts:instantiateWithCode': //contract deploy with wasm code
                 //0x2c986a6cb47b94a9e50f5d3f660e0f37177989594eb087bf7309c2e15e2340c8
-                let wasmWithCode = this.processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args)
+                let wasmWithCode = await this.processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args)
                 //if (this.debugLevel >= paraTool.debugInfo) console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] contracts:instantiateWithCode`, wasmWithCode)
                 indexer.addWasmContract(wasmWithCode, wasmWithCode.withCode);
                 break;
@@ -141,24 +141,60 @@ module.exports = class AstarParser extends ChainParser {
         }
     }
 
-    getWasmContractsEvent(indexer, extrinsic) {
+    async getWasmContractsEvent(indexer, extrinsic) {
         let wasmContractsEvents = [];
-        extrinsic.events.forEach((ev) => {
+        let metadata = {};
+        for (let i = 0; i < extrinsic.events.length; i++) {
+            let ev = extrinsic.events[i];
             let palletMethod = `${ev.section}(${ev.method})`
-            if (this.contractsEventFilter(palletMethod)) {
-                wasmContractsEvents.push(ev)
+            if (palletMethod == 'contracts(ContractEmitted)') {
+                let evdata = ev.data;
+                try {
+                    // Important: address here may not the same as called contract!!!
+                    let address = evdata[0];
+                    let data = evdata[1];
+                    if (metadata[address] == undefined) {
+                        metadata[address] = await this.fetchWASMContractMetadata(address, indexer);
+                    }
+                    if (metadata[address]) {
+                        const contract = new ContractPromise(indexer.api, metadata[address], address);
+                        const bytes = hexToU8a(data);
+                        let result = contract.abi.decodeEvent(bytes);
+                        let args = result.args;
+                        let names = result.event.args;
+                        let out = {
+                            identifier: result.event.identifier
+                        };
+                        args.forEach((a, idx) => {
+                            out[names[idx].name] = a.toHuman();
+                        })
+                        wasmContractsEvents.push(out);
+                    }
+                } catch (err) {
+                    console.log(err)
+                }
             }
-        })
+        }
         return wasmContractsEvents
     }
 
+    async fetchWASMContractMetadata(address_ss58, indexer) {
+        // TODO: add chainID?
+        let sql = `select CONVERT(metadata using utf8) metadata from wasmCode, contract where address_ss58 = '${address_ss58}' and wasmCode.codeHash = contract.codeHash`
+        let recs = await indexer.poolREADONLY.query(sql)
+        if (recs.length == 1) {
+            return recs[0].metadata;
+        }
+        return null;
+    }
+
     async processContractsCall(indexer, extrinsic, feed, fromAddress, section_method, args, callID) {
-        console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}] EXTINRIC`, extrinsic, `ARGS:`, args)
-        let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
+        let wasmContractsEvents = await this.getWasmContractsEvent(indexer, extrinsic)
         let {
             address,
             address_ss58
         } = this.processWasmDest(args.dest)
+
         let r = {
             callID: callID,
             chainID: indexer.chainID,
@@ -175,17 +211,14 @@ module.exports = class AstarParser extends ChainParser {
             caller: paraTool.getPubKey(extrinsic.signer),
             caller_ss58: extrinsic.signer,
             data: args.data,
-            events: wasmContractsEvents,
             identifier: null,
-            decodedCall: null
+            decodedCall: null,
         }
+        let metadata = {};
         try {
-            let sql = `select CONVERT(metadata using utf8) metadata from wasmCode, contract where address_ss58 = '${address_ss58}' and wasmCode.codeHash = contract.codeHash`
-            let recs = await indexer.poolREADONLY.query(sql)
-            if (recs.length > 0) {
-                let metadata = recs[0].metadata;
-                console.log("FOUND METADATA", sql, metadata);
-                const contract = new ContractPromise(indexer.api, metadata, address_ss58);
+            metadata[address_ss58] = await this.fetchWASMContractMetadata(address_ss58, indexer);
+            if (metadata[address_ss58]) {
+                const contract = new ContractPromise(indexer.api, metadata[address_ss58], address_ss58);
                 const bytes = hexToU8a(args.data);
                 let result = contract.abi.decodeMessage(compactAddLength(bytes));
                 r.decodedCall = result.args.map((a) => {
@@ -194,25 +227,19 @@ module.exports = class AstarParser extends ChainParser {
                 let message = result.message
                 r.identifier = message.identifier;
                 console.log("DECODED", r.identifier, r.decodedCall);
+                extrinsic.identifier = r.identifier;
+                extrinsic.decodedCall = r.decodedCall;
+                extrinsic.decodedEvents = wasmContractsEvents;
             } else {
-                console.log("NOT FOUND", sql);
+                console.log("NOT FOUND", address_ss58);
             }
         } catch (err) {
             console.log("processContractsCall", err);
         }
-
-        for (const ev of wasmContractsEvents) {
-            let eventMethodSection = `${ev.section}(${ev.method})`
-            console.log(ev);
-            if (eventMethodSection == 'contracts(ContractEmitted)') {
-                // WARNING: contract address here is not the same as called contract
-                /* contractAddr, encodedEvents ["anCpiHdWuGUiQbsrqsbmYyRzdG4zP8LzmnyDy9GZxQS28Yq","0x000001d2ae8d7ab7db366b2451da59e1af3eb2398315c512d0cc400a9d70566f76e96040420f00000000000000000000000000"]*/
-            }
-        }
         return r
     }
 
-    processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args) {
+    async processContractsInstantiate(indexer, extrinsic, feed, fromAddress, section_method, args) {
         //contract deploy with available codehash
         //0x7e020cd122a51d4f037f95a86761f6af33228d0a8c68f8f79fd1f27c17885914 //indexPeriods 22007 2022-07-14 16
         /*
@@ -225,8 +252,7 @@ module.exports = class AstarParser extends ChainParser {
           "salt": "0x"
         }
         */
-        //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
-        let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
+        let wasmContractsEvents = await this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
             network: indexer.getIDByChainID(indexer.chainID),
@@ -260,7 +286,7 @@ module.exports = class AstarParser extends ChainParser {
         return r
     }
 
-    processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args) {
+    async processContractsInstantiateWithCode(indexer, extrinsic, feed, fromAddress, section_method, args) {
         //contract deploy with wasm byte code
         //0x2c986a6cb47b94a9e50f5d3f660e0f37177989594eb087bf7309c2e15e2340c8 //indexPeriods 22007 2022-08-18 23
         /*
@@ -274,7 +300,7 @@ module.exports = class AstarParser extends ChainParser {
         }
         */
         //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
-        let wasmContractsEvents = this.getWasmContractsEvent(indexer, extrinsic)
+        let wasmContractsEvents = await this.getWasmContractsEvent(indexer, extrinsic)
         let r = {
             chainID: indexer.chainID,
             network: indexer.getIDByChainID(indexer.chainID),
