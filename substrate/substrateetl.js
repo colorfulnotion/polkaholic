@@ -2473,7 +2473,6 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                 let fn = path.join(dir, `${relayChain}-${tbl}.json`)
                 let f = fs.openSync(fn, 'w', 0o666);
                 let fulltbl = `${projectID}:${bqDataset}.${tbl}`;
-                let projectID = `${projectID}`
                 if (tbl == "chains") {
                     let sql = `select id, chainName as chain_name, paraID para_id, ss58Format as ss58_prefix, symbol, isEVM as is_evm, isWASM as is_wasm from chain where ( crawling = 1 or active = 1 ) and relayChain = '${relayChain}' order by para_id`;
                     let recs = await this.poolREADONLY.query(sql)
