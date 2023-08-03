@@ -946,14 +946,14 @@ from chain where chainID = '${chainID}' limit 1`);
         try {
             //console.log(cmd);
             let res = await exec(cmd);
-            console.log(res)
+            //console.log(res)
             return true
         } catch (err) {
             console.log(err);
             return false
         }
     }
-    
+
     async execute_bqJob(sqlQuery, targetBQLocation = null) {
         // run bigquery job with suitable credentials
         const bigqueryClient = this.get_big_query();
