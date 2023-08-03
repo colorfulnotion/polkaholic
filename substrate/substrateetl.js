@@ -4515,6 +4515,10 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             let sql = `update blocklog set loaded = 1 where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
+        }else{
+            let sql = `update blocklog set loaded = 0 where chainID = '${chainID}' and logDT = '${logDT}'`
+            this.batchedSQL.push(sql);
+            await this.update_batchedSQL();
         }
         // load account metrics
         try {
