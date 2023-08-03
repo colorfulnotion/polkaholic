@@ -3976,6 +3976,25 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         this.chainID = chainID
     }
 
+    async mark_dump_duplicate(){
+        const bigquery = this.get_big_query();
+        let projectID = `${this.project}`
+        let relayChains = ["polkadot", "kusama"]
+        for (const relayChain of relayChains){
+            let query = `select '${relayChain}' as relayChain, paraID, FORMAT_TIMESTAMP('%Y-%m-%d', DT) as logDT, count(*) cnt from (SELECT _TABLE_SUFFIX as paraID, TIMESTAMP_TRUNC(block_time, DAY) DT, event_id, count(*) cnt FROM \`substrate-etl.crypto_${relayChain}.transfers*\` WHERE TIMESTAMP_TRUNC(block_time, DAY) >= TIMESTAMP("2023-01-01") and TIMESTAMP_TRUNC(block_time, DAY) < TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) group by paraID, event_id, block_time having cnt >= 2) as d group by relayChain, logDT, paraID order by paraID, logDT`
+            console.log(query)
+            let recs = await this.execute_bqJob(query);
+            console.log(recs)
+            for (const rec of recs){
+                let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraTool.dechexToInt(rec.paraID), rec.relayChain);
+                let cmd = `update blocklog set loaded = 0, loadDT=NULL where chainID=${chainID} and logDT='${rec.logDT}'`
+                console.log(cmd)
+                this.batchedSQL.push(cmd);
+            }
+        }
+        await this.update_batchedSQL()
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
