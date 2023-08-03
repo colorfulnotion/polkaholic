@@ -4485,12 +4485,9 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                 if (tbl == "specversions") {
                     cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
-                try {
-                    console.log(cmd);
-                    await exec(cmd);
-                } catch (err) {
+                let isSuccess = this.execute_bqLoad(cmd)
+                if (!isSuccess){
                     numSubstrateETLLoadErrors++;
-                    console.log(err);
                 }
             }
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
