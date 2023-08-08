@@ -28,17 +28,20 @@ async function main() {
         .description(`Crawl Blocks of Chain`)
         .usage("2004")
         .argument('<chainID>', 'ChainID to crawl', myParseInt)
+        .option('-r, --replica <replica>', 'Replica', 0)
         .action(async (chainID, opt) => {
             var crawler = new Crawler();
             let isDevelopment = (process.env.NODE_ENV == "development") ? true : false
             var debugLevel = paraTool.debugErrorOnly
+            let replica = opt.replica ? parseInt(opt.replica) : 0;
+            crawler.setReplica(replica)
             crawler.setDebugLevel(debugLevel) // TODO
             await crawler.assetManagerInit();
             let [unsubscribeFinalizedHeads, unsubscribeStorage, unsubscribeRuntimeVersion] = await crawler.crawlBlocks(chainID);
             // do not process.exit
         });
 
-    program.command('crawltraces')
+    program.command('maintainer')
         .description(`Indexer maintenance`)
         .action(async (chainID, opt) => {
             var crawler = new Crawler();

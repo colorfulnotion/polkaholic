@@ -1181,14 +1181,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     async maintainIndexer() {
-        let sql = `select chainID from chainhostnameendpoint where updateDT < date_sub(Now(), interval 5 minute) and hostname = '${this.hostname}' order by updateDT Desc limit 100`;
-        var chains = await this.poolREADONLY.query(sql);
-        for (const chain of chains) {
-            let chainID = chain.chainID;
-            let cmd = `systemctl restart crawler${chainID}.service`
-            await exec(cmd);
-        }
-        sql = `select chainID, CONVERT(auditFailures using utf8) auditFailures from blocklogstats where audited = 'Failure' and monthDT = LAST_DAY(Now()) limit 100`;
+        let sql = `select chainID, CONVERT(auditFailures using utf8) auditFailures from blocklogstats where audited = 'Failure' and monthDT = LAST_DAY(Now()) limit 100`;
         console.log(sql);
         var failures = await this.poolREADONLY.query(sql);
         for (const failure of failures) {
@@ -1216,7 +1209,9 @@ module.exports = class Crawler extends Indexer {
     async indexChainRandom(lookbackBackfillDays = 60, audit = true, backfill = true, write_bq_log = true, update_chain_assets = true) {
         // pick a chainID that the node is also crawling
         let hostname = this.hostname;
-        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) )  and chainID in ( select chainID from chainhostnameendpoint where hostname = '${hostname}' ) group by chainID having count(*) < 500 order by rand() desc`;
+        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 
+and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) ) 
+group by chainID having count(*) < 500 order by rand() desc`;
         console.log(sql);
         var chains = await this.poolREADONLY.query(sql);
 
@@ -1963,10 +1958,6 @@ module.exports = class Crawler extends Indexer {
                 await this.markFinalizedReadyForIndexing(chain, blockTS);
                 let sql2 = `insert into chain ( chainID, blocksCovered, blocksFinalized, lastFinalizedDT ) values ( '${chainID}', '${bn}', '${bn}', Now() ) on duplicate key update blocksFinalized = values(blocksFinalized), lastFinalizedDT = values(lastFinalizedDT), blocksCovered = IF( blocksCovered < values(blocksFinalized), values(blocksFinalized), blocksCovered )`
                 this.batchedSQL.push(sql2);
-                if (bn % 10 == 0) {
-                    let sqltmp = `update chainhostnameendpoint set updateDT = Now() where chainID = '${chainID}' and hostname = '${this.hostname}'`
-                    this.batchedSQL.push(sqltmp);
-                }
                 if (bn % 5000 == indexUpdateInterval) {
                     // every 5000 blocks, push 24 hours of onto indexlog from blocklog
                     let sqltmp = `select floor(unix_timestamp(blockDT)/3600)*3600 as f from block${chainID} where blockDT >= date(date_sub(Now(), interval 24 hour)) group by f`

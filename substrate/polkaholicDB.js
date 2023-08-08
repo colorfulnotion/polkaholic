@@ -88,6 +88,7 @@ module.exports = class PolkaholicDB {
     bigQuery = null;
     googleStorage = null;
     bqTablesCallsEvents = null;
+    replica = 0;
 
     constructor(serviceName = "polkaholic") {
 
@@ -837,7 +838,7 @@ from chain where chainID = '${chainID}' limit 1`);
     async setupAPI(chain, backfill = false) {
         this.chainID = chain.chainID;
         this.chainName = chain.chainName;
-        if (backfill) {
+        if (backfill && chain.WSBackfill) {
             chain.WSEndpoint = chain.WSBackfill
             console.log("API using backfill endpoint", chain.WSEndpoint);
         }
@@ -856,22 +857,20 @@ from chain where chainID = '${chainID}' limit 1`);
         }
     }
 
-    async get_chain_hostname_endpoint(chain, useWSBackfill) {
-        if (useWSBackfill) {
-            return chain.WSBackfill
+    async get_chain_hostname_endpoint(chain) {
+        let replica = this.replica;
+        if (replica == 1 && (chain.WSEndpoint2 != null) && chain.WSEndpoint2.length > 0) {
+            console.log("get_chain_hostname_endpoint - REPLICA 1", chain.WSEndpoint2);
+            return (chain.WSEndpoint2)
         }
-        let hostname = os.hostname();
-        let endpoints = await this.poolREADONLY.query(`select endpoint from chainhostnameendpoint where chainID = '${chain.chainID}' and hostname = '${hostname}'`);
-        if (endpoints.length > 0) {
-            let endpoint = parseInt(endpoints[0].endpoint, 10);
-            if (endpoint == 1 && (chain.WSEndpoint2 != null) && chain.WSEndpoint2.length > 0) {
-                return (chain.WSEndpoint2)
-            }
-            if (endpoint == 2 && (chain.WSEndpoint3 != null) && chain.WSEndpoint3.length > 0) {
-                return (chain.WSEndpoint3)
-            }
+        if (replica == 2 && (chain.WSEndpoint3 != null) && chain.WSEndpoint3.length > 0) {
+            return (chain.WSEndpoint3)
         }
         return (chain.WSEndpoint);
+    }
+
+    setReplica(r) {
+        this.replica = parseInt(r, 10);
     }
 
     getExitOnDisconnect() {
@@ -942,7 +941,7 @@ from chain where chainID = '${chainID}' limit 1`);
         return this.bigQuery;
     }
 
-    async execute_bqLoad(cmd){
+    async execute_bqLoad(cmd) {
         try {
             //console.log(cmd);
             let res = await exec(cmd);
@@ -975,7 +974,7 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async load_calls_events(datasetId = "substrate") {
-	return;
+        return;
         const bigquery = this.get_big_query()
         let sql = `select table_name, column_name, data_type, ordinal_position, is_nullable from substrate-etl.${datasetId}.INFORMATION_SCHEMA.COLUMNS where ( table_name like 'call_%' or table_name like 'evt_%' ) and column_name not in ("block_time", "relay_chain", "para_id", "extrinsic_id", "extrinsic_hash", "call_id", "signer_ss58", "signer_pub_key") limit 1000000`;
         let columns = await this.execute_bqJob(sql);
