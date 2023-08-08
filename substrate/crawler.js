@@ -65,7 +65,6 @@ const {
 const mysql = require("mysql2");
 const Indexer = require("./indexer");
 const paraTool = require("./paraTool");
-const Ably = require('ably');
 
 const maxTraceAttempts = 10;
 const minCrawlTracesToActivateRPCBackfill = 1;
@@ -1627,18 +1626,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
         }
     }
 
-    async setup_ably_client(chain) {
-        // TODO: bring key in from config, change
-        this.ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
-        await this.ably_client.connection.once('connected');
-        this.ably_channel_xcmindexer = this.ably_client.channels.get("xcm-indexer");
-        this.ably_channel_xcminfo = this.ably_client.channels.get("xcminfo");
-        let crawler = this;
-        this.ably_channel_xcmindexer.subscribe(async function(message) {
-            await crawler.process_indexer_message(chain, message);
-        });
-    }
-
     async process_indexer_message(chain, message) {
         // if the incoming xcmtransfer is a chainIDDest matching our indexer's chainID, then record a starting balance in xcmtransfers_beneficiary
         try {
@@ -1698,7 +1685,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
         await this.check_chain_endpoint_correctness(chain);
-        await this.setup_ably_client(chain);
 
         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {

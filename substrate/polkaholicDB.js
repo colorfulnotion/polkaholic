@@ -385,12 +385,15 @@ module.exports = class PolkaholicDB {
     }
 
     getChainEVMStatus(chainID) {
-        chainID = chainID.toString()
-        if (this.chainInfos[chainID] != undefined) {
-            return this.chainInfos[chainID].isEVM
-        } else {
-            console.log("getChainEVMStatus FATAL ERROR: must call init", chainID)
-        }
+        if ( chainID ) {
+	    chainID = chainID.toString()
+            if (this.chainInfos[chainID] != undefined) {
+		return this.chainInfos[chainID].isEVM
+            } else {
+		console.log("getChainEVMStatus FATAL ERROR: must call init", chainID)
+            }
+	}
+	return null;
     }
 
     getChainFullInfo(chainID) {

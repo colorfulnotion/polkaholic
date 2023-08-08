@@ -2172,16 +2172,6 @@ app.post('/uploadcontract/:address', async (req, res) => {
 
 })
 
-app.get('/xcminfows/:name?', async (req, res) => {
-    let name = req.params["name"] ? req.params["name"] : "xcminfo";
-    let xcmInfo = await query.getXCMInfoLatest(name);
-    res.render('xcminfows', {
-        name: name,
-        xcmInfo: xcmInfo,
-        apiUrl: '/xcmtransfers'
-    });
-})
-
 app.post('/uploadcode/:codeHash', async (req, res) => {
     if (!req.files || Object.keys(req.files).length === 0) {
         return res.status(400).send('No contract file was uploaded.');

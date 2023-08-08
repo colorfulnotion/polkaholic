@@ -28,7 +28,7 @@ const {
     MultiLocation
 } = require('@polkadot/types/interfaces');
 
-const Ably = require('ably');
+
 const Query = require('./query');
 const mysql = require("mysql2");
 const paraTool = require("./paraTool");
@@ -40,9 +40,6 @@ Cover failure cases in xcmcleaner
 Cover xcmmessages in xcmcleaner if possible
 */
 module.exports = class XCMCleaner extends Query {
-    ably_client = null;
-    ably_channel_xcminfo = null;
-
     // hold xcmtransferdestcandidate recs
     cachedMessages = null;
     // hold substrate-etl recs
@@ -53,23 +50,6 @@ module.exports = class XCMCleaner extends Query {
     }
 
     async publish_xcminfo(msg) {
-        try {
-            if (this.ably_client == null) {
-                this.ably_client = new Ably.Realtime("DTaENA.R5SR9Q:MwHuRIr84rCik0WzUqp3SVZ9ZKmKCxXc9ytypJXnYgc");
-                await this.ably_client.connection.once('connected');
-                this.ably_channel_xcminfo = this.ably_client.channels.get("xcminfo");
-            }
-
-            if (this.ably_client && this.ably_channel_xcminfo) {
-                this.ably_channel_xcminfo.publish("xcminfo", msg);
-                console.log("PUBLISHED FINAL");
-            }
-        } catch (err) {
-            this.logger.error({
-                "op": "xcmCleaner: publish_xcminfo ERROR",
-                err
-            });
-        }
     }
 
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
