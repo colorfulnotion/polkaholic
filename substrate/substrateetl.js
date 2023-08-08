@@ -3975,16 +3975,16 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
         this.chainID = chainID
     }
 
-    async mark_dump_duplicate(){
+    async mark_dump_duplicate() {
         const bigquery = this.get_big_query();
         let projectID = `${this.project}`
         let relayChains = ["polkadot", "kusama"]
-        for (const relayChain of relayChains){
+        for (const relayChain of relayChains) {
             let query = `select '${relayChain}' as relayChain, paraID, FORMAT_TIMESTAMP('%Y-%m-%d', DT) as logDT, count(*) cnt from (SELECT _TABLE_SUFFIX as paraID, TIMESTAMP_TRUNC(block_time, DAY) DT, event_id, count(*) cnt FROM \`substrate-etl.crypto_${relayChain}.transfers*\` WHERE TIMESTAMP_TRUNC(block_time, DAY) >= TIMESTAMP("2023-01-01") and TIMESTAMP_TRUNC(block_time, DAY) < TIMESTAMP(DATE_SUB(CURRENT_DATE(), INTERVAL 1 DAY)) group by paraID, event_id, block_time having cnt >= 2) as d group by relayChain, logDT, paraID order by paraID, logDT`
             console.log(query)
             let recs = await this.execute_bqJob(query);
             console.log(recs)
-            for (const rec of recs){
+            for (const rec of recs) {
                 let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraTool.dechexToInt(rec.paraID), rec.relayChain);
                 let cmd = `update blocklog set loaded = 0, loadDT=NULL where chainID=${chainID} and logDT='${rec.logDT}'`
                 console.log(cmd)
@@ -4485,7 +4485,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
                 let isSuccess = this.execute_bqLoad(cmd)
-                if (!isSuccess){
+                if (!isSuccess) {
                     numSubstrateETLLoadErrors++;
                 }
             }
@@ -4511,7 +4511,7 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             let sql = `update blocklog set loaded = 1 where chainID = '${chainID}' and logDT = '${logDT}' ${w}`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();
-        }else{
+        } else {
             let sql = `update blocklog set loaded = 0 where chainID = '${chainID}' and logDT = '${logDT}'`
             this.batchedSQL.push(sql);
             await this.update_batchedSQL();

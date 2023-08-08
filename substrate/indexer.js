@@ -6566,7 +6566,7 @@ module.exports = class Indexer extends AssetManager {
     }
 
     generate_call_rows(c) {
-	return null;
+        return null;
         let row = {
             chain_id: c.id,
             block_time: c.block_time,
@@ -8430,10 +8430,10 @@ module.exports = class Indexer extends AssetManager {
                     if (r.autotrace === false || r.autotrace == undefined || (r.autotrace && Array.isArray(r.autotrace) && r.autotrace.length == 0) || forceParseTrace) {
                         if (this.debugLevel >= paraTool.debugInfo) console.log(`[${blockNumber}] [${blockHash}] autotrace generation`);
                         autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, r.trace, traceType, api, isFinalized);
-                        console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto generation`, isFinalized);
+                        //console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto generation`, isFinalized);
                     } else {
                         // if (this.debugLevel >= paraTool.debugTracing) SKIP PROCESSING since we covered autotrace generation already
-                        console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto already covered len=${r.autotrace.length}`, isFinalized);
+                        //console.log(`[${blockNumber}] [${blockHash}] processTraceAsAuto already covered len=${r.autotrace.length}`, isFinalized);
                         autoTraces = r.autotrace;
                     }
                     await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, api, isFinalized, isTip); // use result from rawtrace to decorate

@@ -176,8 +176,8 @@ module.exports = class AstarParser extends ChainParser {
                     console.log(err)
                 }
             } else {
-		wasmContractsEvents.push(ev);
-	    }
+                wasmContractsEvents.push(ev);
+            }
         }
         return [wasmContractsEvents, wasmContractsEmitted];
     }
@@ -305,7 +305,7 @@ module.exports = class AstarParser extends ChainParser {
         */
         //console.log(`[${extrinsic.extrinsicID}] [${extrinsic.extrinsicHash}] [${section_method}]`, args)
         let [wasmContractsEvents, wasmContractsEmitted] = await this.getWasmContractsEvent(indexer, extrinsic)
-	console.log("processContractsInstantiateWithCode", wasmContractsEvents);
+        console.log("processContractsInstantiateWithCode", wasmContractsEvents);
         let r = {
             chainID: indexer.chainID,
             network: indexer.getIDByChainID(indexer.chainID),
