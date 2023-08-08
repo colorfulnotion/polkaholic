@@ -2654,7 +2654,6 @@ module.exports = class Query extends AssetManager {
 
     async decorate_block_transaction_trace(r, chainID, txHash) {
         //let tableIdDisabled = true
-        //await this.initEvmSchemaMap(tableIdDisabled)
         //console.log(`decorate_block_transaction_trace txHash=${txHash}`)
         //console.log('decorate_evm_block', r)
         //let evmRPCInternalApi = this.evmRPCInternal

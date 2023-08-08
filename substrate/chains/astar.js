@@ -235,7 +235,7 @@ module.exports = class AstarParser extends ChainParser {
                 extrinsic.decodedCall = r.decodedCall;
                 extrinsic.decodedEvents = wasmContractsEmitted;
             } else {
-                console.log("NOT FOUND", address_ss58);
+                console.log("processContractsCall NOT FOUND", address_ss58);
             }
         } catch (err) {
             console.log("processContractsCall", err);
@@ -454,7 +454,8 @@ module.exports = class AstarParser extends ChainParser {
 
     etherumXCMFilter(indexer, args, events) {
         if (args.transaction != undefined) {
-            let evmTx = false;
+            /*
+          let evmTx = false;
             if (args.transaction.eip1559 != undefined) {
                 evmTx = args.transaction.eip1559
             } else if (args.transaction.legacy != undefined) {
@@ -465,7 +466,7 @@ module.exports = class AstarParser extends ChainParser {
                 let txMethodID = txInput.substr(0, 10)
                 if (this.xcmTransferMethodList.includes(txMethodID) || this.xcmTransactorMethodList.includes(txMethodID)) {
                     //console.log(`Precompiled evmTx!`, evmTx)
-                    let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
+                    /*let output = ethTool.decodeTransactionInput(evmTx, indexer.contractABIs, indexer.contractABISignatures)
                     for (const ev of events) {
                         let eventMethodSection = `${ev.section}(${ev.method})`
                         if (eventMethodSection == 'balances(Withdraw)') {
@@ -489,6 +490,7 @@ module.exports = class AstarParser extends ChainParser {
                     return true
                 }
             }
+*/
         }
         return false
     }

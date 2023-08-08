@@ -246,68 +246,6 @@ module.exports = class Crawler extends Indexer {
         return null;
     }
 
-    async crawlEvmTrace(chain, blockNumber, timeoutMS = 20000) {
-        return false;
-        if (!chain.RPCBackfill) {
-            return (false);
-        }
-        if (chain.RPCBackfill.length == 0) {
-            return (false);
-        }
-        let hexBlocknumber = paraTool.blockNumberToHex(blockNumber);
-        let cmd = `curl ${chain.evmRPCInternal}  -X POST -H "Content-Type: application/json" --data '{"method":"debug_traceBlockByNumber","params":["${hexBlocknumber}", {"tracer": "callTracer"}],"id":1,"jsonrpc":"2.0"}'`
-        try {
-            const {
-                stdout,
-                stderr
-            } = await exec(cmd, {
-                maxBuffer: 1024 * 64000
-            });
-            let traceData = JSON.parse(stdout);
-            if (traceData.result) {
-                console.log(blockNumber, traceData.result.length, cmd);
-                return (traceData.result);
-            }
-            //console.log(cmd);
-            return (null);
-        } catch (error) {
-            this.logger.warn({
-                "op": "crawlEvmTrace",
-                "cmd": cmd,
-                "err": error
-            })
-            console.log(error);
-        }
-        return false;
-    }
-
-    async updateERC20TokenSupply(chain, limitSeconds = 300) {
-        let bn = chain.blocksFinalized;
-        await this.setupAPI(chain);
-        let startTS = this.getCurrentTS();
-
-        let sql = `select asset, decimals, symbol, totalSupply from asset where assetType = 'ERC20' and chainID = '${chain.chainID}' and lastCrawlBN < lastUpdateBN order by numHolders desc`;
-        let assets = await this.poolREADONLY.query(sql);
-        for (const a of assets) {
-            if (this.getCurrentTS() - startTS > limitSeconds) {
-                await this.update_batchedSQL();
-                return;
-            }
-
-            let [tokenSupply, _] = await ethTool.getTokenTotalSupply(this.web3Api, a.asset, bn, a.decimals);
-            if ((tokenSupply !== false && a.symbol != '') || tokenSupply) {
-                console.log(`#${chain.chainID} [${a.asset}] ${tokenSupply} ${a.symbol} seconds=`, this.getCurrentTS() - startTS, limitSeconds)
-                let sql = `update asset set totalSupply = '${tokenSupply}', lastCrawlBN = '${bn}' where asset = '${a.asset}' and chainID = '${chain.chainID}'`
-                this.batchedSQL.push(sql);
-                if (this.batchedSQL.length > 10) {
-                    await this.update_batchedSQL();
-                }
-            } else {
-                console.log(`**#${chain.chainID} [${a.asset}] NO tokenSupply = ${tokenSupply} ${a.symbol} (prev:${a.totalSupply})`)
-            }
-        }
-        await this.update_batchedSQL();
-    }
 
     // crawl_block_trace (used by crawlBackfill) fetches a block using { blockNumber, attempted, crawlTrace } saves in BT with save_block_trace [which updates block${chainID} table]  It does NOT index the block
     async crawl_block_trace(chain, t) {
@@ -321,28 +259,6 @@ module.exports = class Crawler extends Indexer {
             let [signedBlock, events] = await this.crawlBlock(this.api, blockHash);
 
             let blockTS = signedBlock.blockTS;
-            // 1.a get evmBlock, if web3Api is set
-            let evmBlock = false
-            let evmReceipts = false
-            let evmTrace = false
-            let crawlBlockEVM = parseInt(t.crawlBlockEVM, 10) > 0;
-            let crawlReceiptsEVM = parseInt(t.crawlReceiptsEVM, 10) > 0;
-            let crawlTraceEVM = parseInt(t.crawlTraceEVM, 10) > 0;
-            if (this.web3Api) {
-                if (crawlBlockEVM) {
-                    evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
-                }
-                if (crawlReceiptsEVM) {
-                    // we have a rate limit problem with moonriver/moonbeam so we crawl these separately
-                    //warning: evmReceipts is dependent on evmBlock hash
-                    if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
-                    evmReceipts = await ethTool.crawlEvmReceipts(this.web3Api, evmBlock)
-                }
-                if (crawlTraceEVM && (this.chainID == 2004 || this.chainID == 22003)) {
-                    if (!evmBlock) evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
-                    evmTrace = await this.crawlEvmTrace(chain, bn);
-                }
-            }
             // to avoid 'hash' error, we create the a new block copy without decoration and add hash in
             let block = JSON.parse(JSON.stringify(signedBlock));
             block.number = paraTool.dechexToInt(block.header.number);
@@ -355,24 +271,24 @@ module.exports = class Crawler extends Indexer {
             // 2. get the trace, if we are running a full node
             let trace = false
             let crawlTrace = parseInt(t.crawlTrace, 10) > 0;
-            if (crawlTrace && chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
-                trace = await this.crawlTrace(chain, blockHash, block.number, 60000 * (t.attempted + 1));
-                console.log("crawl_block_trace trace", trace.length);
-            } else {
-                console.log(`[crawlTrace=${crawlTrace}] crawl_block_trace chain.RPCBackfill NOT OK`, chain.RPCBackfill);
+            if (crawlTrace) {
+                if (chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
+                    trace = await this.crawlTrace(chain, blockHash, block.number, 60000 * (t.attempted + 1));
+                    console.log("crawl_block_trace trace", trace.length);
+                } else {
+                    console.log(`[crawlTrace=${crawlTrace}] crawl_block_trace chain.RPCBackfill MISSING`, chain.RPCBackfill);
+                }
             }
 
             // 3. store finalized state, blockHash + blockTS in mysql + block + trace BT
             let traceType = crawlTrace ? "state_traceBlock" : false
-            let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, evmBlock, evmReceipts, evmTrace);
+            let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, null, null, null);
             if (success) {
                 return {
                     t,
                     block,
                     events,
                     trace,
-                    evmBlock,
-                    evmReceipts,
                     blockHash
                 };
             }
@@ -390,36 +306,15 @@ module.exports = class Crawler extends Indexer {
             block: false,
             events: false,
             trace: false,
-            evmBlock: false,
-            evmReceipts: false,
             blockHash: false
         };
     }
 
-    // crawl_trace fetches a block
-    async crawl_trace_evm(chain, t, api = false) {
-        let bn = t.blockNumber;
-        let attemptNumber = t.attempted;
-        try {
-            let trace = await this.crawlEvmTrace(chain, bn, 60000 * (attemptNumber + 1));
-            let success = await this.save_trace_evm(chain.chainID, t, trace, "debug_traceBlockByNumber");
-            return [t, trace];
-        } catch (err) {
-            this.logger.warn({
-                "op": "crawl_trace_evm",
-                "chainID": chain.chainID,
-                "bn": bn,
-                "err": err
-            })
-            console.log("failure!", err);
-        }
-        return [t, false];
-    }
     // save_block_trace stores block+events+trace, and is called
     //  (a) called by crawlBackfill/crawl_block (finalized = true)
     //  (b) subscribeStorage for CANDIDATE blocks (finalized = false)
     // it is NOT called by subscribeFinalizedHeads
-    async save_block_trace(chainID, block, blockHash, events, trace, finalized = false, traceType = false, evmBlock = false, evmReceipts = false) {
+    async save_block_trace(chainID, block, blockHash, events, trace, finalized = false, traceType = false) {
         let blockTS = block.blockTS;
         let bn = parseInt(block.header.number, 10);
         let parentHash = block.header.parentHash;
@@ -430,8 +325,6 @@ module.exports = class Crawler extends Indexer {
             key: paraTool.blockNumberToHex(bn),
             data: {
                 blockraw: {},
-                blockrawevm: {},
-                receiptsevm: {},
                 events: {},
                 trace: {},
                 finalized: {},
@@ -470,21 +363,6 @@ module.exports = class Crawler extends Indexer {
             };
         }
 
-        if (evmBlock) {
-            let evmBlockTS = evmBlock.timestamp;
-            let evmBlockhash = evmBlock.blockhash
-            cres['data']['blockrawevm'][blockHash] = {
-                value: JSON.stringify(evmBlock),
-                timestamp: evmBlockTS * 1000000
-            };
-        }
-        if (evmReceipts && Array.isArray(evmReceipts)) {
-            cres['data']['receiptsevm'][blockHash] = {
-                value: JSON.stringify(evmReceipts),
-                timestamp: blockTS * 1000000
-            };
-        }
-
         // flush out the mysql + BT updates
         try {
             const tableChain = this.getTableChain(chainID);
@@ -493,18 +371,6 @@ module.exports = class Crawler extends Indexer {
             let eflds = "";
             let evals = "";
             let eupds = "";
-            if (evmReceipts) {
-                let numReceiptsEVM = ethTool.computeNumEvmlogs(evmReceipts);
-                eflds = ", numReceiptsEVM";
-                evals = `, '${numReceiptsEVM}'`;
-                eupds = ", numReceiptsEVM = values(numReceiptsEVM)";
-            } else if (evmBlock) {
-                eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numTransactionsInternalEVM, gasUsed, gasLimit";
-                let tl = evmBlock.transactions && evmBlock.transactions.length ? evmBlock.transactions.length : 0;
-                let itl = evmBlock.transactionsInternal && evmBlock.transactionsInternal.length ? evmBlock.transactionsInternal.length : 0;
-                evals = `, '${evmBlock.hash}', '${evmBlock.parentHash}', '${tl}', '${itl}', '${evmBlock.gasUsed}', '${evmBlock.gasLimit}'`;
-                eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numTransactionsInternalEVM = values(numTransactionsInternalEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit)";
-            }
             if (trace && finalized) {
                 sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT, crawlBlock, crawlTrace, lastTraceDT ${eflds} ) values (${bn}, '${blockHash}', '${parentHash}', FROM_UNIXTIME(${blockTS}), 0, 0, Now()  ${evals} ) on duplicate key update lastTraceDT = values(lastTraceDT), blockHash = values(blockHash), parentHash = values(parentHash), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace), blockDT = values(blockDT) ${eupds} ;`;
             } else if (trace) {
@@ -530,57 +396,6 @@ module.exports = class Crawler extends Indexer {
         }
     }
 
-    async save_evm_block(chainID, bn, blockhash, evmBlock = false, evmReceipts = false, evmTrace = false) {
-        //todo: store evmBlock
-        let cres = {
-            key: paraTool.blockNumberToHex(bn),
-            data: {}
-        };
-        let save = false;
-        if (evmBlock) {
-            let evmBlockTS = evmBlock.timestamp;
-            let evmBlockhash = evmBlock.blockhash;
-            cres['data']['blockrawevm'] = {};
-            cres['data']['blockrawevm'][blockhash] = {
-                value: JSON.stringify(evmBlock),
-                timestamp: evmBlockTS * 1000000
-            };
-            save = true;
-        }
-        let logsTS = (evmBlock && evmBlock.timestamp) ? evmBlock.timestamp : this.getCurrentTS(); // we don't care about logTS
-        if (evmReceipts) {
-            cres['data']['receiptsevm'] = {};
-            cres['data']['receiptsevm'][blockhash] = {
-                value: JSON.stringify(evmReceipts),
-                timestamp: logsTS * 1000000
-            };
-            save = true;
-        }
-        if (evmTrace) {
-            cres['data']['traceevm'] = {};
-            cres['data']['traceevm'][blockhash] = {
-                value: JSON.stringify(evmTrace),
-                timestamp: logsTS * 1000000
-            };
-            save = true;
-        }
-        //console.log(`save_evm_block: cbt read chain${chainID} prefix=${paraTool.blockNumberToHex(bn)}`);
-        // flush out BT updates
-        if (save) {
-            try {
-                const tableChain = this.getTableChain(chainID);
-                await tableChain.insert([cres]);
-            } catch (err) {
-                this.logger.warn({
-                    "op": "save_evm_block",
-                    chainID,
-                    bn,
-                    err
-                })
-                return (false);
-            }
-        }
-    }
 
     async save_trace(chainID, t, trace, traceType = "state_traceBlock") {
         if (!trace) return (false);
@@ -625,55 +440,6 @@ module.exports = class Crawler extends Indexer {
             })
             return (false);
         }
-    }
-
-    async save_trace_evm(chainID, t, trace, traceEVMType = "debug_traceBlockByHash") {
-        if (!trace) return (false);
-        let bn = parseInt(t.blockNumber, 10);
-        let blockTS = parseInt(t.blockTS, 10);
-        let blockHash = t.blockHash;
-        let cres = {
-            key: paraTool.blockNumberToHex(bn),
-            data: {
-                traceevm: {},
-                n: {}
-            }
-        };
-
-        cres['data']['traceevm'][blockHash] = {
-            value: JSON.stringify(trace),
-            timestamp: blockTS * 1000000
-        };
-
-        cres['data']['n']['traceEVMType'] = {
-            value: traceEVMType,
-            timestamp: blockTS * 1000000
-        };
-
-        // flush out the mysql + BT updates
-        try {
-            const tableChain = this.getTableChain(chainID);
-            await tableChain.insert([cres]);
-            return (true);
-        } catch (err) {
-            this.logger.warn({
-                "op": "save_trace_evm",
-                chainID,
-                bn,
-                err
-            })
-            console.log(err);
-            return (false);
-        }
-    }
-
-
-    async audit_blockrawevm(blockEVM, bn) {
-        if (blockEVM.hash && (blockEVM.number == bn)) {
-            return true;
-        }
-        console.log("audit_blockrawevm FAIL", blockEVM);
-        return (false);
     }
 
     //audit_blockraw - check { header, extrinsics, number, blockTS, hash }
@@ -860,10 +626,6 @@ module.exports = class Crawler extends Indexer {
         let start = paraTool.blockNumberToHex(startBN);
         let end = paraTool.blockNumberToHex(endBN);
         let families = ["blockraw", "events", "trace", "finalized"]
-        if (chain.isEVM > 0) {
-            families.push("blockrawevm");
-            families.push("receiptsevm");
-        }
         let res = tableChain.createReadStream({
             start,
             end,
@@ -878,27 +640,15 @@ module.exports = class Crawler extends Indexer {
                 let bn = parseInt(row.id.substr(2), 16);
                 let rowData = row.data;
                 let blockData = rowData["blockraw"];
-                let blockEVMData = rowData["blockrawevm"];
-                let receiptsEVMData = rowData["receiptsevm"];
-                let traceEVMData = rowData["traceevm"];
                 let eventsData = rowData["events"];
                 let traceData = rowData["trace"];
                 let finalizedData = rowData["finalized"];
                 let cellBlock = false;
-                let cellBlockEVM = false;
-                let cellReceiptsEVM = false;
-                let cellTraceEVM = false;
                 let cellEvents = false;
                 let cellTrace = false;
                 let crawlBlock = 1;
-                let crawlBlockEVM = (chain.isEVM > 0) ? 1 : 0;
-                let crawlReceiptsEVM = (chain.isEVM > 0) ? 1 : 0;
-                let crawlTraceEVM = (chain.isEVM > 0) ? 1 : 0;
                 let crawlTrace = 0;
                 let block = false;
-                let blockEVM = false;
-                let receiptsEVM = false;
-                let traceEVM = false;
                 let trace = false;
                 let events = false;
                 let blockStats = false;
@@ -913,17 +663,6 @@ module.exports = class Crawler extends Indexer {
                             cellEvents = eventsData[h][0];
                             finalized[bn] = true;
                             blockHash = h;
-                        }
-                        // QUESTION: is there always only one hash for a bn in evm?
-                        if (blockEVMData && (blockEVMData[h])) {
-                            cellBlockEVM = blockEVMData[h][0];
-                        }
-                        // QUESTION: is there always only one hash for a bn in evm?
-                        if (receiptsEVMData && (receiptsEVMData[h])) {
-                            cellReceiptsEVM = receiptsEVMData[h][0];
-                        }
-                        if (traceEVMData && (traceEVMData[h])) {
-                            cellTraceEVM = traceEVMData[h][0];
                         }
                         if (traceData && traceData[h]) {
                             cellTrace = traceData[h][0];
@@ -950,24 +689,6 @@ module.exports = class Crawler extends Indexer {
                     if ((events.length > 0) && isBlockRawVerified) {
                         crawlBlock = 0;
                     }
-
-                    if (chain.isEVM > 0) {
-                        if (cellBlockEVM) {
-                            blockEVM = JSON.parse(cellBlockEVM.value);
-                            let isBlockEVMRawVerified = await this.audit_blockrawevm(blockEVM, bn);
-                            if (isBlockEVMRawVerified) {
-                                crawlBlockEVM = 0;
-                            }
-                        }
-                        if (cellReceiptsEVM) {
-                            receiptsEVM = JSON.parse(cellReceiptsEVM.value);
-                            crawlReceiptsEVM = 0;
-                        }
-                        if (cellTraceEVM) {
-                            traceEVM = JSON.parse(cellTraceEVM.value);
-                            crawlTraceEVM = 0;
-                        }
-                    }
                 }
 
                 if (cellTrace) {
@@ -981,8 +702,7 @@ module.exports = class Crawler extends Indexer {
                     }
                 }
 
-                let esql = (chain.isEVM > 0) ? `, ${crawlBlockEVM}, ${crawlReceiptsEVM}, ${crawlTraceEVM}` : ""
-                let sql = `('${bn}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${esql})`
+                let sql = `('${bn}', '${blockHash}', '${parentHash}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}')`
                 auditRows.push(sql);
             } catch (err) {
                 this.logger.warn({
@@ -1045,14 +765,11 @@ module.exports = class Crawler extends Indexer {
         let chainID = chain.chainID;
         if (auditRows.length == 0) return;
 
-        let eflds = (chain.isEVM > 0) ? ", crawlBlockEVM, crawlReceiptsEVM, crawlTraceEVM" : "";
-        let efldsu = (chain.isEVM > 0) ? ", crawlBlockEVM = values(crawlBlockEVM), crawlReceiptsEVM = values(crawlReceiptsEVM), crawlTraceEVM = values(crawlTraceEVM)" : "";
-
         let i = 0;
         for (i = 0; i < auditRows.length; i += 10000) {
             let j = i + 10000;
             if (j > auditRows.length) j = auditRows.length;
-            let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT, crawlBlock, crawlTrace ${eflds}) values ` + auditRows.slice(i, j).join(",") + ` on duplicate key update crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace), blockHash = values(blockHash), parentHash = values(parentHash), blockDT = values(blockDT) ${efldsu}`;
+            let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, blockDT, crawlBlock, crawlTrace) values ` + auditRows.slice(i, j).join(",") + ` on duplicate key update crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace), blockHash = values(blockHash), parentHash = values(parentHash), blockDT = values(blockDT)`;
             this.batchedSQL.push(sql)
         }
         auditRows = [];
@@ -1268,8 +985,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
     async crawlBackfill(chain, techniqueParams = ["mod", 0, 1], lookbackBlocks = null, wsBackfill = false) {
         let chainID = chain.chainID;
         let sql = false;
-        let extraflds = (chain.isEVM > 0) ? " crawlBlockEVM, crawlReceiptsEVM, " : "";
-        let extracond = (chain.isEVM > 0) ? " or crawlBlockEVM = 1 or crawlReceiptsEVM = 1 " : "";
         if (lookbackBlocks == null) {
             lookbackBlocks = await this.getChainLookbackBlocks(chainID);
         }
@@ -1279,12 +994,12 @@ group by chainID having count(*) < 500 order by rand() desc`;
             let nmax = techniqueParams[2];
             let w = (nmax > 1) ? `and blockNumber % ${nmax} = ${n}` : "";
             let w2 = ` and blockNumber > ${chain.blocksCovered} - ${lookbackBlocks}`
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) ${w} ${w2} and blockNumber <= ${chain.blocksFinalized} and ( attemptedDT is null or attemptedDT < Date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 50000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, attempted from block${chainID} where ( crawlBlock = 1 ) ${w} ${w2} and blockNumber <= ${chain.blocksFinalized} and ( attemptedDT is null or attemptedDT < Date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 50000`
             console.log("lookback", sql);
         } else if (techniqueParams[0] == "range") {
             let startBN = techniqueParams[1];
             let endBN = techniqueParams[2];
-            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, ${extraflds} attempted from block${chainID} where ( crawlBlock = 1 ${extracond} ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and ( attemptedDT is null  or attemptedDT < date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 50000`
+            sql = `select blockNumber, crawlBlock, 0 as crawlTrace, attempted from block${chainID} where ( crawlBlock = 1 ) and blockNumber >= ${startBN} and blockNumber <= ${endBN} and ( attemptedDT is null  or attemptedDT < date_sub(Now(), interval POW(3, attempted) MINUTE) ) order by blockNumber desc limit 50000`
             console.log("lookback", sql);
         }
         let tasks = await this.poolREADONLY.query(sql);
@@ -1309,9 +1024,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
                     t,
                     block,
                     events,
-                    trace,
-                    evmBlock,
-                    evmReceipts
+                    trace
                 } = t_block_trace;
                 if (t.attempted > 100) t.attempted = 100;
 
@@ -1326,16 +1039,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 } else {
                     flds.push(`attempted = ${t.attempted + 1}`);
                     flds.push(`attemptedDT = Now()`);
-                }
-                if (chain.isEVM > 0) {
-                    if ((t.crawlBlockEVM > 0) && evmBlock && evmBlock.hash) {
-                        t.crawlBlockEVM = 0;
-                        flds.push("crawlBlockEVM = 0");
-                    }
-                    if ((t.crawlReceiptsEVM > 0) && evmReceipts && Array.isArray(evmReceipts)) {
-                        t.crawlReceiptsEVM = 0;
-                        flds.push("crawlReceiptsEVM = 0");
-                    }
                 }
                 let sql = `update block${chainID} set ${flds.join(", ")} where blockNumber = '${t.blockNumber}'`;
                 this.batchedSQL.push(sql)
@@ -1355,54 +1058,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
             return result[0].numRecentCrawlBlocks;
         }
         return (-1);
-    }
-    // for any missing traces, this refetches the dataset
-    async crawlTracesEVM(chainID, techniqueParams = ["mod", 0, 1], lookback = 600) {
-        let chain = await this.setupChainAndAPI(chainID);
-        let done = false;
-        do {
-            let sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, blockHashEVM, attempted from block${chainID} where crawlTraceEVM > 0 and length(blockHash) > 0 and blockNumber % ${techniqueParams[2]} = ${techniqueParams[1]} and blockDT >= date_sub(Now(), interval ${lookback} DAY) and attempted < ${maxTraceAttempts} order by crawlTraceEVM desc,attempted, blockNumber desc limit 1000`
-            if (techniqueParams[0] == "range") {
-                let startBN = techniqueParams[1];
-                let endBN = techniqueParams[2];
-                sql = `select blockNumber, UNIX_TIMESTAMP(blockDT) as blockTS, blockHash, blockHashEVM, attempted from block${chainID} where crawlTraceEVM > 0 and length(blockHash) > 0 and blockNumber >= ${startBN} and blockNumber <= ${endBN} and attempted < ${maxTraceAttempts} order by blockNumber limit 1000`
-            }
-            let tasks = await this.poolREADONLY.query(sql);
-
-            let jmp = 1;
-            for (var i = 0; i < tasks.length; i += jmp) {
-                let j = i + jmp;
-                if (j > tasks.length) j = tasks.length;
-                let pieces = tasks.slice(i, j);
-                let res = pieces.map((t1) => {
-                    let t2 = {
-                        chainID: chainID,
-                        blockNumber: t1.blockNumber,
-                        blockHash: t1.blockHash,
-                        blockHashEVM: t1.blockHashEVM,
-                        blockTS: t1.blockTS,
-                        attempted: t1.attempted
-                    };
-                    return this.crawl_trace_evm(chain, t2, this.api);
-                });
-                let res2 = await Promise.all(res);
-                res2.forEach(async (t_trace) => {
-                    let [t, trace] = t_trace;
-                    if (trace) {
-                        let sql = `update block${chainID} set crawlTraceEVM = 0 where blockNumber = ${t.blockNumber}`
-                        this.batchedSQL.push(sql)
-                    } else {
-                        let sql = `update block${chainID} set attempted = attempted + 1, attemptedDT = Now() where blockNumber = ${t.blockNumber}`
-                        this.batchedSQL.push(sql)
-                    }
-                    await this.mark_indexlog_dirty(chainID, t_trace.blockTS)
-                    return
-                });
-                this.batchedSQL.push(`update chain set traceTSLast = UNIX_TIMESTAMP(Now()) where chainID = ${chainID}`)
-                await this.update_batchedSQL();
-            }
-        } while (!done);
-
     }
 
     // for any missing traces, this refetches the dataset
@@ -1451,7 +1106,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         block,
                         events,
                         trace,
-                        evmBlock,
                         blockHash
                     } = t_trace;
                     let flds = [];
@@ -1543,9 +1197,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 });
             }
             await this.update_indexlog_hourly(chain)
-            if (chain.isEVM > 0 && (chain.evmRPC)) {
-                await this.updateERC20TokenSupply(chain);
-            }
             await this.updateSpecVersions(chain);
             return (true);
         }
@@ -1646,7 +1297,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         tx.chainID = chain.chainID;
                         tx.timestamp = ts;
                     }
-                    await crawler.processPendingEVMTransactions(txs);
                 } else if (ts % 60 == 0) {
 
                     for (const txhash of Object.keys(crawler.coveredtx)) {
@@ -1752,14 +1402,10 @@ group by chainID having count(*) < 500 order by rand() desc`;
 
         let blockStats = false;
         let blockTS = 0;
-        let crawlBlockEVM = (chain.isEVM > 0) ? 1 : 0;
-        let crawlReceiptsEVM = (chain.isEVM > 0) ? 1 : 0;
-        let crawlTraceEVM = (chain.isEVM > 0) ? 1 : 0;
         let crawlBlock = 1;
         let crawlTrace = 1;
         if (bn > this.latestBlockNumber) this.latestBlockNumber = bn;
         // read the row and DELETE all the blockraw:XXX and trace:XXX rows that do NOT match the finalized hash
-        // todo: delete evmblock evmreceipt evmtrace and fetch the finalized one
         const filter = {
             column: {
                 cellLimit: 30
@@ -1796,9 +1442,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
             const blockData = rowData["blockraw"];
             const traceData = rowData["trace"];
             const eventsData = rowData["events"];
-            const evmBlockData = rowData["blockrawevm"];
-            const evmReceiptsData = rowData["receiptsevm"];
-            const evmTraceData = rowData["traceevm"];
             let block = false;
             let events = false;
             let trace = false;
@@ -1818,30 +1461,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         if (cellEvent) {
                             events = JSON.parse(cellEvent.value);
                         }
-                    }
-                }
-            }
-
-            if (evmBlockData) {
-                for (const blockHash of Object.keys(evmBlockData)) {
-                    if (blockHash != finalizedHash) {
-                        cols.push("blockrawevm:" + blockHash);
-                    }
-                }
-            }
-
-            if (evmReceiptsData) {
-                for (const blockHash of Object.keys(evmReceiptsData)) {
-                    if (blockHash != finalizedHash) {
-                        cols.push("receiptsevm:" + blockHash);
-                    }
-                }
-            }
-
-            if (evmTraceData) {
-                for (const blockHash of Object.keys(evmTraceData)) {
-                    if (blockHash != finalizedHash) {
-                        cols.push("traceevm:" + blockHash);
                     }
                 }
             }
@@ -1879,21 +1498,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                     blockHash: finalizedHash,
                 }
                 //todo: missing rRow.blockHash
-
-                //store evmBlock here?
-                if (this.web3Api) {
-                    let evmBlock = await ethTool.crawlEvmBlock(this.web3Api, bn)
-                    let evmReceipts = await ethTool.crawlEvmReceipts(this.web3Api, evmBlock) // this is using the result from previous call
-                    let evmTrace = false // (chainID == paraTool.chainIDMoonbeam || chainID == paraTool.chainIDMoonriver) ? await this.crawlEvmTrace(chain, bn) : false;
-
-                    await this.save_evm_block(chainID, bn, finalizedHash, evmBlock, evmReceipts, evmTrace)
-                    rRow.evmBlock = evmBlock;
-                    rRow.evmReceipts = evmReceipts;
-                    rRow.evmTrace = evmTrace;
-                    if (evmBlock) crawlBlockEVM = 0;
-                    if (evmReceipts) crawlReceiptsEVM = 0;
-                    if (evmTrace) crawlTraceEVM = 0;
-                }
                 let isSignedBlock = false
 
                 let refreshAPI = false
@@ -1940,18 +1544,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 let eflds = "";
                 let evals = "";
                 let eupds = "";
-                if (chain.isEVM) {
-                    let blockHashEVM = blockStats.blockHashEVM ? blockStats.blockHashEVM : "";
-                    let parentHashEVM = blockStats.parentHashEVM ? blockStats.parentHashEVM : "";
-                    let numTransactionsEVM = blockStats.numTransactionsEVM ? blockStats.numTransactionsEVM : 0;
-                    let numTransactionsInternalEVM = blockStats.numTransactionsInternalEVM ? blockStats.numTransactionsInternalEVM : 0;
-                    let numReceiptsEVM = blockStats.numReceiptsEVM ? blockStats.numReceiptsEVM : 0;
-                    let gasUsed = blockStats.gasUsed ? blockStats.gasUsed : 0;
-                    let gasLimit = blockStats.gasLimit ? blockStats.gasLimit : 0;
-                    eflds = ", blockHashEVM, parentHashEVM, numTransactionsEVM, numTransactionsInternalEVM, numReceiptsEVM, gasUsed, gasLimit, crawlBlockEVM, crawlReceiptsEVM, crawlTraceEVM";
-                    evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numTransactionsInternalEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}', ${crawlBlockEVM}, ${crawlReceiptsEVM}, ${crawlTraceEVM}`;
-                    eupds = ", blockHashEVM = values(blockHashEVM), parentHashEVM = values(parentHashEVM), numTransactionsEVM = values(numTransactionsEVM), numTransactionsInternalEVM = values(numTransactionsInternalEVM), numReceiptsEVM = values(numReceiptsEVM), gasUsed = values(gasUsed), gasLimit = values(gasLimit), crawlBlockEVM = values(crawlBlockEVM), crawlReceiptsEVM = values(crawlReceiptsEVM), crawlTraceEVM = values(crawlTraceEVM)";
-                }
                 let sql = `insert into block${chainID} (blockNumber, blockHash, parentHash, numExtrinsics, numSignedExtrinsics, numTransfers, numEvents, valueTransfersUSD, fees, blockDT, crawlBlock, crawlTrace ${eflds}) values ('${bn}', '${finalizedHash}', '${parentHash}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', FROM_UNIXTIME('${blockTS}'), '${crawlBlock}', '${crawlTrace}' ${evals}) on duplicate key update blockHash=values(blockHash), parentHash = values(parentHash), blockDT=values(blockDT), numExtrinsics = values(numExtrinsics), numSignedExtrinsics = values(numSignedExtrinsics), numTransfers = values(numTransfers), numEvents = values(numEvents), valueTransfersUSD = values(valueTransfersUSD), fees = values(fees), crawlBlock = values(crawlBlock), crawlTrace = values(crawlTrace) ${eupds}`;
                 this.batchedSQL.push(sql);
                 // mark that the PREVIOUS hour is ready for indexing, since this block is FINALIZED, so that continuously running "indexChain" job can index the newly finalized hour
@@ -2065,11 +1657,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
     async process_indexer_crawlBlock(chain, crawlBlock) {
         try {
             let blockNumber = crawlBlock.blockNumber;
-            if (chain.isEVM) {
-                crawlBlock.crawlBlockEVM = 1;
-                crawlBlock.crawlReceiptsEVM = 1;
-                crawlBlock.crawlTraceEVM = 1;
-            }
             await this.crawl_block_trace(chain, crawlBlock)
             let blockHash = await this.getBlockHashFinalized(chain.chainID, blockNumber);
             this.logger.error({
@@ -2105,18 +1692,8 @@ group by chainID having count(*) < 500 order by rand() desc`;
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
         }
-        let evmChainList = [paraTool.chainIDEthereum, paraTool.chainIDOptimism, paraTool.chainIDPolygon,
-            paraTool.chainIDMoonriverEVM, paraTool.chainIDMoonbeamEVM, paraTool.chainIDAstarEVM, paraTool.chainIDShidenEVM,
-            paraTool.chainIDArbitrum, paraTool.chainIDAvalanche
-        ]
-        if (evmChainList.includes(chainID)) {
-            console.log(`evmchain no longer supported`)
-            process.exit(0)
-            return [null, null, null];
-        } else {
-            console.log("loading substrate");
-            await this.load_calls_events("substrate");
-        }
+        console.log("loading substrate");
+        await this.load_calls_events("substrate");
 
         // Subscribe to chain updates and log the current block number on update.
         let chain = await this.setupChainAndAPI(chainID);
@@ -2125,9 +1702,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
 
         await this.setup_chainParser(chain, paraTool.debugNoLog, true);
         if (chain.WSEndpointSelfHosted == 1) {
-            if (chain.isEVM) {
-                setInterval(this.crawlTxpoolContent, 1000, chain, this);
-            }
             setInterval(this.crawlPendingExtrinsics, 1000, chain, this);
         }
 
@@ -2245,10 +1819,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         }
 
                         if (blockNumber > this.latestBlockNumber) this.latestBlockNumber = blockNumber;
-                        let evmBlock = false
-                        let evmReceipts = false
-                        let evmTrace = false
-
                         // write { blockraw:blockHash => block, trace:blockHash => trace, events:blockHash => events } to bigtable
                         let success = await this.save_block_trace(chainID, block, blockHash, events, trace, false, traceType);
                         if (success) {
@@ -2258,7 +1828,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
                                 this.apiAt = this.api //set here for opaqueCall  // TODO: what if metadata changes?
                                 let signedExtrinsicBlock = block
                                 signedExtrinsicBlock.extrinsics = signedBlock.extrinsics //add signed extrinsics
-                                // IMPORTANT NOTE: we only need to do this for evm chains... (review)
+
                                 let isFinalized = false
                                 let isTip = true
                                 let isTracesPresent = success // true here
@@ -2266,8 +1836,8 @@ group by chainID having count(*) < 500 order by rand() desc`;
                                 let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
                                 await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized, true); // use result from rawtrace to decorate
 
-                                //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
-                                let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, evmBlock, evmReceipts, evmTrace, autoTraces, isFinalized, false, isTip, isTracesPresent);
+                                //processBlockEvents(chainID, block, eventsRaw, unused0, unused1, unused2, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
+                                let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, null, null, null, autoTraces, isFinalized, false, isTip, isTracesPresent);
 
                                 await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                                 if (blockNumber > this.blocksCovered) {
@@ -2284,17 +1854,6 @@ group by chainID having count(*) < 500 order by rand() desc`;
                                 let fees = blockStats && blockStats.fees ? blockStats.fees : 0
                                 let vals = ["numExtrinsics", "numSignedExtrinsics", "numTransfers", "numEvents", "valueTransfersUSD", "fees", "lastTraceDT"]
                                 let evals = "";
-                                if (chain.isEVM) {
-                                    let blockHashEVM = blockStats.blockHashEVM ? blockStats.blockHashEVM : "";
-                                    let parentHashEVM = blockStats.parentHashEVM ? blockStats.parentHashEVM : "";
-                                    let numTransactionsEVM = blockStats.numTransactionsEVM ? blockStats.numTransactionsEVM : 0;
-                                    let numTransactionsInternalEVM = blockStats.numTransactionsInternalEVM ? blockStats.numTransactionsInternalEVM : 0;
-                                    let numReceiptsEVM = blockStats.numReceiptsEVM ? blockStats.numReceiptsEVM : 0;
-                                    let gasUsed = blockStats.gasUsed ? blockStats.gasUsed : 0;
-                                    let gasLimit = blockStats.gasLimit ? blockStats.gasLimit : 0;
-                                    vals.push("blockHashEVM", "parentHashEVM", "numTransactionsEVM", "numTransactionsInternalEVM", "numReceiptsEVM", "gasUsed", "gasLimit");
-                                    evals = `, '${blockHashEVM}', '${parentHashEVM}', '${numTransactionsEVM}', '${numTransactionsInternalEVM}', '${numReceiptsEVM}', '${gasUsed}', '${gasLimit}'`;
-                                }
 
                                 let out = `('${blockNumber}', '${numExtrinsics}', '${numSignedExtrinsics}', '${numTransfers}', '${numEvents}', '${valueTransfersUSD}', '${fees}', from_unixtime(${blockTS}) ${evals} )`;
                                 await this.upsertSQL({
@@ -2381,8 +1940,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
 
                                 await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized, true); // use result from rawtrace to decorate
 
-                                //processBlockEvents(chainID, block, eventsRaw, evmBlock = false, evmReceipts, evmTrace, autoTraces, finalized = false, unused = false, isTip = false, tracesPresent = false)
-                                let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, false, false, false, [], isFinalized, false, isTip, isTracesPresent);
+                                let [blockStats, xcmMeta] = await this.processBlockEvents(chainID, signedExtrinsicBlock, events, null, null, null, [], isFinalized, false, isTip, isTracesPresent);
 
                                 await this.immediateFlushBlockAndAddressExtrinsics(true) //this is tip
                                 if (blockNumber > this.blocksCovered) {
