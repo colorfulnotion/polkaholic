@@ -385,12 +385,15 @@ module.exports = class PolkaholicDB {
     }
 
     getChainEVMStatus(chainID) {
-        chainID = chainID.toString()
-        if (this.chainInfos[chainID] != undefined) {
-            return this.chainInfos[chainID].isEVM
-        } else {
-            console.log("getChainEVMStatus FATAL ERROR: must call init", chainID)
-        }
+        if ( chainID ) {
+	    chainID = chainID.toString()
+            if (this.chainInfos[chainID] != undefined) {
+		return this.chainInfos[chainID].isEVM
+            } else {
+		console.log("getChainEVMStatus FATAL ERROR: must call init", chainID)
+            }
+	}
+	return null;
     }
 
     getChainFullInfo(chainID) {
@@ -847,12 +850,6 @@ from chain where chainID = '${chainID}' limit 1`);
             //for substrate, initiat with polkadotjs
             if (!this.api) {
                 this.api = await this.get_api(chain);
-            }
-        }
-        if (!this.web3Api) {
-            this.web3Api = await this.getWeb3Api(chain, backfill);
-            if (this.web3Api) {
-                this.contractABIs = await this.getContractABI();
             }
         }
     }
@@ -2030,87 +2027,6 @@ from chain where chainID = '${chainID}' limit 1`);
         } catch (e) {
             console.log(e)
             return null;
-        }
-    }
-
-    async extract_blocks(bnStart, bnEnd, chainID) {
-        let relayChain = paraTool.getRelayChainByChainID(chainID)
-        let paraID = paraTool.getParaIDfromChainID(chainID)
-        const tableChain = this.getTableChain(chainID);
-        const {
-            Storage
-        } = require('@google-cloud/storage');
-        const storage = new Storage();
-        let bucketName = "crypto_substrate";
-        const bucket = storage.bucket(bucketName);
-        let jmp = 100;
-
-
-        for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-            let bn1 = bn0 + jmp - 1;
-            if (bn1 > bnEnd) bn1 = bnEnd;
-            // check if we have archived
-            let sql = `select sum(if(archived=1,1,0)) as archived, count(*) cnt from block${chainID} where blockNumber >= ${bn0} and blockNumber <= ${bn1}`;
-            let recs = await this.poolREADONLY.query(sql);
-            if (recs.length > 0) {
-                let c = recs[0];
-                let archived = parseInt(c.archived);
-                let cnt = parseInt(c.cnt);
-                if (archived == cnt) {
-                    // we have no work to do!
-                    console.log("NO WORK TO DO", bn0, bn1, c);
-                    continue;
-                } else {
-                    console.log("... workload: ", bn0, bn1, "archived", c.archived, "cnt", cnt);
-                }
-            }
-
-
-            let start = paraTool.blockNumberToHex(bn0);
-            let end = paraTool.blockNumberToHex(bn1);
-            let [rows] = await tableChain.getRows({
-                start: start,
-                end: end
-            });
-            let out = [];
-            for (const row of rows) {
-                let blockNumber = parseInt(row.id.substr(2), 16);
-                let r = this.build_block_from_row(row);
-                let result = {}
-                result["blockraw"] = r["block"];
-                result["events"] = r["events"];
-                result["feed"] = r["feed"];
-                if (result["blockraw"] && result["events"] && result["feed"]) {
-                    const compressedData = JSON.stringify(result);
-                    const fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber);
-                    const file = bucket.file(fileName);
-                    const writeStream = file.createWriteStream({
-                        contentType: 'application/json',
-                        gzip: true
-                    });
-                    writeStream.write(compressedData);
-                    writeStream.end();
-
-                    // Wait for the write stream to finish writing
-                    await new Promise((resolve, reject) => {
-                        writeStream.on('finish', resolve);
-                        writeStream.on('error', reject);
-                    });
-                    console.log(`gs://${bucketName}/${fileName}`);
-                    out.push(`(${blockNumber}, 1)`)
-                } else {
-                    console.log("PROBLEM", r);
-                }
-            }
-            if (out.length > 0) {
-                await this.upsertSQL({
-                    "table": `block${chainID}`,
-                    "keys": ["blockNumber"],
-                    "vals": ["archived"],
-                    "data": out,
-                    "replace": ["archived"]
-                });
-            }
         }
     }
 

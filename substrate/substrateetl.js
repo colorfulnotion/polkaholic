@@ -149,26 +149,6 @@ module.exports = class SubstrateETL extends AssetManager {
         process.exit(0)
     }
 
-    async update_archiver_chain_sector(chainID, sector) {
-        let startBN = sector * 10000;
-        let endBN = startBN + 10000;
-        let sql = `insert into archiver (chainID, sector, archived, cnt) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt from block${chainID} where blockNumber >= ${startBN} and blockNumber < ${endBN} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt)`
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-    }
-
-    async get_archiver_chain_sector() {
-        let sql = `select chainID, sector from archiver where  archived < cnt and lastDT < date_sub(Now(), interval 30 DAY) order by rand() limit 1`;
-        let recs = await this.poolREADONLY.query(sql);
-        if (recs.length == 1) {
-            let r = recs[0];
-            let chainID = parseInt(r.chainID, 10);
-            let sector = parseInt(r.sector, 10);
-            return [chainID, sector];
-        }
-        console.log("FAIL", sql)
-        return [null, null];
-    }
 
     async cleanReapedExcess(chainID) {
         let projectID = `${this.project}`
@@ -1079,7 +1059,7 @@ FROM
             return false;
         }
         let chain = chains[0];
-        let wsEndpoint = chain.WSEndpoint;
+	let wsEndpoint = this.get_wsendpoint(chain);
         let chainName = chain.chainName;
         let paraID = chain.paraID;
         let id = chain.id;
@@ -1981,7 +1961,24 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         console.log("DONE");
     }
 
-
+    get_wsendpoint(chain) {
+        let wsEndpoint = chain.WSEndpoint;
+        let alts = {
+            0: ['wss://1rpc.io/dot', 'wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://polkadot-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io', 'wss://polkadot.public.curie.radiumblock.co/ws'],
+            2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
+            22023: ['wss://moonriver.public.blastapi.io', 'wss://wss.api.moonriver.moonbeam.network', 'wss://moonriver.api.onfinality.io/public-ws', 'wss://moonriver.unitedbloc.com:2001'],
+            2004: ['wss://1rpc.io/glmr', 'wss://moonbeam.public.blastapi.io', 'wss://wss.api.moonbeam.network', 'wss://moonbeam.api.onfinality.io/public-ws', 'wss://moonbeam.unitedbloc.com:3001'],
+	    2000: ['wss://acala-rpc.dwellir.com'],
+	    2094: ['wss://rpc-pendulum.prd.pendulumchain.tech'],
+	    2026: ['wss://eden-rpc.dwellir.com'] // 'wss://nodle-parachain.api.onfinality.io/public-ws'
+        }
+	let chainID = chain.chainID;
+        if (alts[chainID] !== undefined && (alts[chainID].length > 0)) {
+            let a = alts[chainID];
+            wsEndpoint = a[Math.floor(Math.random() * a.length)];
+        }
+	return wsEndpoint;
+    }
     async updateNativeBalances(chainID, logDT = null, startTS = 0, perPagelimit = 1000) {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
@@ -1996,18 +1993,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         let paraID = chain.paraID;
         let chainName = chain.chainName;
         let id = chain.id;
-
-        let wsEndpoint = chain.WSEndpoint;
-        let alts = {
-            0: ['wss://1rpc.io/dot', 'wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://polkadot-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io', 'wss://polkadot.public.curie.radiumblock.co/ws'],
-            2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
-            22023: ['wss://moonriver.public.blastapi.io', 'wss://wss.api.moonriver.moonbeam.network', 'wss://moonriver.api.onfinality.io/public-ws', 'wss://moonriver.unitedbloc.com:2001'],
-            2004: ['wss://1rpc.io/glmr', 'wss://moonbeam.public.blastapi.io', 'wss://wss.api.moonbeam.network', 'wss://moonbeam.api.onfinality.io/public-ws', 'wss://moonbeam.unitedbloc.com:3001']
-        }
-        if (alts[chainID] !== undefined && (alts[chainID].length > 0)) {
-            let a = alts[chainID];
-            wsEndpoint = a[Math.floor(Math.random() * a.length)];
-        }
+	let wsEndpoint = this.get_wsendpoint(chain);
         let prev_numHolders = chain.numHolders;
         let decimals = this.getChainDecimal(chainID)
         const provider = new WsProvider(wsEndpoint);
@@ -2114,6 +2100,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
         while (!done) {
             let apiAt = await api.at(finalizedBlockHash)
+	    console.log("finalizedBlockHash", finalizedBlockHash);
             let query = null;
             try {
                 query = await apiAt.query.system.account.entriesPaged({

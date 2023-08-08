@@ -97,9 +97,7 @@ module.exports = class Indexer extends AssetManager {
 
     wasmContractMap = {};
     wasmContractCallMap = {};
-    ably_client = null;
-    ably_channel_xcmindexer = null;
-    ably_channel_xcminfo = null;
+    wasmContractMetadata = {};
 
     addressBalanceRequest = {}
     xcmtransfers_beneficiary = {};
@@ -2064,29 +2062,9 @@ module.exports = class Indexer extends AssetManager {
     }
 
     publish_xcmtransfer(msg) {
-        try {
-            if (this.ably_client && this.ably_channel_xcmindexer) {
-                this.ably_channel_xcmindexer.publish("xcm-indexer", msg);
-            }
-        } catch (err) {
-            this.logger.error({
-                "op": "publish_xcmtransfer ERROR",
-                err
-            });
-        }
     }
 
     publish_xcminfo(msg) {
-        try {
-            if (this.ably_client && this.ably_channel_xcminfo) {
-                this.ably_channel_xcminfo.publish("xcminfo", msg);
-            }
-        } catch (err) {
-            this.logger.error({
-                "op": "publish_xcminfo ERROR",
-                err
-            });
-        }
     }
 
 

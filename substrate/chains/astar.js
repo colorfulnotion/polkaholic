@@ -23,7 +23,6 @@ module.exports = class AstarParser extends ChainParser {
 
     xcmTransferMethodList = ["0xecf766ff", "0x019054d0", "0x106d59fe", "0x400c0e8d"];
     xcmTransactorMethodList = ["0xf90eb212"];
-
     async processWasmContracts(indexer, extrinsic, feed, fromAddress, section = false, method = false, args = false, depth = 0, idx = 0) {
         let module_section = section;
         let module_method = method
@@ -118,6 +117,7 @@ module.exports = class AstarParser extends ChainParser {
         }
     }
 
+    
     contractsEventFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         switch (palletMethod) {
@@ -211,18 +211,22 @@ module.exports = class AstarParser extends ChainParser {
             address_ss58,
             value: paraTool.dechexToInt(args.value),
             gasLimit: args.gas_limit ? JSON.stringify(args.gas_limit) : null,
-            storageDepositLimit: args.storage_deposit_limit ? args.storage_deposit_limit : null,
+            storageDepositLimit: args.storage_deposit_limit ? paraTool.dechexToInt(args.storage_deposit_limit) : null, // TODO 
             caller: paraTool.getPubKey(extrinsic.signer),
             caller_ss58: extrinsic.signer,
             data: args.data,
             identifier: null,
             decodedCall: null,
         }
-        let metadata = {};
         try {
-            metadata[address_ss58] = await this.fetchWASMContractMetadata(address_ss58, indexer);
-            if (metadata[address_ss58]) {
-                const contract = new ContractPromise(indexer.api, metadata[address_ss58], address_ss58);
+	    if ( indexer.wasmContractMetadata[address_ss58] ) {
+	    } else {
+		indexer.wasmContractMetadata[address_ss58] = await this.fetchWASMContractMetadata(address_ss58, indexer);
+		console.log("READ", address_ss58, indexer.wasmContractMetadata[address_ss58] )
+	    }
+	    let metadata = indexer.wasmContractMetadata[address_ss58];
+            if (metadata && Object.keys(metadata).length > 0) {
+                const contract = new ContractPromise(indexer.api, metadata, address_ss58);
                 const bytes = hexToU8a(args.data);
                 let result = contract.abi.decodeMessage(compactAddLength(bytes));
                 r.decodedCall = result.args.map((a) => {
@@ -235,6 +239,7 @@ module.exports = class AstarParser extends ChainParser {
                 extrinsic.decodedCall = r.decodedCall;
                 extrinsic.decodedEvents = wasmContractsEmitted;
             } else {
+		
                 console.log("processContractsCall NOT FOUND", address_ss58);
             }
         } catch (err) {

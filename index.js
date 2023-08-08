@@ -1977,6 +1977,7 @@ app.get('/wasmcode/:codeHash/:chainID?', async (req, res) => {
         let codeHash = req.params["codeHash"];
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
         let code = await query.getWASMCode(codeHash, chainID);
+	console.log("CODE", code);
         res.render('wasmcode', {
             codeHash: codeHash,
             chainInfo: query.getChainInfo(),
@@ -2170,16 +2171,6 @@ app.post('/uploadcontract/:address', async (req, res) => {
         res.send('Contract File uploaded!');
     });
 
-})
-
-app.get('/xcminfows/:name?', async (req, res) => {
-    let name = req.params["name"] ? req.params["name"] : "xcminfo";
-    let xcmInfo = await query.getXCMInfoLatest(name);
-    res.render('xcminfows', {
-        name: name,
-        xcmInfo: xcmInfo,
-        apiUrl: '/xcmtransfers'
-    });
 })
 
 app.post('/uploadcode/:codeHash', async (req, res) => {
