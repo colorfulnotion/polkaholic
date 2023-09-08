@@ -120,7 +120,7 @@ module.exports = class SubstrateETL extends AssetManager {
         // setup paraID specific tables, including paraID=0 for the relay chain
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs", "balances", "specversions", "calls", "traces"] // remove evmtx, evmtransfers
         let p = (chainID != undefined) ? ` and chainID = ${chainID} ` : ""
-        let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama', 'shibuya') ${p} order by chainID`
+        let sql = `select chainID, isEVM from chain where relayChain in ('polkadot', 'kusama', 'shibuya', 'rococo') ${p} order by chainID`
         let recs = await this.poolREADONLY.query(sql);
         console.log(`***** setup "chain" tables:${tbls} (chainID=${chainID}) ******`)
         for (const rec of recs) {
@@ -793,89 +793,111 @@ FROM
         return false;
     }
 
-    async pick_chainbalancecrawler(specific_chainID = null) {
+    async pick_chainbalancecrawler(specific_chainID = null, specific_logDT = null, force = false) {
+        if (force) {
+            let ts = paraTool.logDT_hr_to_ts(specific_logDT, 0);
+            let jobID = "force" + this.getCurrentTS();
+            return [specific_chainID, ts, jobID];
+        }
         let w = (specific_chainID) ? ` and chainID = '${specific_chainID}' ` : " and chainID in ( select chainID from chain where relayChain in ('polkadot','kusama') )";
-        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS, startTS, logDT from chainbalancecrawler as c where hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 5 MINUTE) ${w} order by lastDT DESC limit 1`;
-        console.log("pick_chainbalancecrawler", sql);
+        if (specific_logDT) {
+            w += ` and logDT = '${specific_logDT}'`;
+        }
+        let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS, jobID, logDT from chainbalancecrawler as c where lastDT < date_sub(Now(), interval 2 MINUTE) ${w} order by rand() limit 1`;
         let chains = await this.pool.query(sql);
+        console.log(chains.length, sql);
         if (chains.length == 0) {
             return [null, null, null];
         }
         // check that its actually in the ready state
         let chainID = chains[0].chainID;
         let logTS = chains[0].indexTS;
-        let startTS = chains[0].startTS;
+        let jobID = chains[0].jobID;
         let [logDT, _] = paraTool.ts_to_logDT_hr(logTS);
+        console.log("pick_chainbalancecrawler chose:", chainID, logDT);
         if (await this.is_update_balance_ready(chainID, logDT)) {
-            return [chainID, chains[0].indexTS, startTS];
+            return [chainID, chains[0].indexTS, jobID];
+        } else {
+            let sql2 = `delete from chainbalancecrawler where logDT = '${logDT}' and chainID = '${chainID}'`
+            this.batchedSQL.push(sql2);
+            await this.update_batchedSQL();
         }
+
         console.log("pick_chainbalancecrawler ... not ready anymore", chainID, logDT)
         return [null, null, null];
     }
 
     // pick a random chain to load yesterday for all chains
-    async updateAddressBalances(specific_chainID = null) {
+    async updateAddressBalances(specific_chainID = null, specific_logDT = null, force = false) {
         // pick something your node started already
-        let [chainID, indexTS, startTS] = await this.pick_chainbalancecrawler(specific_chainID);
+        let [chainID, indexTS, jobID] = await this.pick_chainbalancecrawler(specific_chainID, specific_logDT, force);
+        console.log(chainID, indexTS, jobID);
         if (chainID == null) {
             let orderby = "blocklog.logDT desc, rand()";
             let w = (specific_chainID != null) ? ` and blocklog.chainID = '${specific_chainID}' ` : "";
-            // pick a chain-logDT combo that has been marked Ready ( all blocks finalized ), and no other node is working on
-            let othersRecs = await this.pool.query(`select chainID, UNIX_TIMESTAMP(logDT) as logTS from chainbalancecrawler where hostname != '${this.hostname}' and lastDT > date_sub(Now(), interval 3 minute)`);
-            let others = {};
-            for (const o of othersRecs) {
-                others[`${o.chainID}-${o.logTS}`] = true;
-            }
-            // now out of candidate jobs choose the first one that hasn't been picked
-            let sql = `select chainID, UNIX_TIMESTAMP(logDT) as indexTS from blocklog where chainID in (select chainID from chain where relayChain in ('polkadot','kusama')) and  ( updateAddressBalanceStatus = "Ready" or (updateAddressBalanceStatus = 'Ignore' and logDT = date(date_sub(Now(), interval 1 day))) ) and
- ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE )
- or lastUpdateAddressBalancesStartDT is Null  ) and blocklog.logDT >= '${balanceStartDT}' ${w} order by ${orderby}`;
-            let jobs = await this.pool.query(sql);
+            // pick a chain-logDT combo that has been marked Ready ( all blocks finalized )
+            // 
+            let sql = `select blocklog.chainID, UNIX_TIMESTAMP(blocklog.logDT) as indexTS 
+from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecrawler.logDT and chainbalancecrawler.chainID = blocklog.chainID
+  where chainbalancecrawler.logDT is null and chainbalancecrawler.chainID is null and blocklog.chainID in (select chainID from chain where relayChain in ('polkadot','kusama'))
+  and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE ) or lastUpdateAddressBalancesStartDT is Null )
+  and ( blocklog.updateAddressBalanceStatus = "Ready" ) 
+  and blocklog.logDT >= '${balanceStartDT}' ${w} order by rand()`;
             console.log(sql);
+            let jobs = await this.pool.query(sql);
             if (jobs.length == 0) {
                 console.log(`No updatebalances jobs available`)
                 return false;
             }
-
             for (const c of jobs) {
-                if (others[`${c.chainID}-${c.indexTS}`]) {
-                    console.log("skipping job cand:", c);
-                } else {
-                    console.log("choosing job cand:", c);
-                    chainID = c.chainID;
-                    indexTS = c.indexTS;
-                    startTS = this.getCurrentTS();
-                    break;
-                }
+                console.log("choosing job cand:", c);
+                chainID = c.chainID;
+                indexTS = c.indexTS;
+                jobID = `${chainID}-${indexTS}-${this.getCurrentTS()}`;
+                break;
             }
         }
         if (chainID == null) {
             return (false);
         }
-        console.log("SELECTED", chainID);
+
+        // read updateBalancesLookbackDays
+        let updateBalancesLookbackDays = 365;
+        let sql1 = `select updateBalancesLookbackDays, crawling from chain where chainID = '${chainID}'`
+        let lookbackRecs = await this.poolREADONLY.query(sql1);
+        if (lookbackRecs.length > 0) {
+            updateBalancesLookbackDays = lookbackRecs[0].updateBalancesLookbackDays;
+        }
         let [logDT, hr] = paraTool.ts_to_logDT_hr(indexTS);
-        let sql = `update blocklog set lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}' and lastUpdateAddressBalancesAttempts < 30`;
+        if (indexTS < this.getCurrentTS() - updateBalancesLookbackDays * 86400) {
+            sql1 = `update blocklog set updateAddressBalanceStatus = 'Ignore' where logDT = '${logDT}' and chainID = '${chainID}'`
+            this.batchedSQL.push(sql1);
+            await this.update_batchedSQL();
+            return;
+        }
+
+        let sql = `update blocklog set accountMetricsStatus = 'NotReady', lastUpdateAddressBalancesAttempts = lastUpdateAddressBalancesAttempts + 1 where logDT = '${logDT}' and chainID = '${chainID}' and lastUpdateAddressBalancesAttempts < 30`;
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
-        await this.update_address_balances_logDT(chainID, logDT, startTS);
+        await this.update_address_balances_logDT(chainID, logDT, jobID);
         return (true);
     }
 
-    async update_address_balances_logDT(chainID, logDT, startTS) {
+    async update_address_balances_logDT(chainID, logDT, jobID) {
         try {
-            let res0 = await this.updateNativeBalances(chainID, logDT, startTS);
+            let res0 = await this.updateNativeBalances(chainID, logDT, jobID);
             if (res0 == false) {
                 return (false);
             }
-            let res1 = await this.updateNonNativeBalances(chainID, logDT, startTS);
-            if (res1) {
-                await this.load_bqlogfn(chainID, logDT, startTS);
-            }
+            let res1 = await this.updateNonNativeBalances(chainID, logDT, jobID);
+
+            await this.load_bqlogfn(chainID, logDT, jobID);
+
             return (true);
         } catch (err) {
             console.log(err);
             // make sure we can start over
-            await this.clean_chainbalancecrawler(logDT, chainID, startTS);
+            await this.clean_chainbalancecrawler(logDT, chainID, jobID);
             this.logger.error({
                 "op": "update_address_balances_logDT",
                 err
@@ -902,19 +924,64 @@ FROM
         return [min_numAddresses, max_numAddresses];
     }
 
-
     async clean_chainbalancecrawler(logDT, chainID) {
-        let sql = `delete from chainbalancecrawler where logDT = '${logDT}' and chainID = '${chainID}'`;
+        let sql = `delete from chainbalancecrawler where (logDT = '${logDT}' and chainID = '${chainID}') or lastDT < date_sub(Now(), interval 12 hour)`;
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
     }
 
-    async load_bqlogfn(chainID, logDT, startTS) {
+    async load_bqlogfn(chainID, logDT, jobID) {
         let projectID = `${this.project}`
         let logDTp = logDT.replaceAll("-", "")
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
-        let fn = this.get_bqlogfn(chainID, logDT, startTS)
+        let fn = this.get_bqlogfn(chainID, logDT, jobID);
+
+        // scan all the rows and write to fn
+        try {
+            let tblBalances = this.instance.table("balances");
+            let startRow = `${chainID}#${logDT}#${jobID}`
+            let endRow = `${chainID}#${logDT}#zzzzz`
+            console.log("startRow", startRow, endRow)
+            let done = false;
+            let cnt = 0;
+            while (!done) {
+                let [rows] = await tblBalances.getRows({
+                    start: startRow,
+                    end: endRow,
+                    limit: 50000
+                });
+                let rawRows = [];
+                for (let i = 0; i < rows.length - 1; i++) {
+                    let row = rows[i];
+                    let rowData = row.data;
+                    if (rowData["balances"]) {
+                        for (const last of Object.keys(rowData["balances"])) {
+                            let cells = rowData["balances"][last]
+                            let cell = cells[0];
+                            rawRows.push(cell.value);
+                        }
+                    }
+                }
+                // write to disk
+                if (rawRows.length > 0) {
+                    rawRows.push("");
+                    await fs.appendFileSync(fn, rawRows.join("\r\n"));
+                    if (rows.length < 50000) {
+                        done = true;
+                    } else {
+                        cnt += rows.length;
+                        startRow = rows[rows.length - 1].id;
+                        console.log("wrote ", cnt, "rows", fn);
+                    }
+                } else {
+                    done = true;
+                }
+            }
+        } catch (err) {
+            console.log(err);
+        }
+
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd)
         let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.balances${paraID}$${logDTp}' ${fn} schema/substrateetl/balances.json`
 
@@ -940,7 +1007,7 @@ FROM
             }
             let numAddresses = parseInt(row["numAddresses"], 10);
             // update numAddresses and mark "AuditRequired"
-            let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now(), numAddresses = '${numAddresses}', numAddressesLastUpdateDT = Now(), updateAddressBalanceStatus = 'AuditRequired' where chainID = ${chainID} and logDT = '${logDT}'`;
+            let sql_upd = `update blocklog set lastUpdateAddressBalancesEndDT = Now(), numAddresses = '${numAddresses}', numAddressesLastUpdateDT = Now(), updateAddressBalanceStatus = 'AuditRequired', accountMetricsStatus = 'Ready' where chainID = ${chainID} and logDT = '${logDT}'`;
             console.log("updateAddressBalances", "min", min_numAddresses, "max", max_numAddresses, sql_upd);
             this.batchedSQL.push(sql_upd);
 
@@ -963,27 +1030,10 @@ FROM
             })
         }
     }
-    async clean_bqlogfn(chainID, logDT, startTS) {
-        let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT, startTS) : null;
-        if (fs.existsSync(bqlogfn)) {
-            fs.unlinkSync(bqlogfn);
-        }
-        // place an empty file ala "touch"
-        try {
-            const time = new Date();
-            fs.utimesSync(bqlogfn, time, time);
-        } catch (e) {
-            let fd = fs.openSync(bqlogfn, 'a');
-            fs.closeSync(fd);
-        }
-        let sql_upd = `update blocklog set lastUpdateAddressBalancesStartDT = Now() where chainID = ${chainID} and logDT = '${logDT}'`;
-        console.log("updateAddressBalances START", sql_upd);
-        this.batchedSQL.push(sql_upd);
-        await this.update_batchedSQL();
-    }
 
-    get_bqlogfn(chainID, logDT, startTS, tbl = "balances") {
-        return `/tmp/${tbl}${chainID}-${logDT}-${startTS}.json`
+    get_bqlogfn(chainID, logDT, jobID, tbl = "balances") {
+        let startTS = this.getCurrentTS();
+        return `/tmp/${tbl}${chainID}-${logDT}-${jobID}-${startTS}.json`
     }
 
     generate_btRealtimeRow(rowKey, encodedAssetChain,
@@ -1051,7 +1101,7 @@ FROM
         return (row);
     }
 
-    async updateNonNativeBalances(chainID, logDT = null, startTS = null, perPagelimit = 1000) {
+    async updateNonNativeBalances(chainID, logDT = null, jobID = null, perPagelimit = 1000) {
         await this.assetManagerInit();
         let chains = await this.pool.query(`select relayChain, chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
         if (chains.length == 0) {
@@ -1059,7 +1109,7 @@ FROM
             return false;
         }
         let chain = chains[0];
-	let wsEndpoint = this.get_wsendpoint(chain);
+        let wsEndpoint = this.get_wsendpoint(chain);
         let chainName = chain.chainName;
         let paraID = chain.paraID;
         let id = chain.id;
@@ -1077,7 +1127,7 @@ FROM
                 process.exit(1);
             }
         });
-        let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT, startTS) : null;
+
         const rawChainInfo = await api.registry.getChainProperties()
         var chainInfo = JSON.parse(rawChainInfo);
         const prefix = chainInfo.ss58Format
@@ -1396,12 +1446,29 @@ FROM
 
 
             if (logDT) {
-                // write rows
+                // write rows to balances
+                let tblBalances = this.instance.table("balances")
                 let rawRows = bqRows.map((r) => {
-                    return JSON.stringify(r);
+                    let assetChain = paraTool.makeAssetChain(r.asset, chainID);
+                    let encodedAssetChain = paraTool.encodeAssetChain(assetChain)
+                    let key = `${chainID}#${logDT}#${jobID}#${r.address_pubkey}#${encodedAssetChain}`
+                    let hres = {
+                        key,
+                        data: {
+                            balances: {}
+                        }
+                    }
+                    hres['data']['balances']['last'] = {
+                        value: JSON.stringify(r),
+                        timestamp: this.getCurrentTS() * 1000000
+                    };
+                    return (hres)
                 });
-                rawRows.push("");
-                await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
+                if (rawRows.length > 0) {
+                    console.log("WRITING", rawRows.length);
+                    await this.insertBTRows(tblBalances, rawRows, "balances");
+                }
+
                 bqRows = [];
                 if (rows.length > 0) {
                     console.log(`writing ${chainName}`, rows.length, "rows chainID=", chainID);
@@ -1431,7 +1498,7 @@ FROM
     }
 
     async getLastKey(chainID, logDT) {
-        let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' and hostname = '${this.hostname}' and lastDT > date_sub(Now(), interval 6 hour)`
+        let sql = `select lastKey from chainbalancecrawler where chainID = '${chainID}' and logDT = '${logDT}' order by tally desc`
         let chains = await this.pool.query(sql);
         console.log("getLastKey", sql, chains);
         if (chains.length == 0) {
@@ -1968,18 +2035,23 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
             22023: ['wss://moonriver.public.blastapi.io', 'wss://wss.api.moonriver.moonbeam.network', 'wss://moonriver.api.onfinality.io/public-ws', 'wss://moonriver.unitedbloc.com:2001'],
             2004: ['wss://1rpc.io/glmr', 'wss://moonbeam.public.blastapi.io', 'wss://wss.api.moonbeam.network', 'wss://moonbeam.api.onfinality.io/public-ws', 'wss://moonbeam.unitedbloc.com:3001'],
-	    2000: ['wss://acala-rpc.dwellir.com'],
-	    2094: ['wss://rpc-pendulum.prd.pendulumchain.tech'],
-	    2026: ['wss://eden-rpc.dwellir.com'] // 'wss://nodle-parachain.api.onfinality.io/public-ws'
+            2000: ['wss://acala-rpc-0.aca-api.network'],
+            2094: ['wss://rpc-pendulum.prd.pendulumchain.tech'],
+            2026: ['wss://eden-rpc.dwellir.com'],
+            22048: ['wss://kusama.rpc.robonomics.network'],
+            22114: ['wss://turing-rpc.dwellir.com'],
+            2034: ['wss://hydradx-rpc.dwellir.com']
+
         }
-	let chainID = chain.chainID;
+        let chainID = chain.chainID;
         if (alts[chainID] !== undefined && (alts[chainID].length > 0)) {
             let a = alts[chainID];
             wsEndpoint = a[Math.floor(Math.random() * a.length)];
+            console.log("choose", wsEndpoint);
         }
-	return wsEndpoint;
+        return wsEndpoint;
     }
-    async updateNativeBalances(chainID, logDT = null, startTS = 0, perPagelimit = 1000) {
+    async updateNativeBalances(chainID, logDT, jobID, perPagelimit = 1000) {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
         if (chains.length == 0) {
@@ -1987,13 +2059,12 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             return false;
         }
 
-        let bqlogfn = logDT ? this.get_bqlogfn(chainID, logDT, startTS) : null;
         let chain = chains[0];
         let relayChain = chain.relayChain;
         let paraID = chain.paraID;
         let chainName = chain.chainName;
         let id = chain.id;
-	let wsEndpoint = this.get_wsendpoint(chain);
+        let wsEndpoint = this.get_wsendpoint(chain);
         let prev_numHolders = chain.numHolders;
         let decimals = this.getChainDecimal(chainID)
         const provider = new WsProvider(wsEndpoint);
@@ -2041,7 +2112,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                     let currencyID = (chainID == 2011) ? 25969 : 1734700659; // native asset id
                     let res = await api.query.eqAggregates.totalUserGroups("Balances", currencyID);
                     totalIssuance = (res.collateral - res.debt) / 10 ** decimals;
-                    console.log(res, totalIssuance);
+                    console.log("totalIssuance: ", totalIssuance);
                 } else {
                     console.log("totalIssuance NOT AVAIL");
                 }
@@ -2081,13 +2152,9 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             ts: blockTS
         })
         let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
-        let last_key = await this.getLastKey(chainID, logDT);
+        let last_key = await this.getLastKey(chainID, logDT, jobID);
 
-        if (last_key == "" || (bqlogfn && !fs.existsSync(bqlogfn))) {
-            last_key = "";
-            await this.clean_bqlogfn(chainID, logDT, startTS);
-            console.log("STARTING CLEAN", bqlogfn);
-        } else {
+        if (last_key == "") {} else {
             console.log("RESUMING with last_key", last_key)
         }
         let sql_reset = `update blocklog set lastUpdateAddressBalancesAttempts = 0 where logDT = '${logDT}' and chainID = '${chainID}'`
@@ -2100,7 +2167,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         let [yesterdayDT, __] = paraTool.ts_to_logDT_hr(this.getCurrentTS() - 86400);
         while (!done) {
             let apiAt = await api.at(finalizedBlockHash)
-	    console.log("finalizedBlockHash", finalizedBlockHash);
+            console.log("finalizedBlockHash", finalizedBlockHash);
             let query = null;
             try {
                 query = await apiAt.query.system.account.entriesPaged({
@@ -2138,7 +2205,24 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                 let misc_frozen_raw = balance.miscFrozen ? paraTool.dechexToIntStr(balance.miscFrozen.toString()) : "";
                 let frozen_raw = balance.feeFrozen ? paraTool.dechexToIntStr(balance.feeFrozen.toString()) : "";
                 let flags_raw = balance.flags ? balance.flags.toString() : "";
-
+                if (chainID == 22024 || chainID == 2011) {
+                    balance = balance.toJSON();
+                    if (balance.v0 && balance.v0.balance) {
+                        balance = balance.v0.balance;
+                        console.log(balance)
+                        // String {"nonce":0,"consumers":0,"providers":3,"sufficients":0,"data":{"v0":{"lock":0,"balance":[[6450786,{"positive":170000000}],[6648164,{"positive":408318303}],[6648936,{"positive":40143961}],[1651864420,{"positive":2852210857}],[1734700659,{"positive":80714784622320}],[1751412596,{"positive":22000000000}],[2019848052,{"positive":50000000000}],[517081101362,{"positive":42000000000}]]}}}
+                        for (let b of balance) {
+                            if (b.length == 2) {
+                                let currencyID = b[0];
+                                if (((currencyID == 1734700659) || (currencyID == 25969)) && b[1].positive) {
+                                    free_raw = b[1].positive.toString()
+                                }
+                            }
+                        }
+                    } else {
+                        console.log("CHECK genshiro", balance);
+                    }
+                }
                 let free = (free_raw.length > 0) ? free_raw / 10 ** decimals : 0;
                 let reserved = (reserved_raw.length > 0) ? reserved_raw / 10 ** decimals : 0;
                 let misc_frozen = (misc_frozen_raw.length > 0) ? misc_frozen_raw / 10 ** decimals : 0;
@@ -2155,6 +2239,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                     let reserved_usd = (priceUSD > 0) ? reserved * priceUSD : 0;
                     let misc_frozen_usd = (priceUSD > 0) ? misc_frozen * priceUSD : 0;
                     let frozen_usd = (priceUSD > 0) ? frozen * priceUSD : 0;
+
                     if ((free > 0) || (reserved > 0) || (misc_frozen > 0) || (frozen > 0)) {
                         bqRows.push({
                             chain_name: chainName,
@@ -2194,17 +2279,28 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                     }
                 }
             }
+            console.log("writing", `${chainID}#${logDT}#${jobID} with PUBKEY${encodedAssetChain}`, bqRows.length);
             if (logDT) {
-                // write rows
+                // write rows to balances
+                let tblBalances = this.instance.table("balances")
                 let rawRows = bqRows.map((r) => {
-                    return JSON.stringify(r);
+                    let key = `${chainID}#${logDT}#${jobID}#${r.address_pubkey}#${encodedAssetChain}`
+                    console.log
+                    let hres = {
+                        key,
+                        data: {
+                            balances: {}
+                        }
+                    }
+                    hres['data']['balances']['last'] = {
+                        value: JSON.stringify(r),
+                        timestamp: this.getCurrentTS() * 1000000
+                    };
+                    return (hres)
                 });
-                rawRows.push("");
-                await fs.appendFileSync(bqlogfn, rawRows.join("\n"));
-                if (rows.length > 0) {
-                    console.log("WRITING", rows.length, tblName)
-                    await this.insertBTRows(tblRealtime, rows, tblName);
-                    rows = [];
+                if (rawRows.length > 0) {
+                    console.log("WRITING", rawRows.length);
+                    await this.insertBTRows(tblBalances, rawRows, "balances");
                 }
             }
             last_key = (query.length > 999) ? query[query.length - 1][0] : "";
@@ -2212,7 +2308,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             const gbRounded = this.gb_heap_used();
             console.log(`system.account page: `, page++, last_key.toString(), "recs=", query.length, `Heap allocated ${gbRounded} GB`, query.length);
             // save last_key state in db and get out if memory is getting lost (>1GB heap) -- we will pick it up again
-            let sql1 = `insert into chainbalancecrawler (chainID, logDT, hostname, lastDT, lastKey, startTS) values ('${chainID}', '${logDT}', '${this.hostname}', Now(), '${last_key.toString()}', '${startTS}') on duplicate key update lastDT = values(lastDT), lastKey = values(lastKey), startTS = values(startTS)`
+            let sql1 = `insert into chainbalancecrawler (chainID, logDT, jobID, lastDT, lastKey, tally) values ('${chainID}', '${logDT}', '${jobID}', Now(), '${last_key.toString()}', '${query.length}') on duplicate key update jobID = values(jobID), lastDT = values(lastDT), lastKey = values(lastKey), tally = tally + values(tally)`
             console.log(sql1);
             this.batchedSQL.push(sql1);
             await this.update_batchedSQL();
@@ -2228,7 +2324,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             }
         }
         console.log(`****** Native account: numHolders = ${numHolders}`);
-        let sql = `update blocklog set numNativeHolders = '${numHolders}' where chainID = ${chainID} and logDT = '${logDT}'`
+        let sql = `update blocklog set numNativeHolders = '${numHolders}' where chainID = ${chainID} and logDT = '${logDT}'`;
         console.log(numHolders, sql);
         this.batchedSQL.push(sql);
         await this.update_batchedSQL();
@@ -2776,13 +2872,20 @@ monthDT <= last_day(date(date_sub(Now(), interval 1 day))) group by chainID orde
                 crawlingStatus: r.crawlingStatus,
                 url
             })
-            chains[r.chainID].covered = true;
+            if (chains[r.chainID]) {
+                chains[r.chainID].covered = true;
+            }
         }
 
         for (const chainID of Object.keys(chains)) {
             if (chains[chainID].covered == undefined) {
                 let c = chains[chainID];
                 let desc = c.crawling > 0 ? "active and onboarding" : "active but not being indexed";
+                if (summary[c.relayChain] == undefined) {
+                    summary[c.relayChain] = {
+                        missing: []
+                    }
+                }
                 summary[c.relayChain].missing.push({
                     chainName: c.chainName,
                     paraID: c.paraID,
@@ -3068,160 +3171,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async update_networklog(network, logDT, jobStartTS = 0) {
-        let project = this.project;
-        let sqla = {
-            "accountsall": `select count(*) as numAddresses from substrate-etl.dotsama.accountsall where date(ts) = '${logDT}'`,
-            "accountsnew": `select count(distinct address_pubkey) as numNewAccounts from substrate-etl.dotsama.accountsnew where date(ts) = '${logDT}'`,
-            "accountsreaped": `select count(distinct address_pubkey) as numReapedAccounts from substrate-etl.dotsama.accountsreaped where date(ts) = '${logDT}'`,
-            "accountsactive": `select count(*) as numActiveAccounts  from substrate-etl.dotsama.accountsactive where date(ts) = '${logDT}'`
-        }
+    async update_networklog(network, logDT, jobStartTS = 0) {}
 
-        console.log(sqla);
-        let r = {}
-        let vals = [];
-        for (const k of Object.keys(sqla)) {
-            let sql = sqla[k];
-            let rows = await this.execute_bqJob(sql);
-            let row = rows.length > 0 ? rows[0] : null;
-            if (row) {
-                for (const a of Object.keys(row)) {
-                    r[a] = row[a] > 0 ? row[a] : 0;
-                    vals.push(` ${a} = ${mysql.escape(row[a])}`);
-                }
-            }
-        }
-        let elapsedSeconds = this.getCurrentTS() - jobStartTS;
-        vals.push(` loadDT=Now()`);
-        vals.push(` networkMetricsStatus = "AuditRequired" `);
-        vals.push(` networkMetricsElapsedSeconds = "${elapsedSeconds}" `);
-        let sql = `update networklog set ` + vals.join(",") + `  where network = '${network}' and logDT = '${logDT}'`
-        console.log(sql)
-        this.batchedSQL.push(sql);
-        await this.update_batchedSQL();
-    }
-
-    async dump_networkmetrics(network, logDT) {
-        let jobTS = this.getCurrentTS();
-        let projectID = `${this.project}`
-        if (network != "dotsama") {
-            // not covering other networks yet
-            return (false);
-        }
-        console.log(`dump_networkmetrics logDT=${logDT}`)
-        let bqDataset = 'dotsama'
-        let bqjobs = []
-        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
-        let accountTbls = ["new", "reaped", "active", "all"]
-        let polkadot = this.get_relayChain_dataset("polkadot");
-        let kusama = this.get_relayChain_dataset("kusama");
-        for (const tbl of accountTbls) {
-            let tblName = `accounts${tbl}`
-            let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
-            let targetSQL, partitionedFld, cmd;
-            switch (tbl) {
-                case "active":
-                    targetSQL = `With pk as
-(SELECT address_pubkey,  count(distinct(para_id)) polkadot_active_cnt, 0 as kusama_active_cnt FROM \`substrate-etl.${polkadot}.accountsactive*\`
- WHERE DATE(ts) = "${currDT}" group by address_pubkey
- UNION ALL
- (SELECT address_pubkey, 0 as polkadot_active_cnt, count(distinct(para_id)) kusama_active_cnt FROM \`substrate-etl.${kusama}.accountsactive*\`
- WHERE DATE(ts) = "${currDT}" group by address_pubkey))
- select address_pubkey, TIMESTAMP_SECONDS(${logTS}) as ts, sum(polkadot_active_cnt) polkadot_active_cnt, sum(kusama_active_cnt) kusama_active_cnt from pk
- group by address_pubkey`
-                    partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                    bqjobs.push({
-                        tbl: tblName,
-                        destinationTbl: destinationTbl,
-                        cmd: cmd
-                    })
-                    break;
-                case "new":
-                    targetSQL = `WITH currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM \`substrate-etl.${polkadot}.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM \`substrate-etl.${kusama}.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot full outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
-prevDayPolkadot AS (SELECT address_pubkey,  count(distinct(para_id)) polkadot_network_cnt, min(ts) as ts FROM \`substrate-etl.${polkadot}.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
-prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, min(ts) as ts FROM \`substrate-etl.${kusama}.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
-prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot full outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
-select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDayAll where address_pubkey not in (select address_pubkey from prevDayAll) order by polkadot_network_cnt desc;`
-                    partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                    bqjobs.push({
-                        tbl: tblName,
-                        destinationTbl: destinationTbl,
-                        cmd: cmd
-                    })
-                    break;
-
-                case "reaped":
-                    targetSQL = `WITH currDayPolkadot AS (SELECT address_pubkey, count(distinct(para_id)) polkadot_network_cnt, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts  FROM \`substrate-etl.${polkadot}.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-                    currDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, max(ts) as ts FROM \`substrate-etl.${kusama}.balances*\` WHERE DATE(ts) = "${currDT}" group by address_pubkey),
-                    currDayAll as (SELECT ifNUll(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) as address_pubkey, ifNUll(currDayKusama.ts,currDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from currDayPolkadot full outer join currDayKusama on currDayPolkadot.address_pubkey = currDayKusama.address_pubkey),
-                    prevDayPolkadot AS (SELECT address_pubkey,  count(distinct(para_id)) polkadot_network_cnt, max(ts) as ts FROM \`substrate-etl.${polkadot}.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
-                    prevDayKusama AS (SELECT address_pubkey,  count(distinct(para_id)) kusama_network_cnt, max(ts) as ts FROM \`substrate-etl.${kusama}.balances*\` WHERE DATE(ts) = "${prevDT}" group by address_pubkey),
-                    prevDayAll as (SELECT ifNUll(prevDayKusama.address_pubkey,prevDayPolkadot.address_pubkey) as address_pubkey, ifNUll(prevDayKusama.ts,prevDayPolkadot.ts) as ts, ifNULL(polkadot_network_cnt, 0) as polkadot_network_cnt, ifNULL(kusama_network_cnt, 0) as kusama_network_cnt from prevDayPolkadot full outer join prevDayKusama on prevDayPolkadot.address_pubkey = prevDayKusama.address_pubkey)
-                    select address_pubkey, polkadot_network_cnt, kusama_network_cnt, max(TIMESTAMP_ADD(ts, INTERVAL 1 Day) ) as ts from prevDayAll where address_pubkey not in (select address_pubkey from currDayAll) group by address_pubkey, polkadot_network_cnt, kusama_network_cnt order by polkadot_network_cnt desc`
-                    partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                    bqjobs.push({
-                        tbl: tblName,
-                        destinationTbl: destinationTbl,
-                        cmd: cmd
-                    })
-                    break;
-
-                case "all":
-                    targetSQL = `SELECT
-  IFNULL(currDayKusama.address_pubkey,currDayPolkadot.address_pubkey) AS address_pubkey,
-  IFNULL(currDayKusama.ts,currDayPolkadot.ts) AS ts,
-  IFNULL(polkadot_network_cnt, 0) AS polkadot_network_cnt,
-  IFNULL(kusama_network_cnt, 0) AS kusama_network_cnt
- FROM (  SELECT address_pubkey, COUNT(DISTINCT(para_id)) polkadot_network_cnt, MIN(ts) AS ts  FROM \`substrate-etl.${polkadot}.balances*\` WHERE DATE(ts) = "${currDT}" GROUP BY address_pubkey) AS currDayPolkadot
- FULL OUTER JOIN (  SELECT    address_pubkey,    COUNT(DISTINCT(para_id)) kusama_network_cnt,    MIN(ts) AS ts  FROM    \`substrate-etl.${kusama}.balances*\`  WHERE    DATE(ts) = "${currDT}"  GROUP BY    address_pubkey) AS currDayKusama
- ON currDayPolkadot.address_pubkey = currDayKusama.address_pubkey`;
-                    partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                    bqjobs.push({
-                        tbl: tblName,
-                        destinationTbl: destinationTbl,
-                        cmd: cmd
-                    })
-                    break;
-
-                case "active":
-                    break;
-
-                case "passive":
-                    break;
-                default:
-
-            }
-        }
-        let errloadCnt = 0;
-        let isDry = false;
-        for (const bqjob of bqjobs) {
-            try {
-                if (isDry) {
-                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                } else {
-                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                    await exec(bqjob.cmd);
-                }
-            } catch (e) {
-                errloadCnt++
-                console.log("PROBLEM", e);
-                this.logger.error({
-                    "op": "dump_networkmetrics",
-                    e
-                })
-            }
-        }
-
-        if (errloadCnt == 0 && !isDry) {
-            await this.update_networklog(network, logDT, jobTS);
-        }
-    }
+    async dump_networkmetrics(network, logDT) {}
 
     getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true) {
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
@@ -3318,22 +3270,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
                     }
                     break;
                 }
-            case "dotsama_crowdloan":
-                sql = `select crowdloanMetricsStatus from blocklog where chainID in (0, 2) and logDT = '${logDT}';`
-                recs = await this.poolREADONLY.query(sql)
-                //console.log("dotsama_crowdloan ready sql", sql);
-                if (recs.length == 2) {
-                    let cnt = 0
-                    for (const rec of recs) {
-                        status = rec.crowdloanMetricsStatus
-                        if (rec.crowdloanMetricsStatus == "FirstStepDone") {
-                            cnt++
-                        }
-                    }
-                    //need both relaychain have "FirstStepDone" to initiate the aggregate step
-                    if (cnt == 2) return (true);
-                }
-                break;
             case "sources":
                 sql = `select sourceMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
                 recs = await this.poolREADONLY.query(sql)
@@ -3390,80 +3326,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
 
     }
 
-    async dump_dotsama_crowdloan(logDT) {
-        let paraID = 0
-        let projectID = `${this.project}`
-        let bqDataset = (this.isProd) ? `dotsama` : `dotsama_dev`
-        let bqDataset_txra = (this.isProd) ? `` : `_dev` //MK write to relay_dev for dev
-        let bqjobs = []
-        console.log(`dump_dotsama_crowdloan logDT=${logDT}, projectID=${projectID}, bqDataset=${bqDataset}, bqDataset_txra=${bqDataset_txra}`)
-
-        // load new accounts
-        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
-        let accountTbls = ["accountscrowdloan"]
-
-        for (const tbl of accountTbls) {
-            let tblName = `${tbl}`
-            let destinationTbl = `${bqDataset}.${tblName}$${logYYYYMMDD}`
-            let targetSQL, partitionedFld, cmd;
-            switch (tbl) {
-                case "accountscrowdloan":
-                    /* Crowdloan
-                    With CrowdloanP as (SELECT contributor_pubkey, sum(contribution) contribution_p, sum(contribution_usd) contribution_value_usd_p,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("polkadot-",paraID)) order by concat("polkadot-",paraID) asc),',') crowdloans_chains_p, ARRAY_TO_STRING(ARRAY_AGG((concat("0-",extrinsic_id)) order by concat("0-",extrinsic_id) asc ),',') crowdloans_extrinsic_id_p, count(distinct(paraID)) crowdloans_num_chains_p, count(*) crowdloans_num_contributions_p, max(ts) as last_contibution_ts_p FROM `substrate-etl.polkadot_dev.crowdloan` WHERE DATE(ts) = "2021-11-11" group by contributor_pubkey),
-                    CrowdloanK as (SELECT contributor_pubkey, sum(contribution) contribution_k, sum(contribution_usd) contribution_value_usd_k,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("kusama-",paraID)) order by concat("kusama-",paraID) asc ),',') crowdloans_chains_k, ARRAY_TO_STRING(ARRAY_AGG((concat("2-",extrinsic_id)) order by concat("2-",extrinsic_id) asc ),',') crowdloans_extrinsic_id_k, count(distinct(paraID)) crowdloans_num_chains_k, count(*) crowdloans_num_contributions_k, max(ts) as last_contibution_ts_k FROM `substrate-etl.kusama_dev.crowdloan` WHERE DATE(ts) = "2011-11-11" group by contributor_pubkey),
-                    Crowdloan as (
-                    select contributor_pubkey, sum(contribution_k) contribution_KSM, sum(contribution_p) contribution_DOT, sum(ifNull(contribution_value_usd_p,0)+ ifNull(contribution_value_usd_k,0)) contribution_value_usd, sum(ifNull(crowdloans_num_chains_p,0)+ ifNull(crowdloans_num_chains_k,0)) crowdloans_num_chains, sum(ifNull(crowdloans_num_contributions_p,0)+ ifNull(crowdloans_num_contributions_k,0)) crowdloans_num_contributions,
-                    max(concat(if(crowdloans_chains_p is null,"empty", crowdloans_chains_p),if(crowdloans_chains_k is not null,concat(',',crowdloans_chains_k),''))) crowdloans_chains,
-                    max(concat(if(crowdloans_extrinsic_id_p is null,"empty", crowdloans_extrinsic_id_p),if(crowdloans_extrinsic_id_k is not null,concat(',',crowdloans_extrinsic_id_k),''))) crowdloans_extrinsic_id,
-                    max(IFNULL(last_contibution_ts_k, last_contibution_ts_p)) ts, max(IFNULL(last_contibution_ts_p, last_contibution_ts_k)) ts2
-                    from CrowdloanP FULL OUTER JOIN CrowdloanK USING (contributor_pubkey) group by contributor_pubkey order by crowdloans_num_chains desc)
-                    select contributor_pubkey as address_pubkey, contribution_KSM as crowdloan_contribution_KSM, contribution_DOT as crowdloan_contribution_DOT, contribution_value_usd as crowdloan_value_usd, crowdloans_num_chains, crowdloans_num_contributions, replace(crowdloans_chains,"empty,","") crowdloans_chains, replace(crowdloans_extrinsic_id,"empty,","") crowdloans_extrinsic_id, if(ts > ts2, ts, ts2) as ts from Crowdloan order by address_pubkey
-                    */
-                    targetSQL = `With CrowdloanP as (SELECT contributor_pubkey, sum(contribution) contribution_p, sum(contribution_usd) contribution_value_usd_p,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("polkadot-",paraID)) order by concat("polkadot-",paraID) asc),",") crowdloans_chains_p, ARRAY_TO_STRING(ARRAY_AGG((concat("0-",extrinsic_id)) order by concat("0-",extrinsic_id) asc ),",") crowdloans_extrinsic_id_p, count(distinct(paraID)) crowdloans_num_chains_p, count(*) crowdloans_num_contributions_p, max(ts) as last_contibution_ts_p FROM \`${projectID}.polkadot${bqDataset_txra}.crowdloan\` WHERE DATE(ts) = "${currDT}" group by contributor_pubkey),
-                    CrowdloanK as (SELECT contributor_pubkey, sum(contribution) contribution_k, sum(contribution_usd) contribution_value_usd_k,  ARRAY_TO_STRING(ARRAY_AGG(distinct(concat("kusama-",paraID)) order by concat("kusama-",paraID) asc ),",") crowdloans_chains_k, ARRAY_TO_STRING(ARRAY_AGG((concat("2-",extrinsic_id)) order by concat("2-",extrinsic_id) asc ),",") crowdloans_extrinsic_id_k, count(distinct(paraID)) crowdloans_num_chains_k, count(*) crowdloans_num_contributions_k, max(ts) as last_contibution_ts_k FROM \`substrate-etl.kusama${bqDataset_txra}.crowdloan\` WHERE DATE(ts) = "${currDT}" group by contributor_pubkey),
-                    Crowdloan as (
-                    select contributor_pubkey, sum(contribution_k) contribution_KSM, sum(contribution_p) contribution_DOT, sum(ifNull(contribution_value_usd_p,0)+ ifNull(contribution_value_usd_k,0)) contribution_value_usd, sum(ifNull(crowdloans_num_chains_p,0)+ ifNull(crowdloans_num_chains_k,0)) crowdloans_num_chains, sum(ifNull(crowdloans_num_contributions_p,0)+ ifNull(crowdloans_num_contributions_k,0)) crowdloans_num_contributions,
-                    max(concat(if(crowdloans_chains_p is null,"empty", crowdloans_chains_p),if(crowdloans_chains_k is not null,concat(",",crowdloans_chains_k),""))) crowdloans_chains,
-                    max(concat(if(crowdloans_extrinsic_id_p is null,"empty", crowdloans_extrinsic_id_p),if(crowdloans_extrinsic_id_k is not null,concat(",",crowdloans_extrinsic_id_k),""))) crowdloans_extrinsic_id,
-                    max(IFNULL(last_contibution_ts_k, last_contibution_ts_p)) ts, max(IFNULL(last_contibution_ts_p, last_contibution_ts_k)) ts2
-                    from CrowdloanP FULL OUTER JOIN CrowdloanK USING (contributor_pubkey) group by contributor_pubkey order by crowdloans_num_chains desc)
-                    select contributor_pubkey as address_pubkey, contribution_KSM as crowdloan_contribution_KSM, contribution_DOT as crowdloan_contribution_DOT, contribution_value_usd as crowdloan_value_usd, crowdloans_num_chains, crowdloans_num_contributions, SPLIT(replace(crowdloans_chains,"empty,","")) crowdloans_chains, SPLIT(replace(crowdloans_extrinsic_id,"empty,","")) crowdloans_extrinsic_id, if(ts > ts2, ts, ts2) as ts from Crowdloan order by address_pubkey`
-                    partitionedFld = 'ts'
-                    cmd = `bq query --destination_table '${destinationTbl}' --project_id=${projectID} --time_partitioning_field ${partitionedFld} --replace  --use_legacy_sql=false '${paraTool.removeNewLine(targetSQL)}'`;
-                    bqjobs.push({
-                        tbl: tblName,
-                        destinationTbl: destinationTbl,
-                        cmd: cmd
-                    })
-                    break;
-                default:
-            }
-        }
-        let errloadCnt = 0
-        let isDry = false;
-        for (const bqjob of bqjobs) {
-            try {
-                if (isDry) {
-                    console.log(`\n\n [DRY] * ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                } else {
-                    console.log(`\n\n* ${bqjob.destinationTbl} *\n${bqjob.cmd}`)
-                    await exec(bqjob.cmd);
-                }
-            } catch (e) {
-                errloadCnt++
-                this.logger.error({
-                    "op": "dump_dotsama_crowdloan",
-                    e
-                })
-            }
-        }
-        if (errloadCnt == 0) {
-            let sql = `update blocklog set crowdloanMetricsStatus = 'AuditRequired' where chainID in (${paraTool.chainIDPolkadot}, ${paraTool.chainIDKusama}) and logDT = '${logDT}'`
-            this.batchedSQL.push(sql);
-        }
-        await this.update_batchedSQL();
-        return true
-    }
 
     async dump_relaychain_crowdloan(relayChain, logDT) {
         let paraID = 0
@@ -3721,10 +3583,6 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             let elapsedSeconds = this.getCurrentTS() - jobTS;
             let sql_upd = `update blocklog set loadedAccountMetrics = 1, loadAccountMetricsDT=Now(), accountMetricsStatus = "AuditRequired", accountMetricsElapsedSeconds = '${elapsedSeconds}' where chainID = '${chainID}' and logDT = '${logDT}'`
             this.batchedSQL.push(sql_upd);
-
-            // add new network logs -- TODO: remove AuditRequired
-            let sql_networklog = `insert ignore into networklog ( network, logDT, networkMetricsStatus ) (select "dotsama", logDT, "Ready" from blocklog where logDT >= "${balanceStartDT}" group by logDT having sum(if(accountMetricsStatus in ("Audited", "AuditRequired"), 1, 0)) = sum(if(accountMetricsStatus!="Ignore", 1, 0)) )`
-            this.batchedSQL.push(sql_networklog);
             await this.update_batchedSQL();
 
         }
@@ -4807,13 +4665,15 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             "xcmtransfers1": `select count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from ${project}.${bqDataset}.xcmtransfers where origination_para_id = ${paraID} and date(origination_ts) = '${logDT}'`,
         }
         // don't compute this unless accountMetricsStatus is "AuditRequired" or "Audited"
-        let accountMetricsStatus = "AuditRequired" // TODO: load from blocklog
-        if (accountMetricsStatus == "Audited" || accountMetricsStatus == "AuditRequired") {
-            sqla["accountsnew"] = `select count(distinct address_pubkey) as numNewAccounts from ${project}.${bqDataset}.accountsnew${paraID} where date(ts) = '${logDT}'`
-            sqla["accountsreaped"] = `select count(distinct address_pubkey) as numReapedAccounts from ${project}.${bqDataset}.accountsreaped${paraID} where date(ts) = '${logDT}'`
-            sqla["accountsactive"] = `select count(*) as numActiveAccounts, sum(if(accountType = "System", 1, 0)) as numActiveSystemAccounts, sum(if(accountType = "User", 1, 0)) as numActiveUserAccounts from ${project}.${bqDataset}.accountsactive${paraID} where date(ts) = '${logDT}'`
-            sqla["accountspassive"] = `select count(*) as numPassiveAccounts from ${project}.${bqDataset}.accountspassive${paraID} where date(ts) = '${logDT}'`
+        let numAddresses_prevDT = null;
+        let recs = await this.poolREADONLY.query(`select numAddresses from blocklog where chainID = '${chainID}' and logDT = date(date_sub('${logDT}', interval 1 day)) limit 1`);
+        if (recs.length == 1) {
+            numAddresses_prevDT = recs[0].numAddresses;
         }
+        sqla["accountsnew"] = `select count(distinct address_pubkey) as numNewAccounts from ${project}.${bqDataset}.accountsnew${paraID} where date(ts) = '${logDT}'`
+        sqla["accountsreaped"] = `select count(distinct address_pubkey) as numReapedAccounts from ${project}.${bqDataset}.accountsreaped${paraID} where date(ts) = '${logDT}'`
+        sqla["accountsactive"] = `select count(*) as numActiveAccounts, sum(if(accountType = "System", 1, 0)) as numActiveSystemAccounts, sum(if(accountType = "User", 1, 0)) as numActiveUserAccounts from ${project}.${bqDataset}.accountsactive${paraID} where date(ts) = '${logDT}'`
+        sqla["accountspassive"] = `select count(*) as numPassiveAccounts from ${project}.${bqDataset}.accountspassive${paraID} where date(ts) = '${logDT}'`
 
         console.log(sqla);
         let r = {}
@@ -4825,7 +4685,18 @@ select address_pubkey, polkadot_network_cnt, kusama_network_cnt, ts from currDay
             if (row) {
                 for (const a of Object.keys(row)) {
                     r[a] = row[a] > 0 ? row[a] : 0;
+                    //console.log(a, r[a]);
+                    if ((a == "numNewAccounts" || a == "numReapedAccounts")) {
+                        let rat = r[a] / (1 + numAddresses_prevDT);
+                        if ((numAddresses_prevDT == null) || (rat > .5)) {
+                            console.log("NULLIFY", a);
+                            row[a] = null; // don't add new or reaped if its more than half of what we saw yesterday, of if yesterday is blank
+                        } else {
+                            console.log("keep", a, r[a], numAddresses_prevDT, rat);
+                        }
+                    }
                     vals.push(` ${a} = ${mysql.escape(row[a])}`);
+
                     if (a == "numAddresses") {
                         vals.push(` numAddressesLastUpdateDT = Now() `);
                     }

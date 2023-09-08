@@ -93,16 +93,8 @@ async function main() {
                     }
                     if (_paraID == 0) {
                         await substrateetl.dump_xcm_range(_relayChain, null);
-                        await substrateetl.update_xcm_summary(_relayChain, _logDT); {
-                            let x = await substrateetl.get_random_networkmetrics_ready();
-                            let _network = x.network;
-                            let _logDT = x.logDT;
-                            if (_logDT && _network) {
-                                let [weekagoDT, _] = paraTool.ts_to_logDT_hr(substrateetl.getCurrentTS() - 86400 * 7);
-                                await substrateetl.dump_networkmetrics(_network, _logDT);
-                                await substrateetl.dump_substrateetl_xcmgar(weekagoDT)
-                            }
-                        }
+                        await substrateetl.update_xcm_summary(_relayChain, _logDT);
+                        await substrateetl.dump_substrateetl_xcmgar(weekagoDT);
                     }
                 }
                 if (tally % 10 == 0) {
@@ -315,52 +307,6 @@ async function main() {
             process.exit(0);
         });
 
-    program.command('networkmetrics')
-        .description(`Generate Network metrics (dotsama)`)
-        .usage("-l 2023-02-01 -n dotsama")
-        .option('-n, --network <network>', `Network (e.g. dotsama, ethereum, polygon)`, 'dotsama')
-        .option('-l, --logDT <logDT>', `LogDT in YYYY-MM-DD form`, null)
-        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
-        .option('-f, --force', `Force even if not ready`, false)
-        .action(async (opt) => {
-            let substrateetl = new SubstrateETL();
-            let network = opt.network;
-            let logDT = opt.logDT;
-            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
-            let force = opt.force;
-            if (logDT && network) {
-                if (endDT) {
-                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
-                    console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
-                    for (const dt of logDTRange) {
-                        if (force || (await substrateetl.is_dump_ready(network, dt, {
-                                network
-                            }))) {
-                            await substrateetl.dump_networkmetrics(network, dt);
-                        }
-                    }
-                } else {
-                    if (force || (await substrateetl.is_dump_ready(network, logDT, {
-                            network
-                        }))) {
-                        await substrateetl.dump_networkmetrics(network, logDT);
-                    }
-                }
-                process.exit(0);
-            }
-            while (true) {
-                let x = await substrateetl.get_random_networkmetrics_ready();
-                let _network = x.network;
-                let _logDT = x.logDT;
-                if (_logDT && _network) {
-                    await substrateetl.dump_networkmetrics(_network, _logDT);
-                    await substrateetl.sleep(1000);
-                } else {
-                    process.exit(0);
-                }
-            }
-            process.exit(0);
-        });
 
     program.command('palletstorage')
         .description(`Mark pallet storage combination across chains`)
@@ -437,16 +383,15 @@ async function main() {
                     console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange) {
                         let startTS = manager.getCurrentTS();
-                        await manager.update_address_balances_logDT(chainID, dt, startTS);
+                        await manager.updateAddressBalances(chainID, dt, true);
                         //TODO: review the startTS?
                     }
                     process.exit(0);
                 } else if (logDT) {
                     var manager = new SubstrateETL();
                     let done = false;
-                    let startTS = opt.startTS ? opt.startTS : manager.getCurrentTS();
                     do {
-                        done = await manager.update_address_balances_logDT(chainID, logDT, startTS);
+                        done = await manager.updateAddressBalances(chainID, logDT, true);
                         //await manager.sleep(5000);
                     } while (!done)
                     if (!done) {
@@ -558,12 +503,6 @@ async function main() {
             var substrateetl = new SubstrateETL();
             let fix = opt.fix;
             await substrateetl.dump_substrateetl_polkaholic(fix)
-            let x = await substrateetl.get_random_networkmetrics_ready();
-            let _network = x.network;
-            let _logDT = x.logDT;
-            if (_logDT && _network) {
-                await substrateetl.dump_networkmetrics(_network, _logDT);
-            }
             process.exit(0);
         })
 

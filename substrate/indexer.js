@@ -2061,11 +2061,9 @@ module.exports = class Indexer extends AssetManager {
         }
     }
 
-    publish_xcmtransfer(msg) {
-    }
+    publish_xcmtransfer(msg) {}
 
-    publish_xcminfo(msg) {
-    }
+    publish_xcminfo(msg) {}
 
 
     // sets up xcmtransferdestcandidate inserts, which are matched to those in xcmtransfer when we writeFeedXCMDest

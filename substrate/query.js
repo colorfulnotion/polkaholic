@@ -6548,89 +6548,88 @@ module.exports = class Query extends AssetManager {
 
     async getWASMCode(codeHash, chainID = null) {
         try {
-	    const axios = require("axios");
+            const axios = require("axios");
             let w = (chainID) ? ` and chainID = '${chainID}'` : "";
             let sql = `select codeHash, chainID, wasm, codeStoredBN, codeStoredTS, extrinsicID, extrinsicHash, language, compiler, storer, storer_ss58, CONVERT(metadata using utf8) metadata, status, convert(srcURLs using utf8) srcURLs, verifier, convert(authors using utf8) authors, contractName, verifyDT from wasmCode where codeHash = '${codeHash}' ${w}`
             let wasmCodes = await this.poolREADONLY.query(sql);
-	    let covered = {};
+            let covered = {};
             if (wasmCodes.length == 0) {
                 // return not found error
                 throw new paraTool.NotFoundError(`WASM Code Hash not found: ${codeHash}`)
                 return (false);
             }
-	    let wasmCode = {
-		wasm: "",
-		codeHash,
-	        metadata: {},
-		id: "unknown",
-		chainName: "unknown",
-		contracts: [],
-		source: [],
-		codeStoredBN: null,
-		codeStoredTS: null,
-		status: null,
-		srcURLs: []
-	    };
-		
-	    for ( const w of wasmCodes ) {
-		if ( w.wasm ) {
-		    if ( w.chainID < wasmCode.chainID || ( w.status == "Verified" ) ) {
-			let flds = ["codeStoredBN", "codeStoredTS", "extrinsicID", "extrinsicHash", "language", "compiler", "storer", "storer_ss58", "verified", "contractName", "verifyDT", "status"];
-			for (const f of flds) {
-			    if ( w[f] != undefined && wasmCode[f] == undefined ) {
-				wasmCode[f] = w[f];
-			    }
-			}
-		    }
-		    wasmCode.wasm = w.wasm.toString();
-		    try {
-			wasmCode.metadata = JSON.parse(w.metadata);
-		    } catch (err) {
-			console.log(err);
-		    }
-		}
-		if ( w.chainID != undefined ) {
-		    let [_, id] = this.convertChainID(w.chainID)
-		    let chainName = this.getChainName(w.chainID);
-		    wasmCode.id = id;
-		    wasmCode.chainName = chainName;
-		
-		    // fetch all the contracts
-		    sql = `select chainID, address, address_ss58, extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer, deployer_ss58 from contract where codeHash ='${codeHash}' and chainID = '${w.chainID}'`
-		    let contracts = await this.poolREADONLY.query(sql);
-		    for (const c of contracts) {
-			c.id = id;
-			c.chainName = chainName;
-		    }
-		    wasmCode.contracts = wasmCode.contracts.concat(contracts);
-		}
-		if ( w.srcURLs ) {
-		    wasmCode.srcURLs = w.srcURLs
-		    let srcURLs = wasmCode.srcURLs ? JSON.parse(w.srcURLs) : [];
-		    for (const srcUrl of srcURLs) {
-			if ( covered[srcUrl] ) {
-			} else if (srcUrl.includes(".zip") || srcUrl.includes("Cargo.lock") || srcUrl.includes("Cargo.toml") || srcUrl.includes(".contract")) {
-			    covered[srcUrl] = true;
-			    wasmCode.source.push({
-				srcUrl
-			    });
-			} else {
-			    covered[srcUrl] = true;
-			    try {
-				let response = await axios.get(srcUrl, {
-				    responseType: 'text'
-				})
-				response = response.data;
-				wasmCode.source.push({
-				    srcUrl,
-				    source: JSON.stringify(response)
-				});
-			    } catch (e) {}
-			}
-		    }
-		}
-	    }
-	    console.log("RESP", wasmCode);
+            let wasmCode = {
+                wasm: "",
+                codeHash,
+                metadata: {},
+                id: "unknown",
+                chainName: "unknown",
+                contracts: [],
+                source: [],
+                codeStoredBN: null,
+                codeStoredTS: null,
+                status: null,
+                srcURLs: []
+            };
+
+            for (const w of wasmCodes) {
+                if (w.wasm) {
+                    if (w.chainID < wasmCode.chainID || (w.status == "Verified")) {
+                        let flds = ["codeStoredBN", "codeStoredTS", "extrinsicID", "extrinsicHash", "language", "compiler", "storer", "storer_ss58", "verified", "contractName", "verifyDT", "status"];
+                        for (const f of flds) {
+                            if (w[f] != undefined && wasmCode[f] == undefined) {
+                                wasmCode[f] = w[f];
+                            }
+                        }
+                    }
+                    wasmCode.wasm = w.wasm.toString();
+                    try {
+                        wasmCode.metadata = JSON.parse(w.metadata);
+                    } catch (err) {
+                        console.log(err);
+                    }
+                }
+                if (w.chainID != undefined) {
+                    let [_, id] = this.convertChainID(w.chainID)
+                    let chainName = this.getChainName(w.chainID);
+                    wasmCode.id = id;
+                    wasmCode.chainName = chainName;
+
+                    // fetch all the contracts
+                    sql = `select chainID, address, address_ss58, extrinsicHash, extrinsicID, instantiateBN, blockTS, deployer, deployer_ss58 from contract where codeHash ='${codeHash}' and chainID = '${w.chainID}'`
+                    let contracts = await this.poolREADONLY.query(sql);
+                    for (const c of contracts) {
+                        c.id = id;
+                        c.chainName = chainName;
+                    }
+                    wasmCode.contracts = wasmCode.contracts.concat(contracts);
+                }
+                if (w.srcURLs) {
+                    wasmCode.srcURLs = w.srcURLs
+                    let srcURLs = wasmCode.srcURLs ? JSON.parse(w.srcURLs) : [];
+                    for (const srcUrl of srcURLs) {
+                        if (covered[srcUrl]) {} else if (srcUrl.includes(".zip") || srcUrl.includes("Cargo.lock") || srcUrl.includes("Cargo.toml") || srcUrl.includes(".contract")) {
+                            covered[srcUrl] = true;
+                            wasmCode.source.push({
+                                srcUrl
+                            });
+                        } else {
+                            covered[srcUrl] = true;
+                            try {
+                                let response = await axios.get(srcUrl, {
+                                    responseType: 'text'
+                                })
+                                response = response.data;
+                                wasmCode.source.push({
+                                    srcUrl,
+                                    source: JSON.stringify(response)
+                                });
+                            } catch (e) {}
+                        }
+                    }
+                }
+            }
+            console.log("RESP", wasmCode);
             return wasmCode
         } catch (err) {
             console.log("PROB", err)
@@ -6704,6 +6703,8 @@ module.exports = class Query extends AssetManager {
         switch (network) {
             case "shibuya":
                 return 30000;
+            case "rococo":
+                return 41002;
             case "astar":
                 return 2006;
             case "shiden":

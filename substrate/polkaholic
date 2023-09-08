@@ -60,13 +60,13 @@ async function main() {
             let sector = opt.sector ? opt.sector : null;
             if (sector && chainID) {
                 await crawler.extract_blocks(sector, chainID);
-		console.log("DONE");
-		process.exit(0);
+                console.log("DONE");
+                process.exit(0);
             } else {
                 let [chainID, sector] = await crawler.get_archiver_chain_sector();
-		console.log(chainID, sector);
+                console.log(chainID, sector);
                 await crawler.extract_blocks(sector, chainID);
-		process.exit(0);
+                process.exit(0);
             }
         })
 

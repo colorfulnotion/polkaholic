@@ -733,9 +733,6 @@ function getParaIDExtra(relaychain = 'polkadot') {
         case 'moonbase-relay':
             return 60000
             break;
-        case 'shibuya-relay':
-            return 80000
-            break;
         default:
             //unknown
             return 90000
@@ -760,10 +757,6 @@ function getRelayChainByChainID(chainID = 0) {
             return 'shibuya';
         case 4:
             return 'rococo';
-        case 6:
-            return 'moonbase-relay';
-        case 8:
-            return 'shibuya-relay';
         default:
             return 'unknown';
     }
@@ -778,18 +771,11 @@ function getRelayChainID(relaychain = 'polkadot') {
         case 'kusama':
             return 2
             break;
-        case 'westend':
-            return 30000
-            break;
         case 'rococo':
             return 40000
             break;
-        case 'moonbase':
-        case 'moonbase-relay':
-            return 60000
-            break;
-        case 'shibuya-relay':
-            return 80000
+        case 'westend':
+            return 50000
             break;
         default:
             return 90000

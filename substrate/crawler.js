@@ -1329,10 +1329,10 @@ group by chainID having count(*) < 500 order by rand() desc`;
         console.log("FAIL", sql)
         return [null, null];
     }
-    
+
     async extract_blocks(sector, chainID) {
-	let bnStart = sector * 10000;
-	let bnEnd = bnStart + 10000;
+        let bnStart = sector * 10000;
+        let bnEnd = bnStart + 10000;
 
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
@@ -1344,25 +1344,25 @@ group by chainID having count(*) < 500 order by rand() desc`;
         let bucketName = "crypto_substrate";
         const bucket = storage.bucket(bucketName);
         let jmp = 50;
-	let chain = await this.getChain(chainID);
+        let chain = await this.getChain(chainID);
 
         await this.assetManagerInit();
         await this.setupChainAndAPI(chainID);
-	
+
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
             // check if we have archived
-	    let covered = {}
+            let covered = {}
             let sql = `select blockNumber from block${chainID} where blockNumber >= ${bn0} and blockNumber <= ${bn1} and archived = 1`;
-	    console.log(sql);
+            console.log(sql);
             let recs = await this.poolREADONLY.query(sql);
             if (recs.length > 0) {
-		for (const r of recs) {
-		    covered[r.blockNumber] = true;
-		}
+                for (const r of recs) {
+                    covered[r.blockNumber] = true;
+                }
             }
-            
+
             let start = paraTool.blockNumberToHex(bn0);
             let end = paraTool.blockNumberToHex(bn1);
             let [rows] = await tableChain.getRows({
@@ -1372,74 +1372,74 @@ group by chainID having count(*) < 500 order by rand() desc`;
             let out = [];
             for (const row of rows) {
                 let blockNumber = parseInt(row.id.substr(2), 16);
-		if ( covered[blockNumber] ) {
-		    //console.log("COVERED", blockNumber, bnStart, bnEnd);
-		    continue;
-		}
-		let r = null
-		try {
+                if (covered[blockNumber]) {
+                    //console.log("COVERED", blockNumber, bnStart, bnEnd);
+                    continue;
+                }
+                let r = null
+                try {
                     r = this.build_block_from_row(row);
-		    if ( r["block"] == false || r["feed"] == false ) {
-			console.log("fetch blockNumber", blockNumber);
-			await this.nukeBlock(chainID, blockNumber);
-			let t2 = {
-			    chainID,
-			    blockNumber
-			};
-			let x = await this.crawl_block_trace(chain, t2)
-			await this.index_block(chain, blockNumber, x.blockHash);
-			out.push(`(${blockNumber}, 1)`)
-			r = null;
-		    }
-		} catch (err) {
-		    console.log(err, "build_block");
-		}
+                    if (r["block"] == false || r["feed"] == false) {
+                        console.log("fetch blockNumber", blockNumber);
+                        await this.nukeBlock(chainID, blockNumber);
+                        let t2 = {
+                            chainID,
+                            blockNumber
+                        };
+                        let x = await this.crawl_block_trace(chain, t2)
+                        await this.index_block(chain, blockNumber, x.blockHash);
+                        out.push(`(${blockNumber}, 1)`)
+                        r = null;
+                    }
+                } catch (err) {
+                    console.log(err, "build_block");
+                }
                 let result = {}
-		if ( r ) {
+                if (r) {
                     result["blockraw"] = r["block"];
                     result["events"] = r["events"];
                     result["feed"] = r["feed"];
                     if (result["blockraw"] && result["events"] && result["feed"]) {
-			const compressedData = JSON.stringify(result);
-			const fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber);
-			const file = bucket.file(fileName);
-			const writeStream = file.createWriteStream({
+                        const compressedData = JSON.stringify(result);
+                        const fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber);
+                        const file = bucket.file(fileName);
+                        const writeStream = file.createWriteStream({
                             contentType: 'application/json',
                             gzip: true
-			});
-			writeStream.write(compressedData);
-			writeStream.end();
-			
-			// Wait for the write stream to finish writing
-			await new Promise((resolve, reject) => {
+                        });
+                        writeStream.write(compressedData);
+                        writeStream.end();
+
+                        // Wait for the write stream to finish writing
+                        await new Promise((resolve, reject) => {
                             writeStream.on('finish', resolve);
                             writeStream.on('error', reject);
-			});
-			console.log(`gs://${bucketName}/${fileName}`, out.length);
-			out.push(`(${blockNumber}, 1)`)
-			if (out.length > 20) {
-			    await this.upsertSQL({
-				"table": `block${chainID}`,
-				"keys": ["blockNumber"],
-				"vals": ["archived"],
-				"data": out,
-				"replace": ["archived"]
-			    });
-			    try {
-				let sql1 = `insert into archiver (chainID, sector, archived, cnt, lastUpdateDT) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt, Now() from block${chainID} where blockNumber >= ${bnStart} and blockNumber < ${bnEnd} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt), lastUpdateDT = values(lastUpdateDT)`
-				console.log(sql1);
-				this.batchedSQL.push(sql1);
-				await this.update_batchedSQL()
-				out = []
-			    } catch (e) {
-				console.log(e);
-			    }
-			}
-		    }
+                        });
+                        console.log(`gs://${bucketName}/${fileName}`, out.length);
+                        out.push(`(${blockNumber}, 1)`)
+                        if (out.length > 20) {
+                            await this.upsertSQL({
+                                "table": `block${chainID}`,
+                                "keys": ["blockNumber"],
+                                "vals": ["archived"],
+                                "data": out,
+                                "replace": ["archived"]
+                            });
+                            try {
+                                let sql1 = `insert into archiver (chainID, sector, archived, cnt, lastUpdateDT) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt, Now() from block${chainID} where blockNumber >= ${bnStart} and blockNumber < ${bnEnd} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt), lastUpdateDT = values(lastUpdateDT)`
+                                console.log(sql1);
+                                this.batchedSQL.push(sql1);
+                                await this.update_batchedSQL()
+                                out = []
+                            } catch (e) {
+                                console.log(e);
+                            }
+                        }
+                    }
                 }
             }
             if (out.length > 0) {
-		console.log("FIN", out);
+                console.log("FIN", out);
                 await this.upsertSQL({
                     "table": `block${chainID}`,
                     "keys": ["blockNumber"],
@@ -1449,11 +1449,11 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 });
             }
         }
-		let sql1 = `insert into archiver (chainID, sector, archived, cnt, lastUpdateDT) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt, Now() from block${chainID} where blockNumber >= ${bnStart} and blockNumber < ${bnEnd} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt), lastUpdateDT = values(lastUpdateDT)`
-		console.log(sql1);
-		this.batchedSQL.push(sql1);
-		await this.update_batchedSQL()
-	console.log("XXXXXX");
+        let sql1 = `insert into archiver (chainID, sector, archived, cnt, lastUpdateDT) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt, Now() from block${chainID} where blockNumber >= ${bnStart} and blockNumber < ${bnEnd} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt), lastUpdateDT = values(lastUpdateDT)`
+        console.log(sql1);
+        this.batchedSQL.push(sql1);
+        await this.update_batchedSQL()
+        console.log("XXXXXX");
     }
     async crawl_parachains(chainID = 2) {
         let allEndPoints = Endpoints.getAllEndpoints();
@@ -1840,7 +1840,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
             this.lastEventReceivedTS = this.getCurrentTS(); // if no event received in 5mins, restart
             let bn = parseInt(header.number.toString(), 10);
             let finalizedHash = header.hash.toString();
-	    await fs.writeFileSync("/tmp/lastblock", finalizedHash);
+            await fs.writeFileSync("/tmp/lastblock", finalizedHash);
             if (chainID == paraTool.chainIDMangataX) {
                 let trueFinalizedHash = await this.api.rpc.chain.getBlockHash(header.number);
                 if (finalizedHash != trueFinalizedHash) {
