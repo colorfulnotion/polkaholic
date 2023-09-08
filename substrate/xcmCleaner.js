@@ -49,8 +49,7 @@ module.exports = class XCMCleaner extends Query {
         super("manager")
     }
 
-    async publish_xcminfo(msg) {
-    }
+    async publish_xcminfo(msg) {}
 
     async setupChainAndAPI(chainID, withSpecVersions = true, backfill = false) {
         let chain = await this.getChainWithVersion(chainID, withSpecVersions);

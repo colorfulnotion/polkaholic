@@ -1977,7 +1977,7 @@ app.get('/wasmcode/:codeHash/:chainID?', async (req, res) => {
         let codeHash = req.params["codeHash"];
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
         let code = await query.getWASMCode(codeHash, chainID);
-	console.log("CODE", code);
+        console.log("CODE", code);
         res.render('wasmcode', {
             codeHash: codeHash,
             chainInfo: query.getChainInfo(),

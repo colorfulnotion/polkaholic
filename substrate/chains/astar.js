@@ -117,7 +117,7 @@ module.exports = class AstarParser extends ChainParser {
         }
     }
 
-    
+
     contractsEventFilter(palletMethod) {
         //let palletMethod = `${rewardEvent.section}(${rewardEvent.method})`
         switch (palletMethod) {
@@ -219,12 +219,11 @@ module.exports = class AstarParser extends ChainParser {
             decodedCall: null,
         }
         try {
-	    if ( indexer.wasmContractMetadata[address_ss58] ) {
-	    } else {
-		indexer.wasmContractMetadata[address_ss58] = await this.fetchWASMContractMetadata(address_ss58, indexer);
-		console.log("READ", address_ss58, indexer.wasmContractMetadata[address_ss58] )
-	    }
-	    let metadata = indexer.wasmContractMetadata[address_ss58];
+            if (indexer.wasmContractMetadata[address_ss58]) {} else {
+                indexer.wasmContractMetadata[address_ss58] = await this.fetchWASMContractMetadata(address_ss58, indexer);
+                console.log("READ", address_ss58, indexer.wasmContractMetadata[address_ss58])
+            }
+            let metadata = indexer.wasmContractMetadata[address_ss58];
             if (metadata && Object.keys(metadata).length > 0) {
                 const contract = new ContractPromise(indexer.api, metadata, address_ss58);
                 const bytes = hexToU8a(args.data);
@@ -239,7 +238,7 @@ module.exports = class AstarParser extends ChainParser {
                 extrinsic.decodedCall = r.decodedCall;
                 extrinsic.decodedEvents = wasmContractsEmitted;
             } else {
-		
+
                 console.log("processContractsCall NOT FOUND", address_ss58);
             }
         } catch (err) {

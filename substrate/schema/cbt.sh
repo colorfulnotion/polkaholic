@@ -4,6 +4,10 @@ cbt setgcpolicy  addressextrinsic  feedtransferunfinalized maxage=1200s or maxve
 cbt setgcpolicy  addressextrinsic  feedunfinalized maxage=7d or maxversions=1
 cbt setgcpolicy  addressextrinsic  feedxcmunfinalized maxage=7d or maxversions=1
 
+
+cbt createtable  balances   "families=balances:maxversions=1"
+cbt setgcpolicy  balances balances maxage=3d or maxversions=1
+
 cbt createtable  accountrealtime   "families=realtime:maxversions=1,wasmcontract:maxversions=1,evmcontract:maxversions=1"
 cbt createfamily accountrealtime wasmcontract
 cbt createfamily accountrealtime evmcontract
