@@ -269,18 +269,15 @@ module.exports = class Crawler extends Indexer {
 
             // 2. get the trace, if we are running a full node
             let trace = false
-            let crawlTrace = parseInt(t.crawlTrace, 10) > 0;
-            if (crawlTrace) {
-                if (chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
-                    trace = await this.crawlTrace(chain, blockHash, block.number, 60000 * (t.attempted + 1));
-                    console.log("crawl_block_trace trace", trace.length);
-                } else {
-                    console.log(`[crawlTrace=${crawlTrace}] crawl_block_trace chain.RPCBackfill MISSING`, chain.RPCBackfill);
-                }
+            if (chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
+                trace = await this.crawlTrace(chain, blockHash, block.number, 60000 * (t.attempted + 1));
+                console.log("crawl_block_trace trace", trace.length);
+            } else {
+                console.log(`crawl_block_trace chain.RPCBackfill MISSING`, chain.RPCBackfill);
             }
 
             // 3. store finalized state, blockHash + blockTS in mysql + block + trace BT
-            let traceType = crawlTrace ? "state_traceBlock" : false
+            let traceType = trace ? "state_traceBlock" : false
             let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, null, null, null);
             if (success) {
                 return {
@@ -876,7 +873,7 @@ module.exports = class Crawler extends Indexer {
         if (this.debugLevel >= paraTool.debugInfo) console.log(`indexPeriod sql=`, sql) //why debugLevel doesn't work???
         var periods = await this.poolREADONLY.query(sql);
         let chain = await this.setupChainAndAPI(chainID);
-        console.log(chain);
+        console.log(periods);
 
         let indexPeriodProcessedCnt = 0
         for (let i = 0; i < periods.length; i++) {
