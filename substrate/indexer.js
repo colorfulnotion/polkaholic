@@ -1132,7 +1132,7 @@ module.exports = class Indexer extends AssetManager {
                 let r = this.xcmtransfer[xcmtransferKeys[i]];
                 if (r.innerCall == undefined && (r.xcmSymbol && !this.validXcmAssetSymbol(r.xcmSymbol, r.chainID, "xcmtransfer", r))) {
                     console.log(`invalid asset`, r.xcmSymbol, r.chainID, "xcmtransfer", r)
-                } else if (r.chainIDDest == false) {
+                } else if (r.chainIDDest == false || r.chainIDDest == null) {
 
                 } else {
                     let innerCall = (r.innerCall) ? `'${r.innerCall}'` : `NULL`

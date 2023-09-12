@@ -3928,8 +3928,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     }
                     if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
                     if (logDT != logDT0) {
-                        console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT);
-                        let sql = `update block${chainID} set crawlBlock = 1 where blockNumber = '${bn}'`;
+                        console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT, " delete ", rowId);
+                        await tableChain.row(rowId).delete();
+                        let sql = `update  block${chainID} set crawlBlock = 1 where blockNumber = '${bn}'`;
                         this.batchedSQL.push(sql);
                         await this.update_batchedSQL();
                     }
@@ -4294,7 +4295,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             if (problem) {
                 for (let c = bn0; c <= bn1; c++) {
                     if (found[c] == undefined) {
-                        let sql = `update block${chainID} set crawlBlock = 1 where blockNumber = '${c}'`;
+                        let sql = `insert into block${chainID} (blockNumber, crawlBlock) values ('${c}', 1) on duplicate key update crawlBlock = values(crawlBlock)`;
                         console.log(sql);
                         this.batchedSQL.push(sql);
                         await this.update_batchedSQL();

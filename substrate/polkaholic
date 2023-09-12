@@ -116,7 +116,7 @@ async function main() {
         .argument('<chainID>', 'ChainID to backfill', myParseInt)
         .option('-n <n>', `shard [0,nmax-1]`, myParseInt, 0)
         .option('-m, --nmax <nmax>', `# of shards`, myParseInt, 1)
-        .option('-l, --lookbackBlocks <lookbackBlocks>', `# of blocks to lookback`, myParseInt, 100000)
+        .option('-l, --lookbackBlocks <lookbackBlocks>', `# of blocks to lookback`, myParseInt, 500000)
         .action(async (chainID, opt) => {
             var crawler = new Crawler();
             await crawler.assetManagerInit();
