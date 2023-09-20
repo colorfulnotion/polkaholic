@@ -161,6 +161,13 @@ table.dataTable tbody td {
     font-size: 8pt;
 }
 
+.contractdata {
+   width: 800px;
+   height: 200px;
+   font-size:8pt;
+   font-family: 'Courier New', monospace;
+}
+
 
 .scrollable
 {

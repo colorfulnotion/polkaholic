@@ -220,7 +220,7 @@ module.exports = class Query extends AssetManager {
             this.logger.error({
                 "op": "query.resetPassword",
                 sql,
-                err
+                e
             });
             return ({
                 error: "Could not reset password"
@@ -257,7 +257,7 @@ module.exports = class Query extends AssetManager {
                 "op": "query.followUser",
                 rawFromAddress,
                 rawToAddress,
-                err
+                e
             });
             return ({
                 error: "Could not follow user"
@@ -1108,7 +1108,7 @@ module.exports = class Query extends AssetManager {
             return (false);
         }
         try {
-            let chains = await this.poolREADONLY.query(`select id, chainID, chainName, blocksCovered, blocksFinalized, symbol, UNIX_TIMESTAMP(lastCrawlDT) as lastCrawlTS, UNIX_TIMESTAMP(lastFinalizedDT) as lastFinalizedTS, iconUrl, crawling, crawlingStatus, numTraces, WSEndpoint, WSEndpoint2, WSEndpoint3, relayChain, paraID, ss58Format, RPCBackfill,
+            let chains = await this.poolREADONLY.query(`select id, chainID, chainName, blocksCovered, blocksFinalized, blocksArchived, symbol, UNIX_TIMESTAMP(lastCrawlDT) as lastCrawlTS, UNIX_TIMESTAMP(lastFinalizedDT) as lastFinalizedTS, iconUrl, crawling, crawlingStatus, numTraces, WSEndpoint, WSEndpoint2, WSEndpoint3, relayChain, paraID, ss58Format, RPCBackfill,
             numHolders, totalIssuance,
             numExtrinsics, numExtrinsics7d, numExtrinsics30d,
             numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
@@ -2797,7 +2797,7 @@ module.exports = class Query extends AssetManager {
         }
         try {
             let families = ["feed", "finalized", "feedevm"];
-            let row = await this.fetch_block(chainID, blockNumber, families, true, blockHash);
+            let row = await this.fetch_block(chain, blockNumber, families, true, blockHash);
             let evmFullBlock = (row.evmFullBlock) ? row.evmFullBlock : false
             if (row && row.receipts != undefined) {
                 try {
@@ -3813,7 +3813,7 @@ module.exports = class Query extends AssetManager {
                 }
             }
         }
-        console.log("REALTIME", realtime, "totalUSDVAL", totalUSDVal, "current", current);
+        //console.log("REALTIME", realtime, "totalUSDVAL", totalUSDVal, "current", current);
 
         if (evmcontractData) {
             let lastCellTS = {};
@@ -5569,20 +5569,6 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async getChainsReindex() {
-        try {
-            let sql = `select id, chain.chainID, sum(readyforindexing) as cnt, sum(iF(indexed=0 and readyforindexing > 0, 1, 0)) as TODO, sum(if(indexed=0 and readyforindexing > 0, elapsedSeconds, 0))/(3600*reindexerCount) as hrs, reindexer, reindexerCount from chain join indexlog on indexlog.chainID = chain.chainID where readyforindexing = 1 group by chain.chainID having TODO > 2 order by TODO desc`
-            let chains = await this.poolREADONLY.query(sql);
-            return chains;
-        } catch (err) {
-            this.logger.error({
-                "op": "query.getChainsReindex",
-                err
-            });
-            return false;
-        }
-    }
-
     chainFilters(chainList = [], targetChainID) {
         if (targetChainID == undefined) return false
         if (isNaN(targetChainID)) return false
@@ -5677,7 +5663,7 @@ module.exports = class Query extends AssetManager {
 
         try {
             let families = ["feed", "finalized", "feedevm"];
-            let row = await this.fetch_block(chainID, blockNumber, families, true);
+            let row = await this.fetch_block(chain, blockNumber, families, true);
             let block = row.feed;
             let eventIndex = 0;
             for (const extrinsic of block.extrinsics) {
@@ -6569,12 +6555,15 @@ module.exports = class Query extends AssetManager {
                 codeStoredBN: null,
                 codeStoredTS: null,
                 status: null,
-                srcURLs: []
+                srcURLs: [],
+                chainID: null
             };
+
+            console.log(sql, wasmCodes);
 
             for (const w of wasmCodes) {
                 if (w.wasm) {
-                    if (w.chainID < wasmCode.chainID || (w.status == "Verified")) {
+                    if (wasmCode.chainID == null || (w.chainID < wasmCode.chainID) || (w.status == "Verified")) {
                         let flds = ["codeStoredBN", "codeStoredTS", "extrinsicID", "extrinsicHash", "language", "compiler", "storer", "storer_ss58", "verified", "contractName", "verifyDT", "status"];
                         for (const f of flds) {
                             if (w[f] != undefined && wasmCode[f] == undefined) {
@@ -6639,7 +6628,7 @@ module.exports = class Query extends AssetManager {
     async getWASMContract(address, chainID = null) {
         address = paraTool.getPubKey(address);
         let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
-        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, authors, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
+        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
         let contracts = await this.poolREADONLY.query(sql);
         if (contracts.length == 0) {
             // return not found error
@@ -6652,6 +6641,7 @@ module.exports = class Query extends AssetManager {
             contract.id = id;
             contract.chainName = chainName;
             let chain = await this.getChain(contract.chainID);
+            contract.authors = contract.authors ? JSON.parse(contract.authors) : [];
             contract.addressPubKey = contract.address
             contract.address = paraTool.getAddress(contract.addressPubKey, chain.ss58Format);
             contract.metadata = contract.metadata ? JSON.parse(contract.metadata) : null;
@@ -6720,7 +6710,7 @@ module.exports = class Query extends AssetManager {
     // verify codeHash signature is on list of valid addresses
     async verify_codeHash_signature(codeHash, signature) {
         const ethers = require("ethers");
-        let validAddresses = ["0x58E0fB1aAB0B04Bd095AbcdF34484DA47Fe9fF77"]
+        let validAddresses = ["0xE4aEa4bEf4c033DC5E881eb863b25C1644Ff2D61"]
         const messageBytes = ethers.utils.toUtf8Bytes(codeHash);
         const signerAddr = await ethers.utils.verifyMessage(messageBytes, signature);
         //console.log('Recovered address:', signerAddr);
@@ -6766,28 +6756,51 @@ module.exports = class Query extends AssetManager {
                 }
                 metadata = JSON.stringify(metadata)
             } else {
+                this.logger.error({
+                    "op": "verify: nometadata",
+                    codeHash,
+                    chainID
+                });
                 throw new paraTool.InvalidError("No .contract metadata found");
             }
             if (wasm == null) {
+                this.logger.error({
+                    "op": "recordWASMCodeVerification: no wasm code",
+                    codeHash,
+                    chainID
+                });
                 throw new paraTool.InvalidError("No WASM code found in metadata");
             }
             // check wasm hex bytes against codeHash
             let actualHash = "0x" + paraTool.blake2_256_from_hex(wasm);
             if (actualHash != codeHash) {
+                this.logger.error({
+                    "op": "recordWASMCodeVerification: codehash mismatch",
+                    actualHash,
+                    codeHash
+                });
                 throw new paraTool.InvalidError(`Code Hash provided ${codeHash} does not match byte code hash of ${actualHash}`);
             }
             let keys = ["codeHash", "chainID"];
-            let vals = ["wasm", "metadata", "status", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier"];
-            await this.upsertSQL({
+            let vals = ["status", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier", "metadata", "wasm"];
+            let sql = await this.upsertSQL({
                 "table": "wasmCode",
                 "keys": ["codeHash", "chainID"],
                 "vals": vals,
-                "data": [`('${codeHash}', '${chainID}', ${mysql.escape(wasm)}, ${mysql.escape(metadata)}, '${status}', ${mysql.escape(language)}, ${mysql.escape(compiler)}, ${mysql.escape(contractName)}, ${mysql.escape(version)}, ${mysql.escape(authors)}, ${mysql.escape(JSON.stringify(srcURLs))}, Now(), ${mysql.escape(signature)}, ${mysql.escape(verifier)} )`],
+                "data": [`(${mysql.escape(codeHash)}, ${mysql.escape(chainID)}, ${mysql.escape(status)}, ${mysql.escape(language)}, ${mysql.escape(compiler)}, ${mysql.escape(contractName)}, ${mysql.escape(version)}, ${mysql.escape(JSON.stringify(authors))}, ${mysql.escape(JSON.stringify(srcURLs))}, Now(), ${mysql.escape(signature)}, ${mysql.escape(verifier)}, ${mysql.escape(metadata)}, ${mysql.escape(wasm)} )`],
                 "replace": ["status"],
-                "replaceIfNull": ["wasm", "metadata", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier"]
+                "replaceIfNull": ["metadata", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier", "wasm"]
+            });
+            this.logger.info({
+                "op": "recordWASMCodeVerification SUCCESS",
+                sql
             });
             return (true)
         } catch (err) {
+            this.logger.error({
+                "op": "recordWASMCodeVerification fail",
+                err
+            });
             throw new paraTool.InvalidError(err.toString());
         }
         return (false);
@@ -6820,6 +6833,11 @@ module.exports = class Query extends AssetManager {
     // 5. records wasmCode data
     // 6. copies everything to CDN
     async postChainWASMContractVerification(network, codeHash, fileData, signature, publishSource = 1) {
+        this.logger.info({
+            "op": "postChainWASMContractVerification:INIT",
+            network,
+            codeHash
+        });
         const util = require('util');
         const exec = util.promisify(require('child_process').exec);
         const AdmZip = require('adm-zip');
@@ -6833,6 +6851,11 @@ module.exports = class Query extends AssetManager {
         let zipFilePath = fileData.path;
         let chainID = this.network_to_chainID(network);
         if (chainID == null) {
+            this.logger.error({
+                "op": "postChainWASMContractVerification:invalid-network",
+                network,
+                codeHash
+            });
             throw new paraTool.InvalidError(`Invalid network ${network}`)
         }
 
@@ -6841,10 +6864,19 @@ module.exports = class Query extends AssetManager {
         if (verifier == null) {
             throw new paraTool.InvalidError(`Invalid signature ${signature} for ${codeHash}`)
         }
-        console.log("VERIFIER:", verifier, "publishSource", publishSource);
+
+
         if (await this.verified_wasm_codeHash(chainID, codeHash)) {
             // TODO: reenable
             // throw new paraTool.InvalidError(`Already verified ${codeHash} for ${network}`)
+            this.logger.error({
+                "op": "postChainWASMContractVerification:validate-verifier",
+                verifier,
+                publishSource,
+                size,
+                originalname,
+                zipFilePath
+            });
         }
 
         // 1. creates local codehash-specific directory
@@ -6857,6 +6889,11 @@ module.exports = class Query extends AssetManager {
         let zipFilePathOriginalName = path.join(targetDirectory, originalname);
         //console.log(`cp ${zipFilePath} ${zipFilePathOriginalName}`);
         fs.copyFileSync(zipFilePath, zipFilePathOriginalName);
+        this.logger.info({
+            "op": "postChainWASMContractVerification-zip file",
+            zipFilePath,
+            zipFilePathOriginalName
+        });
 
         // 3. unzips zipfile into codehash-specific directory
         const zip = new AdmZip(zipFilePath);
@@ -6887,6 +6924,10 @@ module.exports = class Query extends AssetManager {
                 console.log("found metadata with srcURLs=", srcURLs);
             }
         }
+        this.logger.info({
+            "op": "postChainWASMContractVerification-unzipped",
+            srcURLs
+        });
 
         // 5. record wasmCode data
         try {
@@ -6913,6 +6954,11 @@ module.exports = class Query extends AssetManager {
                 srcURLs,
                 infoURL
             };
+            this.logger.info({
+                "op": "postChainWASMContractVerification-SUCCESS",
+                cmd,
+                result
+            });
             console.log(cmd, stdout, result);
             return result;
         } catch (err) {

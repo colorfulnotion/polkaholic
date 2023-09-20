@@ -1285,7 +1285,12 @@ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecraw
                                         free_raw, "", "", "",
                                         "",
                                         blockTS, bn));
-                                    console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
+                                    if (rows.length > 0) {
+                                        console.log("WRITING", rows.length, tblName)
+                                        await this.insertBTRows(tblRealtime, rows, tblName);
+                                        rows = [];
+                                        console.log(symbol, currencyID, `cbt read accountrealtime prefix=${rowKey}`, balance, val.balance, "decimals", decimals);
+                                    }
                                 }
                             }
                         }
@@ -2267,7 +2272,6 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                             nonce: nonce
                         });
                         if ((logDT == yesterdayDT) || (logDT == todayDT)) {
-                            //console.log("updateNativeBalances", rowKey, `cbt read accountrealtime prefix=${rowKey}`, encodedAssetChain);
                             rows.push(this.generate_btRealtimeRow(rowKey, encodedAssetChain,
                                 id, relayChain, paraID, symbol, decimals,
                                 free, reserved, misc_frozen, frozen,
@@ -2279,13 +2283,17 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                     }
                 }
             }
+            if (rows.length > 0) {
+                await this.insertBTRows(tblRealtime, rows, "balances");
+		rows = []
+            }
+	    
             console.log("writing", `${chainID}#${logDT}#${jobID} with PUBKEY${encodedAssetChain}`, bqRows.length);
             if (logDT) {
                 // write rows to balances
                 let tblBalances = this.instance.table("balances")
                 let rawRows = bqRows.map((r) => {
                     let key = `${chainID}#${logDT}#${jobID}#${r.address_pubkey}#${encodedAssetChain}`
-                    console.log
                     let hres = {
                         key,
                         data: {

@@ -67,11 +67,24 @@ let c = contract;
           <code><%- contract.constructor %></code>
       </td>
     </tr>
-
+<% if ( c.metadata ) { %>
+    <tr>
+      <td>Metadata</td>
+      <td>
+         <textarea id="metadata" class="contractdata" disabled><%= JSON.stringify(c.metadata); %></textarea>
+         <div>
+           <a class="btn btn-sm text-capitalize" href="javascript:copyToClipboardId('metadata')"><i class="fa-regular fa-copy"></i>Copy</a>
+         </div>
+       </td>
+    </tr>
+<% } %>   
     <tr>
       <td>WASM</td>
       <td>
-          <textarea style='width: 800px; height: 200px' disabled><%- contract.wasm %></textarea>
+         <textarea id="wasm" class="contractdata" disabled><%- contract.wasm %></textarea>
+         <div>
+           <a class="btn btn-sm text-capitalize" href="javascript:copyToClipboardId('wasm')"><i class="fa-regular fa-copy"></i>Copy</a>
+         </div>
       </td>
     </tr>
   </tbody>

@@ -52,7 +52,7 @@ let chainSymbol = (f.chainSymbol != undefined)? f.chainSymbol: ''
         <% } %>
         <tr>
           <td><%- include("tooltip", {k: "xcmtimeline"}) %>XCM Timeline</td><td>
-	  <% if ( Array.isArray(f.xcmInfo) ) { console.log(f.xcmInfo); %>
+	  <% if ( Array.isArray(f.xcmInfo) ) {  %>
 	    <% for (let i = 0 ; i < f.xcmInfo.length; i++) { %>
             <div>
 	    <%- include("xcminfo", {xcm: f.xcmInfo[i], traceID: null}); %>

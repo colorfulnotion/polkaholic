@@ -6,7 +6,6 @@ function account_group_by_chain(account) {
    let chains = {};
    for ( let i = 0; i < account.length; i++) {
       let a = account[i].assetInfo;
-      console.log("ACCOUNTgroupbychain", account[i]);
       if ( a.chainID != undefined ) {
         let chainID = a.chainID;
         if ( chains[chainID] == undefined ) {
@@ -27,7 +26,6 @@ function account_group_by_chain(account) {
 }
 
 let chains = account_group_by_chain(account);
-console.log("addressTokens: chains", chains);
 for ( const chainID of Object.keys(chains) ) {
   let acc = chains[chainID];
   let chainName = acc[0].assetInfo.chainName

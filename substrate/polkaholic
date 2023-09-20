@@ -52,21 +52,13 @@ async function main() {
 
     program.command('extract')
         .description("Stream data out to GS")
-        .option('-c, --chainID <chainID>', 'Chain ID', "2")
-        .option('-s, --sector <sector>', 'Sector (Block Number * 10000)')
+        .option('-c, --chainID <chainID>', 'Chain ID', null)
         .action(async (opt) => {
             let crawler = new Crawler();
             let chainID = opt.chainID ? opt.chainID : null;
-            let sector = opt.sector ? opt.sector : null;
-            if (sector && chainID) {
-                await crawler.extract_blocks(sector, chainID);
-                console.log("DONE");
-                process.exit(0);
-            } else {
-                let [chainID, sector] = await crawler.get_archiver_chain_sector();
-                console.log(chainID, sector);
-                await crawler.extract_blocks(sector, chainID);
-                process.exit(0);
+            while (true) {
+                await crawler.extract_blocks(chainID);
+                await crawler.sleep(10000);
             }
         })
 
@@ -338,24 +330,22 @@ async function main() {
             var Manager = require("./manager");
             var manager = new Manager();
             await manager.mapChains((c) => {
-                //console.log(`./substrate-etl audit_fix -m -c ${c.chainID}`);
-                //console.log(`./substrate-etl setupsubstrate -c ${c.chainID}`);
                 let chainID = c.chainID;
-                console.log(`insert into archiver ( chainID, sector, archived, cnt, lastDT ) select ${chainID} as chainID, floor(blockNumber/10000) as sector, sum(archived) archived, count(*), max(blockDT) from block${chainID} group by sector on duplicate key update archived = values(archived), cnt = values(cnt), lastDT = values(lastDT);`);
+                console.log(`./polkaholic deleteblocks ${chainID}`);
             });
             process.exit(0);
         })
 
     program.command('deleteblocks')
+        .usage("./polkaholic deleteblocks 22087")
         .description(`Delete blocks`)
         .argument('<chainID>', 'ChainID', myParseInt)
-        .argument('<start>', 'ChainID', myParseInt)
-        .argument('<end>', 'ChainID', myParseInt)
-        .action(async (chainID, start, end) => {
+        .option('-s, --start <start>', null, myParseInt)
+        .option('-e, --end <end>', null, myParseInt)
+        .action(async (chainID, opt) => {
             var Manager = require("./manager");
             var manager = new Manager();
-            // ./polkaholic deleteblocks 22087 1981793 1982984
-            await manager.deleteBlocks(chainID, start, end)
+            await manager.deleteBlocks(chainID)
             process.exit(0);
         })
 

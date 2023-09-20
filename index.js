@@ -1953,7 +1953,6 @@ app.get('/channel/:chainID/:chainIDDest/:symbol?', async (req, res) => {
 // Usage: /wasmcontract/0xfa4c7e407f86e24770b9b7b5826457350df83eab1122bb398f4a5a4892ff98cb
 app.get('/wasmcontract/:address/:chainID?', async (req, res) => {
     try {
-
         let address = req.params["address"];
         let chainID = req.params["chainID"] ? req.params["chainID"] : null;
         let contract = await query.getWASMContract(address, chainID);

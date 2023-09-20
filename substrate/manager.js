@@ -79,14 +79,41 @@ module.exports = class Manager extends AssetManager {
         return inp.toLowerCase().replaceAll("_", "").trim()
     }
 
-    async deleteBlocks(chainID, start, end) {
-        const tableChain = this.getTableChain(chainID);
-        console.log(chainID, start, end);
-        for (let bn = start; bn <= end; bn++) {
-            let id = paraTool.blockNumberToHex(bn);
-            await tableChain.row(id).delete();
-            console.log("deleteBlocks", id);
+    async deleteBlocks(chainID) {
+        let chain = await this.getChain(chainID);
+        let start = 1;
+        let end = chain.blocksArchived;
+        let bnStart = start; //Math.floor((start+65536)/65536)*65536;
+        let bnEnd = Math.floor((end - 65536) / 65536) * 65536;
+        if (bnEnd < bnStart) bnEnd = bnStart;
+        try {
+            const tableChain = this.getTableChain(chainID);
+            console.log("deleteBlocks ---", bnStart, bnEnd);
+            /*
+	    for (let bn =start; bn < bnStart; bn++) {
+		let id = paraTool.blockNumberToHex(bn);
+		await tableChain.row(id).delete();
+		console.log("deleteBlocks start", bn, id);
+	    }
+*/
+            for (let bn = bnStart; bn < bnEnd; bn += 65536) {
+                let id = paraTool.blockNumberToHex(bn);
+                let prefix = id.substring(0, 6); // 0x001c fde0
+                await tableChain.deleteRows(prefix);
+                console.log("deleteBlocks prefix", chainID, bn, prefix);
+            }
+            /*
+	    for (let bn = bnEnd; bn <= end; bn++) {
+		let id = paraTool.blockNumberToHex(bn);
+		await tableChain.row(id).delete();
+		if ( bn % 100 == 0 ) console.log("deleteBlocks end", bn, " target", end, id, chainID);
+	    }
+*/
+        } catch (err) {
+            console.log(err);
         }
+        console.log("DONE");
+        process.exit(0);
     }
 
     lookup_specversion_type(lookup, id) {

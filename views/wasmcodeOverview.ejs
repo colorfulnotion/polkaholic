@@ -9,6 +9,7 @@ let f = code;
       </td>
     </tr>
 
+<% if ( f.codeStoredTS && f.extrinsicHash ) { %>
     <tr>
       <td>Created</td>
       <td>
@@ -16,6 +17,20 @@ let f = code;
         <a href='/blocks/<%= f.chainID; %>'><%= f.chainName; %></a> <%- include("blockNumber", {chainID: f.chainID, blockNumber: f.sourceBlocknumber}); %>
       </td>
     </tr>
+<% } else { %>
+    <tr>
+      <td>Status</td>
+      <td>
+        <i>Not Deployed</i>
+      </td>
+    </tr>
+<% } %>
+<% if ( f.storer_ss58 ) { %>
+    <tr>
+      <td>Storer</td>
+      <td><%- uiTool.presentID(f.storer_ss58) %></td>
+    </tr>
+<% } %>
 <% if ( f.language ) { %>
     <tr>
       <td>Language</td>
@@ -29,22 +44,23 @@ let f = code;
     </tr>
 <% } %>
 
-    <tr>
-      <td>Storer</td>
-      <td><%- uiTool.presentID(f.storer_ss58) %></td>
-    </tr>
-
-
-
-
 <% if ( metadata ) {
      let c = metadata.contract;
-     console.log("METADATA", metadata);
      if ( c && c.name ) { %>
     <tr>
       <th>Contract Name</th>
       <td><%= c.name %></td>
     </tr>
+    <tr>
+      <td>Metadata</td>
+      <td><textarea id="metadata" class="contractdata" disabled><%= JSON.stringify(metadata); %></textarea>
+      <div>
+         <a class="btn btn-sm text-capitalize" href="javascript:copyToClipboardId('metadata')"><i class="fa-regular fa-copy"></i>Copy</a>
+      </div>
+       </td>
+    </tr>
+
+
 <%   }
      if ( c && c.version ) { 
 %>
@@ -60,7 +76,7 @@ let f = code;
       <td><%= c.authors.join(",") %></td>
     </tr>
 <%   }
- } %>
+   } %>
 
 
 <% if ( code.verifier == "0x58E0fB1aAB0B04Bd095AbcdF34484DA47Fe9fF77" ) { %>
@@ -71,10 +87,14 @@ let f = code;
       </td>
     </tr>
 <% } %>
+
     <tr>
       <td>WASM</td>
       <td>
-          <textarea style='width: 800px; height: 200px' disabled><%- code.wasm %></textarea>
+          <textarea id="wasm" class="contractdata" disabled><%- code.wasm %></textarea>
+          <div>
+            <a class="btn btn-sm text-capitalize" href="javascript:copyToClipboardId('wasm')"><i class="fa-regular fa-copy"></i>Copy</a>
+          </div>
       </td>
     </tr>
   </tbody>

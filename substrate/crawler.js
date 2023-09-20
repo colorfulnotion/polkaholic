@@ -1314,22 +1314,54 @@ group by chainID having count(*) < 500 order by rand() desc`;
         });
     }
 
-    async get_archiver_chain_sector() {
-        let sql = `select chainID, sector from archiver where lastDT <= date(date_sub(Now(), interval 1 DAY)) and lastUpdateDT < date_sub(Now(), interval 5 minute) and archived < cnt and cnt > 9900 order by rand() limit 1`;
+    async get_archiver_chain() {
+        let sql = `select chainID, blocksArchived from chain where crawling = 1 and updateBalancesLookbackDays > 100 and blocksCovered - blocksArchived > 7200 order by lastArchiveDT limit 1`;
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 1) {
             let r = recs[0];
             let chainID = parseInt(r.chainID, 10);
-            let sector = parseInt(r.sector, 10);
-            return [chainID, sector];
+            await this.update_chain_blocksArchived(chainID, r.blocksArchived);
+            return chainID;
         }
-        console.log("FAIL", sql)
-        return [null, null];
+        return null;
     }
 
-    async extract_blocks(sector, chainID) {
-        let bnStart = sector * 10000;
-        let bnEnd = bnStart + 10000;
+    async deleteBlocks(chainID, lookback = 2000000) {
+        let chain = await this.getChain(chainID);
+        let start = (chain.blocksArchived > lookback) ? (chain.blocksArchived - lookback) : 1;
+        let end = (chain.blocksCovered - 65536 * 2);
+        let bnStart = start;
+        let bnEnd = Math.floor((end - 65536) / 65536) * 65536;
+        if (bnEnd < bnStart) bnEnd = bnStart;
+        try {
+            const tableChain = this.getTableChain(chainID);
+            console.log("deleteBlocks ---", bnStart, bnEnd);
+            for (let bn = bnStart; bn < bnEnd; bn += 65536) {
+                let id = paraTool.blockNumberToHex(bn);
+                let prefix = id.substring(0, 6); // 0x001c+fde0
+                await tableChain.deleteRows(prefix);
+                console.log("deleteBlocks prefix", chainID, bn, prefix);
+            }
+        } catch (err) {
+            console.log(err);
+        }
+        console.log("DONE");
+        process.exit(0);
+    }
+
+    async extract_blocks(chainID = null) {
+        if (chainID == null) {
+            chainID = await this.get_archiver_chain();
+            if (chainID == null) {
+                process.exit(0);
+                return (null);
+            }
+        }
+
+        let chain = await this.getChain(chainID);
+        let bnStart = chain.blocksArchived;
+        let bnEnd = chain.blocksCovered;
+        if (bnEnd - bnStart > 100000) bnEnd = bnStart + 100000;
 
         let relayChain = paraTool.getRelayChainByChainID(chainID)
         let paraID = paraTool.getParaIDfromChainID(chainID)
@@ -1341,12 +1373,12 @@ group by chainID having count(*) < 500 order by rand() desc`;
         let bucketName = "crypto_substrate";
         const bucket = storage.bucket(bucketName);
         let jmp = 50;
-        let chain = await this.getChain(chainID);
 
         await this.assetManagerInit();
         await this.setupChainAndAPI(chainID);
 
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+            console.log(bn0);
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
             // check if we have archived
@@ -1414,24 +1446,16 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         });
                         console.log(`gs://${bucketName}/${fileName}`, out.length);
                         out.push(`(${blockNumber}, 1)`)
-                        if (out.length > 20) {
-                            await this.upsertSQL({
-                                "table": `block${chainID}`,
-                                "keys": ["blockNumber"],
-                                "vals": ["archived"],
-                                "data": out,
-                                "replace": ["archived"]
-                            });
-                            try {
-                                let sql1 = `insert into archiver (chainID, sector, archived, cnt, lastUpdateDT) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt, Now() from block${chainID} where blockNumber >= ${bnStart} and blockNumber < ${bnEnd} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt), lastUpdateDT = values(lastUpdateDT)`
-                                console.log(sql1);
-                                this.batchedSQL.push(sql1);
-                                await this.update_batchedSQL()
-                                out = []
-                            } catch (e) {
-                                console.log(e);
-                            }
-                        }
+
+                        await this.upsertSQL({
+                            "table": `block${chainID}`,
+                            "keys": ["blockNumber"],
+                            "vals": ["archived"],
+                            "data": out,
+                            "replace": ["archived"]
+                        });
+                        out = [];
+                        await this.update_chain_blocksArchived(chainID, blockNumber);
                     }
                 }
             }
@@ -1445,13 +1469,22 @@ group by chainID having count(*) < 500 order by rand() desc`;
                     "replace": ["archived"]
                 });
             }
+            await this.update_chain_blocksArchived(chainID, bn0);
         }
-        let sql1 = `insert into archiver (chainID, sector, archived, cnt, lastUpdateDT) (select ${chainID} as chainID, ${sector} as sector, sum(archived) archived, count(*) as cnt, Now() from block${chainID} where blockNumber >= ${bnStart} and blockNumber < ${bnEnd} group by chainID, sector) on duplicate key update archived = values(archived), cnt = values(cnt), lastUpdateDT = values(lastUpdateDT)`
-        console.log(sql1);
-        this.batchedSQL.push(sql1);
-        await this.update_batchedSQL()
-        console.log("XXXXXX");
+        await this.deleteBlocks(chainID);
     }
+
+    async update_chain_blocksArchived(chainID, blockNumber) {
+        try {
+            let sql1 = `update chain set blocksArchived = ${blockNumber}, lastArchiveDT = Now()  where chainID = ${chainID}`
+            console.log(sql1);
+            this.batchedSQL.push(sql1);
+            await this.update_batchedSQL()
+        } catch (e) {
+            console.log(e);
+        }
+    }
+
     async crawl_parachains(chainID = 2) {
         let allEndPoints = Endpoints.getAllEndpoints();
         //console.log(`allEndPoints len=${Object.keys(allEndPoints).length}`, allEndPoints)

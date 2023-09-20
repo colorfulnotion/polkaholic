@@ -636,6 +636,7 @@ module.exports = class PolkaholicDB {
             console.log(sql);
         }
         await this.update_batchedSQL(sqlMax);
+        return sql;
     }
 
     /*
@@ -665,7 +666,7 @@ module.exports = class PolkaholicDB {
 
 
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
-        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, chain.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
+        let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, blocksArchived, chain.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
 unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,
 valueTransfersUSD7d, valueTransfersUSD30d, valueTransfersUSD, numTransactionsEVM, numTransactionsEVM7d, numTransactionsEVM30d, numAccountsActive, numAccountsActive7d, numAccountsActive30d, chain.relayChain, chain.paraID, totalIssuance, lastUpdateChainAssetsTS,
 onfinalityID, onfinalityStatus, onfinalityConfig, isEVM, chain.asset, WSEndpoint, WSEndpoint2, WSEndpoint3, active, crawlingStatus, githubURL, substrateURL, parachainsURL, dappURL, xcmasset.priceUSD, xcmasset.priceUSDPercentChange, 0 as numHolders
@@ -695,7 +696,7 @@ from chain left join xcmasset on chain.symbolXcmInteriorKey = xcmasset.xcmInteri
     }
 
     async getChain(chainID, withSpecVersions = false) {
-        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpointArchive, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmRPC, evmRPCInternal, evmRPCBlockReceipts, evmChainID, blocksCovered, blocksFinalized, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, onfinalityConfig, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus, etherscanAPIURL,
+        var chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chainID, chainName, WSEndpoint, WSEndpointSelfHosted, WSEndpointArchive, WSEndpoint2, WSEndpoint3, WSBackfill, RPCBackfill, evmRPC, evmRPCInternal, evmRPCBlockReceipts, evmChainID, blocksCovered, blocksFinalized, blocksArchived, isEVM, backfillLookback, lastUpdateChainAssetsTS, onfinalityID, onfinalityStatus, onfinalityConfig, numHolders, asset, relayChain, lastUpdateStorageKeysTS, crawlingStatus, etherscanAPIURL,
 numExtrinsics, numExtrinsics7d, numExtrinsics30d,
 numSignedExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d,
 numTransfers, numTransfers7d, numTransfers30d,
@@ -809,33 +810,8 @@ from chain where chainID = '${chainID}' limit 1`);
         return text_signature_full.split('*').length;
     }
     async getContractABI() {
-        let contractabis = await this.poolREADONLY.query(`select hex_signature, CONVERT(text_signature using utf8) text_signature, CONVERT(text_signature_full using utf8) text_signature_full, CONVERT(abiMaybe using utf8) abiMaybe, CONVERT(addresses using utf8) addresses from signaturescurated order by numContracts desc`);
         let abis = {}
-        try {
-            for (const abi of contractabis) {
-                let abiType = (abi.hex_signature.length == 10) ? "function" : "event";
-                let hex_signature = abi.hex_signature;
-                let signature = abi.text_signature
-                let signature_full = abi.text_signature_full
-                let jsonABI = JSON.parse(abi.abiMaybe);
-                let topicLen = (abi.hex_signature.length == 10) ? "0" : this.countTopicLen(signature_full);
-                let lookupID = (abiType == 'function') ? `${hex_signature}` : `${hex_signature}-${topicLen}`
-                let r = {
-                    abi: jsonABI,
-                    abiType: abiType,
-                    signature: signature,
-                    signature_full: signature_full,
-                    topic_len: topicLen
-                }
-                if (abis[lookupID] == undefined) {
-                    abis[lookupID] = r
-                }
-                abis[lookupID].addresses = abi.addresses
-            }
-        } catch (err) {
-            console.log(err)
-        }
-        return (abis);
+        return abis;
     }
 
     async setupAPI(chain, backfill = false) {
@@ -2016,12 +1992,10 @@ from chain where chainID = '${chainID}' limit 1`);
         return r;
     }
 
-    async fetch_block_gs(chainID, blockNumber) {
+    async fetch_block_gs(chain, blockNumber) {
         try {
-            if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) ||
-                ((chainID == 0) && blockNumber < 16000000) || ((chainID == 2) && blockNumber < 18300000)) { // fetch { blockraw, events, feed } from GS storage
-                return this.fetch_evm_block_gs(chainID, blockNumber);
-            } else {
+            let chainID = chain.chainID;
+            if (blockNumber < chain.blocksArchived) { // fetch { blockraw, events, feed } from GS storage
                 return this.fetch_substrate_block_gs(chainID, blockNumber);
             }
         } catch (e) {
@@ -2030,11 +2004,12 @@ from chain where chainID = '${chainID}' limit 1`);
         }
     }
 
-    async fetch_block(chainID, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
-        if ((chainID == 2004 && blockNumber >= 3683465 && blockNumber <= 3690513) || (chainID == 1) || ((chainID <= 2) && blockNumber < 35000)) { // fetch { blockraw, events, feed } from GS storage
+    async fetch_block(chain, blockNumber, families = ["feed", "finalized"], feedOnly = false, blockHash = false) {
+        let chainID = chain.chainID;
+        if (blockNumber < chain.blocksArchived) {
             try {
-                let r = await this.fetch_block_gs(chainID, blockNumber);
-                console.log("fetch_block", r);
+                let r = await this.fetch_block_gs(chain, blockNumber);
+                //console.log("fetch_block", r);
                 return r;
             } catch (e) {
                 console.log("ERR", e);
