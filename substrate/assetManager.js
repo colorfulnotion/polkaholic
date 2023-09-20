@@ -122,7 +122,7 @@ module.exports = class AssetManager extends EvmManager {
     }
 
     async chainParserInit(chainID, debugLevel = 0) {
-        if (debugLevel >= paraTool.debugVerbose) console.log(`chainParserInit chainID=${chainID}, this.chainParserChainID=${this.chainParserChainID}`)
+
         if (this.chainParser && (this.chainParserChainID == chainID)) {
             return;
         }
