@@ -6546,6 +6546,29 @@ module.exports = class Query extends AssetManager {
         }
     }
 
+    /*sing utf8) authors, contractName, verifyDT from wasmCode where codeHash = '0xd6afb5562f01207c8baa83ef663e2cbc12169751d0de7b5877b279294eb581c9'  [
+      {
+        codeHash: '0xd6afb5562f01207c8baa83ef663e2cbc12169751d0de7b5877b279294eb581c9',
+        chainID: 30000,
+        wasm: <Buffer 30 78 30 30 36 31 37 33 36 64 30 31 30 30 30 30 30 30 30 31 36 62 31 31 36 30 30 32 37 66 37 66 30 30 36 30 30 33 37 66 37 66 37 66 30 31 37 66 36 30 ... 60334 more bytes>,
+        codeStoredBN: 4685276,
+        codeStoredTS: 1695236190,
+        extrinsicID: '4685276-2',
+        extrinsicHash: '0x5d8198a47a945e189ff1e33c0394e114834bb841d555380a5e2ac59ec32a2fc9',
+        language: null,
+        compiler: null,
+        storer: '0x2c8feeab5bd9a317375e01adb6cb959f1fea78c751936d556fa2e36ede425a47',
+        storer_ss58: 'WwjA4NLgbAKgapEvKf86LNk7gcqSQhsNUTN2AXSc6JPjQf4',
+        metadata: null,
+        status: 'Unknown',
+        srcURLs: null,
+        verifier: null,
+        authors: null,
+        contractName: null,
+        verifyDT: null
+      }
+    ]
+    */
     async getWASMCode(codeHash, chainID = null) {
         try {
             const axios = require("axios");
@@ -6569,12 +6592,15 @@ module.exports = class Query extends AssetManager {
                 codeStoredBN: null,
                 codeStoredTS: null,
                 status: null,
-                srcURLs: []
+                srcURLs: [],
+                chainID: null
             };
+
+            console.log(sql, wasmCodes);
 
             for (const w of wasmCodes) {
                 if (w.wasm) {
-                    if (w.chainID < wasmCode.chainID || (w.status == "Verified")) {
+                    if (wasmCode.chainID == null || (w.chainID < wasmCode.chainID) || (w.status == "Verified")) {
                         let flds = ["codeStoredBN", "codeStoredTS", "extrinsicID", "extrinsicHash", "language", "compiler", "storer", "storer_ss58", "verified", "contractName", "verifyDT", "status"];
                         for (const f of flds) {
                             if (w[f] != undefined && wasmCode[f] == undefined) {
@@ -6766,14 +6792,25 @@ module.exports = class Query extends AssetManager {
                 }
                 metadata = JSON.stringify(metadata)
             } else {
+                this.logger.error({
+                    "op": "verify0-E-nometadata",
+                });
                 throw new paraTool.InvalidError("No .contract metadata found");
             }
             if (wasm == null) {
+                this.logger.error({
+                    "op": "verify0-E-nowasm",
+                });
                 throw new paraTool.InvalidError("No WASM code found in metadata");
             }
             // check wasm hex bytes against codeHash
             let actualHash = "0x" + paraTool.blake2_256_from_hex(wasm);
             if (actualHash != codeHash) {
+                this.logger.error({
+                    "op": "verify0-E-codehash",
+                    actualHash,
+                    codeHash
+                });
                 throw new paraTool.InvalidError(`Code Hash provided ${codeHash} does not match byte code hash of ${actualHash}`);
             }
             let keys = ["codeHash", "chainID"];
@@ -6786,8 +6823,15 @@ module.exports = class Query extends AssetManager {
                 "replace": ["status"],
                 "replaceIfNull": ["wasm", "metadata", "language", "compiler", "contractName", "version", "authors", "srcURLs", "verifyDT", "signature", "verifier"]
             });
+            this.logger.error({
+                "op": "verify0-F-succ"
+            });
             return (true)
         } catch (err) {
+            this.logger.error({
+                "op": "verify0-F-fail",
+                err
+            });
             throw new paraTool.InvalidError(err.toString());
         }
         return (false);
@@ -6833,6 +6877,11 @@ module.exports = class Query extends AssetManager {
         let zipFilePath = fileData.path;
         let chainID = this.network_to_chainID(network);
         if (chainID == null) {
+            this.logger.error({
+                "op": "verify0-B-invalid-network",
+                network,
+                codeHash
+            });
             throw new paraTool.InvalidError(`Invalid network ${network}`)
         }
 
@@ -6841,11 +6890,21 @@ module.exports = class Query extends AssetManager {
         if (verifier == null) {
             throw new paraTool.InvalidError(`Invalid signature ${signature} for ${codeHash}`)
         }
-        console.log("VERIFIER:", verifier, "publishSource", publishSource);
+
+        this.logger.error({
+            "op": "verify0-B-verifier",
+            verifier,
+            publishSource,
+            size,
+            originalname,
+            zipFilePath
+        });
+
         if (await this.verified_wasm_codeHash(chainID, codeHash)) {
             // TODO: reenable
             // throw new paraTool.InvalidError(`Already verified ${codeHash} for ${network}`)
         }
+
 
         // 1. creates local codehash-specific directory
         let targetDirectory = path.join(outputDirectory, codeHash);
@@ -6857,6 +6916,11 @@ module.exports = class Query extends AssetManager {
         let zipFilePathOriginalName = path.join(targetDirectory, originalname);
         //console.log(`cp ${zipFilePath} ${zipFilePathOriginalName}`);
         fs.copyFileSync(zipFilePath, zipFilePathOriginalName);
+        this.logger.error({
+            "op": "verify0-C-verifier",
+            zipFilePath,
+            zipFilePathOriginalName
+        });
 
         // 3. unzips zipfile into codehash-specific directory
         const zip = new AdmZip(zipFilePath);
@@ -6887,6 +6951,12 @@ module.exports = class Query extends AssetManager {
                 console.log("found metadata with srcURLs=", srcURLs);
             }
         }
+        this.logger.error({
+            "op": "verify0-D-verifier",
+            verifier,
+            size,
+            metadata
+        });
 
         // 5. record wasmCode data
         try {
@@ -6895,6 +6965,11 @@ module.exports = class Query extends AssetManager {
             throw new paraTool.InvalidError(err.toString());
         }
 
+        this.logger.error({
+            "op": "verify0-g-verifier",
+            codeHash,
+            srcURLs
+        });
         // 6. copy the entire codehash specific directroy to google storage
         try {
             let cmd = `gsutil -m cp -r ${targetDirectory} ${gsDirectory}`
@@ -6913,6 +6988,13 @@ module.exports = class Query extends AssetManager {
                 srcURLs,
                 infoURL
             };
+            this.logger.error({
+                "op": "verify0-G-verifier",
+                infoURL,
+                cmd,
+                result
+            });
+
             console.log(cmd, stdout, result);
             return result;
         } catch (err) {

@@ -424,6 +424,11 @@ app.post('/verify/:network/:codeHash', upload.single('package'), async (req, res
         let codeHash = req.params["codeHash"];
         let publishSource = req.query.publishSource ? parseInt(req.query.publishSource, 10) : 1;
 
+        this.logger.error({
+            "op": "verify0-A",
+            network,
+            codeHash
+        });
         let result = await query.postChainWASMContractVerification(network, codeHash, packageFile, signature, publishSource);
         if (result) {
             res.write(JSON.stringify(result));
@@ -434,6 +439,10 @@ app.post('/verify/:network/:codeHash', upload.single('package'), async (req, res
         }
 
     } catch (err) {
+        this.logger.error({
+            "op": "verify0-Z",
+            err
+        });
         return res.status(400).json({
             error: err.toString()
         });
