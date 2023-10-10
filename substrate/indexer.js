@@ -6350,7 +6350,7 @@ module.exports = class Indexer extends AssetManager {
 
 
     async processBlockEvents(chainID, block, eventsRaw, unused0 = false, unused1 = false, unused2 = false, autoTraces = false, finalized = false, unused = false, isTip = false, tracesPresent = false) {
-        //processExtrinsic + processBlockAndReceipt 
+        //processExtrinsic + processBlockAndReceipt
         if (!block) return;
         if (!block.extrinsics) return;
         let blockNumber = block.header.number;
@@ -7038,6 +7038,7 @@ module.exports = class Indexer extends AssetManager {
             let p = a2.p;
             let s = a2.s;
             let pallet_section = `${p}:${s}`
+            let traceID = a.traceID
             if (finalized) {
                 let c = null
                 if (a2.asset) {
@@ -7125,7 +7126,7 @@ module.exports = class Indexer extends AssetManager {
                         block_number: blockNumber,
                         block_hash: blockHash,
                         ts: blockTS,
-                        trace_id: `${blockNumber}-${idx}`,
+                        trace_id: traceID,
                         k: a2.k,
                         v: a2.v,
                         section: a2.p,
@@ -7147,8 +7148,9 @@ module.exports = class Indexer extends AssetManager {
                             }
                         }
                     }
+                    //Check?
                     traces.push({
-                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                        insertId: `${relayChain}-${paraID}-${blockNumber}-${traceID}`,
                         json: t
                     });
                 }
