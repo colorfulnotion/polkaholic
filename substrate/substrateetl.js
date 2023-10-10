@@ -4603,8 +4603,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let numTraces = 0;
 
         //TEST:
-        bnStart = 17663809
-        bnEnd = 17663810
+        //bnStart = 17663809
+        //bnEnd = 17663810
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -4629,8 +4629,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         o.block_number = bn;
                         o.block_time = b.blockTS;
                         o.block_hash = b.hash
-                        console.log(`trace`, o)
-                        fs.writeSync(f, JSON.stringify(o) + NL);
+                        if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
+                            console.log(`supressed ${o.section}:${o.storage}`)
+                        }else{
+                            console.log(`trace`, o)
+                            fs.writeSync(f, JSON.stringify(o) + NL);
+                        }
                     });
                 }
             }
@@ -4640,7 +4644,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             fs.closeSync(f);
 
             return
-            
+
             let logDTp = logDT.replaceAll("-", "")
             let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field block_time --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
             console.log(cmd);

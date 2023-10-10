@@ -3138,6 +3138,9 @@ module.exports = class AssetManager extends EvmManager {
             case "Dmp":
             case "Hrmp":
             case "ParachainSystem":
+            case "ParaInclusion":
+            case "ParaInherent":
+            case "Paras":
                 return (true);
         }
         return (false);
