@@ -251,6 +251,12 @@ module.exports = class AssetManager extends EvmManager {
                 storageName: p.storageName
             };
         }
+        //customSK
+        //0x3a65787472696e7369635f696e646578 Substrate:ExtrinsicIndex
+        storageKeysMap["3a65787472696e7369635f696e646578"] = {
+            palletName: "Substrate",
+            storageName: "ExtrinsicIndex"
+        }
         this.storageKeys = storageKeysMap
     }
 
@@ -899,6 +905,12 @@ module.exports = class AssetManager extends EvmManager {
                         sks.push(`('${palletName}', '${storageName}', '${chainID}', '${storageKey}', ${mysql.escape(modifier)}, ${mysql.escape(type0)}, ${mysql.escape(fallback)}, ${mysql.escape(docs)}, Now())`)
                     }
                 }
+            }
+            //customSK
+            //0x3a65787472696e7369635f696e646578 Substrate:ExtrinsicIndex
+            this.storageKeys["3a65787472696e7369635f696e646578"] = {
+                palletName: "Substrate",
+                storageName: "ExtrinsicIndex"
             }
         }
         if (sks.length > 0) {

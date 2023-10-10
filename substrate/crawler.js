@@ -1425,9 +1425,9 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 }
                 let result = {}
                 if (r) {
-                    result["blockraw"] = r["block"];
-                    result["events"] = r["events"];
-                    result["feed"] = r["feed"];
+                    result["blockraw"] = r["block"]; //raw encoded extrinsic + header
+                    result["events"] = r["events"];  // decoded events
+                    result["feed"] = r["feed"]; // decoded extrinsics
                     result["autotrace"] = r["autotrace"] // this is the decorated version
                     if (result["autotrace"] == undefined){
                         //need to issue crawlTrace here..

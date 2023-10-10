@@ -836,12 +836,12 @@ FROM
             let orderby = "blocklog.logDT desc, rand()";
             let w = (specific_chainID != null) ? ` and blocklog.chainID = '${specific_chainID}' ` : "";
             // pick a chain-logDT combo that has been marked Ready ( all blocks finalized )
-            // 
-            let sql = `select blocklog.chainID, UNIX_TIMESTAMP(blocklog.logDT) as indexTS 
+            //
+            let sql = `select blocklog.chainID, UNIX_TIMESTAMP(blocklog.logDT) as indexTS
 from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecrawler.logDT and chainbalancecrawler.chainID = blocklog.chainID
   where chainbalancecrawler.logDT is null and chainbalancecrawler.chainID is null and blocklog.chainID in (select chainID from chain where relayChain in ('polkadot','kusama'))
   and ( lastUpdateAddressBalancesStartDT < date_sub(Now(), interval 3+POW(3, lastUpdateAddressBalancesAttempts) MINUTE ) or lastUpdateAddressBalancesStartDT is Null )
-  and ( blocklog.updateAddressBalanceStatus = "Ready" ) 
+  and ( blocklog.updateAddressBalanceStatus = "Ready" )
   and blocklog.logDT >= '${balanceStartDT}' ${w} order by rand()`;
             console.log(sql);
             let jobs = await this.pool.query(sql);
@@ -2287,7 +2287,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
                 await this.insertBTRows(tblRealtime, rows, "balances");
 		rows = []
             }
-	    
+
             console.log("writing", `${chainID}#${logDT}#${jobID} with PUBKEY${encodedAssetChain}`, bqRows.length);
             if (logDT) {
                 // write rows to balances
@@ -4602,7 +4602,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let jmp = 50;
         let numTraces = 0;
 
-
+        //TEST:
+        bnStart = 17663809
+        bnEnd = 17663810
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -4627,6 +4629,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         o.block_number = bn;
                         o.block_time = b.blockTS;
                         o.block_hash = b.hash
+                        console.log(`trace`, o)
                         fs.writeSync(f, JSON.stringify(o) + NL);
                     });
                 }
@@ -4635,15 +4638,18 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
         try {
             fs.closeSync(f);
+
+            return
+            
             let logDTp = logDT.replaceAll("-", "")
             let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field block_time --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
             console.log(cmd);
-            await exec(cmd);
+            //await exec(cmd);
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
             let loaded = (logDT == todayDT) ? 0 : 1;
             let sql = `insert into blocklog (logDT, chainID, numTraces, traceMetricsStatus, traceMetricsDT) values ('${logDT}', '${chainID}', '${numTraces}', 'AuditRequired', Now() ) on duplicate key update numTraces = values(numTraces), traceMetricsStatus = values(traceMetricsStatus), traceMetricsDT = values(traceMetricsDT)`
             console.log(sql);
-            this.batchedSQL.push(sql);
+            //this.batchedSQL.push(sql);
             await this.update_batchedSQL();
         } catch (err) {
             console.log("dump_trace", err);
