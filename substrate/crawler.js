@@ -168,6 +168,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     async crawlTrace(chain, blockHash, blockNumber, timeoutMS = 20000) {
+        console.log(`crawlTrace** blockHash=${blockHash}. BN=${blockNumber}`)
         try {
             let headers = {
                 "Content-Type": "application/json"
@@ -190,6 +191,7 @@ module.exports = class Crawler extends Indexer {
                 return (false);
             }
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
+            console.log(`crawlTrace[${blockNumber}]** cmd=${cmd}`)
             const {
                 stdout,
                 stderr
@@ -197,6 +199,7 @@ module.exports = class Crawler extends Indexer {
                 maxBuffer: 1024 * 64000
             });
             let traceData = JSON.parse(stdout);
+            console.log(`traceData`, traceData)
             if ((!traceData) || (!traceData.result) || (!traceData.result.blockTrace)) {
                 console.log("NO data", traceData);
                 return false;
@@ -1408,6 +1411,10 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 let r = null
                 try {
                     r = this.build_block_from_row(row);
+                    let finalizedHash = null;
+                    if (r["feed"] != undefined && r["feed"].hash){
+                        finalizedHash = r["feed"].hash
+                    }
                     if (r["block"] == false || r["feed"] == false) {
                         console.log("fetch blockNumber", blockNumber);
                         await this.nukeBlock(chainID, blockNumber);
@@ -1416,9 +1423,16 @@ group by chainID having count(*) < 500 order by rand() desc`;
                             blockNumber
                         };
                         let x = await this.crawl_block_trace(chain, t2)
+                        finalizedHash = x.blockHash
                         await this.index_block(chain, blockNumber, x.blockHash);
                         out.push(`(${blockNumber}, 1)`)
                         r = null;
+                    }
+                    if (r["trace"] == false){
+                        console.log(`trace missing BN=${blockNumber}, finalizedHash=${finalizedHash}`)
+                        await this.crawlTrace(chain, finalizedHash, blockNumber);
+                    }else{
+                        console.log(`trace found BN=${blockNumber}`)
                     }
                 } catch (err) {
                     console.log(err, "build_block");
@@ -1428,8 +1442,8 @@ group by chainID having count(*) < 500 order by rand() desc`;
                     result["blockraw"] = r["block"]; //raw encoded extrinsic + header
                     result["events"] = r["events"];  // decoded events
                     result["feed"] = r["feed"]; // decoded extrinsics
-                    result["autotrace"] = r["autotrace"] // this is the decorated version
-                    if (result["autotrace"] == undefined){
+                    //result["autotrace"] = r["autotrace"] // this is the decorated version
+                    if (r["trace"] == undefined || r["trace"] == false){
                         //need to issue crawlTrace here..
                         console.log(`TODO: crawlTrace+decorate relayChain=${relayChain}. paraID=${paraID}, blockNumber=${blockNumber}`);
                         //let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
