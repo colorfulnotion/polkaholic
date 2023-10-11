@@ -4429,7 +4429,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             if (!query[p][s]) decodeFailed = true;
             if (!query[p][s].meta) decodeFailed = true;
         } catch (e) {
-
             decodeFailed = true
         }
 
@@ -4623,22 +4622,37 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
                 let hdr = b.header;
                 let traces = r.trace;
+                //let parsed_traces = [];
+                let extrinsicIndex = null;
                 if (traces.length > 0) {
                     numTraces += traces.length;
-                    traces.forEach((t, traceIdx) => {
+                    for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
+                        let t = traces[traceIdx];
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
+                        if (o.section == "Substrate" || o.storage == "ExtrinsicIndex"){
+                            if (extrinsicIndex == null) {
+                                extrinsicIndex = 0
+                            }else{
+                                extrinsicIndex++
+                            }
+                        }
                         o.block_number = bn;
                         o.block_time = b.blockTS;
-                        o.block_hash = b.hash
+                        o.block_hash = b.hash;
+                        o.exintrincID = `${bn}-${extrinsicIndex}`;
+                        //parsed_traces.push(o)
+
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
-                            console.log(`supressed ${o.section}:${o.storage}`)
-                        }else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
-                            console.log(`supressed ${o.section}:${o.storage}`)
-                        }else{
-                            console.log(`trace`, o)
+                            console.log(`supressed ${o.section}:${o.storage}`);
+                        } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
+                            console.log(`supressed skipped trace ${o.section}:${o.storage}`);
+                        } else if (o.section == "unknown" || o.storage == "unknown") {
+                            // Skip unknown
+                        } else {
+                            console.log(`trace`, o);
                             fs.writeSync(f, JSON.stringify(o) + NL);
                         }
-                    });
+                    }
                 }
             }
         }
