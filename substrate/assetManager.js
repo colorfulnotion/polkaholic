@@ -915,6 +915,14 @@ module.exports = class AssetManager extends EvmManager {
                 palletName: "Substrate",
                 storageName: "ExtrinsicIndex"
             }
+            this.storageKeys["3a7472616e73616374696f6e5f6c6576656c3a"] = {
+                palletName: "Substrate",
+                storageName: "TransactionLevel"
+            }
+            this.storageKeys["3a696e747261626c6f636b5f656e74726f7079"] = {
+                palletName: "Substrate",
+                storageName: ":intrablock_entropy"
+            }
         }
         if (sks.length > 0) {
             // add potentially new chainPalletStorage records and record that we have done so
