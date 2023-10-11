@@ -4621,6 +4621,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 start: start,
                 end: end
             });
+            //TODO: fetch from gs?
             for (const row of rows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
@@ -4678,6 +4679,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         o.id =  chain_identification
                         o.chain_name = chain_name
 
+                        //TODO: add exintrincID column to trace table
                         //o.exintrincID = `${bn}-${extrinsicIndex}`;
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
                             if (supressedFound[`${o.section}:${o.storage}`] == undefined){
@@ -4700,19 +4702,21 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
 
+        let debug = true
         try {
             fs.closeSync(f);
-            return
             let logDTp = logDT.replaceAll("-", "")
             let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field block_time --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
             console.log(cmd);
-            //await exec(cmd);
+            if (!debug) await exec(cmd);
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
             let loaded = (logDT == todayDT) ? 0 : 1;
             let sql = `insert into blocklog (logDT, chainID, numTraces, traceMetricsStatus, traceMetricsDT) values ('${logDT}', '${chainID}', '${numTraces}', 'AuditRequired', Now() ) on duplicate key update numTraces = values(numTraces), traceMetricsStatus = values(traceMetricsStatus), traceMetricsDT = values(traceMetricsDT)`
             console.log(sql);
-            //this.batchedSQL.push(sql);
-            await this.update_batchedSQL();
+            if (!debug) {
+                this.batchedSQL.push(sql);
+                await this.update_batchedSQL();
+            }
         } catch (err) {
             console.log("dump_trace", err);
         }
