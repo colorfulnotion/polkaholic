@@ -1963,6 +1963,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
                         let traceBlockJSON = traceBlock.toJSON();
                         if (traceBlockJSON) {
+                            //TODO: check traceBlockJSON
                             await this.store_stateTraceBlock_gs(chain.chainID, blockNumber, traceBlockJSON);
                             if (traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events) {
                                 let events = []
