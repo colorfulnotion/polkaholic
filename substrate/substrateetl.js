@@ -4549,10 +4549,16 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+
+        let supressedFound = {}
         let projectID = `${this.project}`
 
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let chain = await this.getChain(chainID);
+
+        let chain_identification = this.getIDByChainID(chainID)
+        let chain_name = this.getChainName(chainID)
+
         await this.get_skipStorageKeys();
         console.log(`dump_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID})`)
         // 1. get bnStart, bnEnd for logDT
@@ -4603,8 +4609,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let numTraces = 0;
 
         //TEST:
-        bnStart = 17663809
-        bnEnd = 17663810
+        //bnStart = 17663809
+        //bnEnd = 17663810
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -4625,6 +4631,25 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let extrinsicIndex = null;
                 if (traces.length > 0) {
                     numTraces += traces.length;
+                    //WANT:
+                    /*
+                    let t = {
+                        relay_chain: relayChain,
+                        para_id: paraID,
+                        id: id,
+                        chain_name: chainName,
+                        block_number: blockNumber,
+                        block_hash: blockHash,
+                        ts: blockTS,
+                        trace_id: traceID,
+                        k: a2.k,
+                        v: a2.v,
+                        section: a2.p,
+                        storage: a2.s,
+                        pk_extra:
+                        pv:
+                    };
+                    */
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
@@ -4643,14 +4668,27 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
                             }
                         }
+
                         o.block_number = bn;
-                        o.block_time = b.blockTS;
+                        o.ts = b.blockTS;
                         o.block_hash = b.hash;
-                        o.exintrincID = `${bn}-${extrinsicIndex}`;
+
+                        o.relay_chain = relayChain
+                        o.para_id = paraID
+                        o.id =  chain_identification
+                        o.chain_name = chain_name
+
+                        //o.exintrincID = `${bn}-${extrinsicIndex}`;
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
-                            console.log(`supressed ${o.section}:${o.storage}`);
+                            if (supressedFound[`${o.section}:${o.storage}`] == undefined){
+                                supressedFound[`${o.section}:${o.storage}`] = 1
+                                console.log(`supressed ${o.section}:${o.storage}`);
+                            }
                         } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
-                            console.log(`supressed skipped trace ${o.section}:${o.storage}`);
+                            if (supressedFound[`${o.section}:${o.storage}`] == undefined){
+                                supressedFound[`${o.section}:${o.storage}`] = 1
+                                console.log(`supressed skipped trace ${o.section}:${o.storage}`);
+                            }
                         } else if (o.section == "unknown" || o.storage == "unknown") {
                             // Skip unknown
                         } else {
