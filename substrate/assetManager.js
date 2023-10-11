@@ -3161,6 +3161,11 @@ module.exports = class AssetManager extends EvmManager {
             case "Paras":
                 return (true);
         }
+        switch (storage) {
+            case ":intrablock_entropy":
+            case "transactionLevel":
+                return (true);
+        }
         return (false);
     }
 

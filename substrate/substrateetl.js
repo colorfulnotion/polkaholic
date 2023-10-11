@@ -4622,26 +4622,31 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
                 let hdr = b.header;
                 let traces = r.trace;
-                //let parsed_traces = [];
                 let extrinsicIndex = null;
                 if (traces.length > 0) {
                     numTraces += traces.length;
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
-                        if (o.section == "Substrate" || o.storage == "ExtrinsicIndex"){
+                        if (o.section == "Substrate" && o.storage == "ExtrinsicIndex"){
                             if (extrinsicIndex == null) {
                                 extrinsicIndex = 0
                             }else{
                                 extrinsicIndex++
                             }
                         }
+                        if (o.section == "System" && o.storage == "Account" && o.pk_extra){
+                            try {
+                                o.address_ss58 = JSON.parse(o.pk_extra)[0]
+                                o.address_pubkey = paraTool.getPubKey(o.address_ss58);
+                            } catch (e){
+
+                            }
+                        }
                         o.block_number = bn;
                         o.block_time = b.blockTS;
                         o.block_hash = b.hash;
                         o.exintrincID = `${bn}-${extrinsicIndex}`;
-                        //parsed_traces.push(o)
-
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
                             console.log(`supressed ${o.section}:${o.storage}`);
                         } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
