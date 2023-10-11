@@ -49,6 +49,7 @@ module.exports = class AssetManager extends EvmManager {
     metadata = {};
 
     skipStorageKeys = {};
+    skipPalletStorageKeys = {};
     accounts = {};
     chainParser = null; // initiated by setup_chainParser (=> chainParserInit)
     chainParserChainID = null;
@@ -460,10 +461,12 @@ module.exports = class AssetManager extends EvmManager {
     async get_skipStorageKeys() {
         if (Object.keys(this.skipStorageKeys).length > 0) return;
         this.skipStorageKeys = {};
+        this.skipPalletStorageKeys = {};
         var storageKeysList = await this.poolREADONLY.query(`select palletName, storageName, storageKey from chainPalletStorage where skip = 1`);
         if (storageKeysList.length > 0) {
             for (const sk of storageKeysList) {
                 this.skipStorageKeys[`${sk.storageKey}`] = sk;
+                this.skipPalletStorageKeys[`${sk.palletName}${sk.storageName}`] = sk;
             }
         }
     }
@@ -3131,6 +3134,13 @@ module.exports = class AssetManager extends EvmManager {
             //console.log(`instruction`, instruction)
             this.analyzeXCMInstruction(analysis, instruction, chainID, chainIDDest, ctx, 'default')
         }
+    }
+
+    supress_skipped_trace(id, section, storage){
+        if (this.skipPalletStorageKeys[`${section}${storage}`] != undefined){
+            return (true);
+        }
+        return (false);
     }
 
     suppress_trace(id, section, storage) {
