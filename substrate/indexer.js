@@ -7009,6 +7009,7 @@ module.exports = class Indexer extends AssetManager {
             return;
         }
         // (s) dedup the events
+        let extrinsicIndex = null;
         for (const a of autoTraces) {
             let o = {}
             o.bn = blockNumber;
@@ -7022,6 +7023,14 @@ module.exports = class Indexer extends AssetManager {
             o.pkExtra = (a.pkExtra != undefined) ? a.pkExtra : null;
             o.traceID = a.traceID
             //dedupEvents[a.k] = o;
+            if (o.s == "Substrate" && o.p == "ExtrinsicIndex"){
+                if (extrinsicIndex == null) {
+                    extrinsicIndex = 0
+                }else{
+                    extrinsicIndex++
+                }
+            }
+            o.extrinsicID = `${blockNumber}-${extrinsicIndex}`
             let fullStoragekey = a.k
             if (dedupEvents[fullStoragekey] == undefined){
                 dedupEvents[fullStoragekey] = []

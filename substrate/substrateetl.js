@@ -4625,9 +4625,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             for (const row of rows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
-                let bn = parseInt(row.id.substr(2), 16);
-                let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
+                let blockTS = b.blockTS
+                let block_hash = b.hash
                 let hdr = b.header;
+                let bn = parseInt(row.id.substr(2), 16);
+                let [logDT0, hr] = paraTool.ts_to_logDT_hr(blockTS);
                 let traces = r.trace;
                 let extrinsicIndex = null;
                 if (traces.length > 0) {
@@ -4671,8 +4673,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         }
 
                         o.block_number = bn;
-                        o.ts = b.blockTS;
-                        o.block_hash = b.hash;
+                        o.ts = blockTS;
+                        o.block_hash = block_hash;
 
                         o.relay_chain = relayChain
                         o.para_id = paraID
@@ -4702,7 +4704,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
 
-        let debug = true
+        let debug = true //TODO: make this false once ready
         try {
             fs.closeSync(f);
             let logDTp = logDT.replaceAll("-", "")
