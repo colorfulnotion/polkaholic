@@ -4655,7 +4655,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     */
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
-                        console.log(`t`, t)
+                        //console.log(`t`, t)
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
                         if (o.section == "Substrate" && o.storage == "ExtrinsicIndex"){
                             if (extrinsicIndex == null) {
@@ -4681,9 +4681,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         o.para_id = paraID
                         o.id =  chain_identification
                         o.chain_name = chain_name
-
-                        //TODO: add exintrincID column to trace table
-                        //o.exintrincID = `${bn}-${extrinsicIndex}`;
+                        o.extrinsic_id = `${bn}-${extrinsicIndex}`;
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
                             if (supressedFound[`${o.section}:${o.storage}`] == undefined){
                                 supressedFound[`${o.section}:${o.storage}`] = 1

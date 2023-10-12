@@ -1913,7 +1913,8 @@ from chain where chainID = '${chainID}' limit 1`);
     }
 
     async store_stateTraceBlock_gs(chainID, blockNumber, blockTrace) {
-        return;
+        //MK: enable storing!
+        //return;
         const bucketName = 'crypto_substrate_traces';
         const storage = new Storage();
         const bucket = storage.bucket(bucketName);

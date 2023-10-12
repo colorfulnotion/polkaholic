@@ -7030,7 +7030,7 @@ module.exports = class Indexer extends AssetManager {
                     extrinsicIndex++
                 }
             }
-            o.extrinsicID = `${blockNumber}-${extrinsicIndex}`
+            o.extrinsic_id = `${blockNumber}-${extrinsicIndex}`
             let fullStoragekey = a.k
             if (dedupEvents[fullStoragekey] == undefined){
                 dedupEvents[fullStoragekey] = []
@@ -7170,10 +7170,12 @@ module.exports = class Indexer extends AssetManager {
                             }
                         }
                         //Check?
-                        traces.push({
-                            insertId: `${relayChain}-${paraID}-${blockNumber}-${traceID}`,
-                            json: t
-                        });
+                        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama){
+                            traces.push({
+                                insertId: `${relayChain}-${paraID}-${blockNumber}-${traceID}`,
+                                json: t
+                            });
+                        }
                     }
                 }
                 //temp local list blacklist for easier debugging
