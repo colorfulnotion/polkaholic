@@ -7026,11 +7026,14 @@ module.exports = class Indexer extends AssetManager {
             if (o.s == "Substrate" && o.p == "ExtrinsicIndex"){
                 if (extrinsicIndex == null) {
                     extrinsicIndex = 0
-                }else{
+                }else if (o.pv == "0"){
+                    extrinsicIndex = null
+                }else {
                     extrinsicIndex++
                 }
             }
             o.extrinsic_id = `${blockNumber}-${extrinsicIndex}`
+            if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
             let fullStoragekey = a.k
             if (dedupEvents[fullStoragekey] == undefined){
                 dedupEvents[fullStoragekey] = []

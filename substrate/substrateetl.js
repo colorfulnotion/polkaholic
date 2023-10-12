@@ -4549,12 +4549,19 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
-
         let supressedFound = {}
         let projectID = `${this.project}`
-
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama){
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
         let chain = await this.getChain(chainID);
+        let chainInfo = await this.getChainFullInfo(chainID)
+        let chainDecimals = chainInfo.decimals
+        let asset = this.getChainAsset(chainID);
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        console.log(`chainDecimals`, chainDecimals, `assetChain`, assetChain)
 
         let chain_identification = this.getIDByChainID(chainID)
         let chain_name = this.getChainName(chainID)
@@ -4608,6 +4615,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let jmp = 50;
         let numTraces = 0;
 
+        //let decimals
         //TEST:
         //bnStart = 17663809
         //bnEnd = 17663810
@@ -4660,7 +4668,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         if (o.section == "Substrate" && o.storage == "ExtrinsicIndex"){
                             if (extrinsicIndex == null) {
                                 extrinsicIndex = 0
-                            }else{
+                            }else if (o.pv == "0"){
+                                extrinsicIndex = null
+                            }else {
                                 extrinsicIndex++
                             }
                         }
@@ -4668,8 +4678,50 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             try {
                                 o.address_ss58 = JSON.parse(o.pk_extra)[0]
                                 o.address_pubkey = paraTool.getPubKey(o.address_ss58);
-                            } catch (e){
+                                //17624544-650: '{"nonce":1,"consumers":3,"providers":1,"sufficients":0,"data":{"free":51430786398441,"reserved":200410000000,"frozen":19477059680539,"flags":"0x800000000000000000005443b495716c"}}
+                                let accountStruct = JSON.parse(o.pv)
+                                let a2 = accountStruct.data
+                                let flds = []
+                                if (a2.free != undefined) {
+                                    flds.push(["free", "free"])
+                                }
+                                if (a2.reserved != undefined) {
+                                    flds.push(["reserved", "reserved"])
+                                }
+                                if (a2.frozen != undefined) {
+                                    flds.push(["frozen", "frozen"])
+                                }
+                                if (a2.flags != undefined){
+                                    o["flags"] = paraTool.dechexToIntStr(a2.flags)
+                                }
+                                /*
+                                if (a2.miscFrozen) {
+                                    flds.push(["miscFrozen", "misc_frozen"])
+                                }
+                                if (a2.feeFrozen) {
+                                    flds.push(["feeFrozen", "fee_frozen"])
+                                }
+                                */
+                                let p = await this.computePriceUSD({
+                                    assetChain:assetChain,
+                                    ts: blockTS
+                                })
+                                let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
+                                if (priceUSD > 0){
+                                    o.price_usd = priceUSD
+                                }
+                                for (const fmap of flds) {
+                                    let f = fmap[0] // e.g. totalIssuance
+                                    let f2 = fmap[1] // e.g. total_issuance
+                                    o[f2] = a2[f] / 10 ** chainDecimals;
+                                    o[`${f2}_raw`] = paraTool.dechexToIntStr(a2[f]);
+                                    if (priceUSD){
+                                        o[`${f2}_usd`] = o[f2] * priceUSD;
+                                    }
+                                }
 
+                                } catch (e){
+                                    console.log(`error~`, e)
                             }
                         }
 
@@ -4682,6 +4734,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         o.id =  chain_identification
                         o.chain_name = chain_name
                         o.extrinsic_id = `${bn}-${extrinsicIndex}`;
+                        if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
                             if (supressedFound[`${o.section}:${o.storage}`] == undefined){
                                 supressedFound[`${o.section}:${o.storage}`] = 1
@@ -4703,7 +4756,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
 
-        let debug = true //TODO: make this false once ready
+        let debug = false //TODO: make this false once ready
         try {
             fs.closeSync(f);
             let logDTp = logDT.replaceAll("-", "")

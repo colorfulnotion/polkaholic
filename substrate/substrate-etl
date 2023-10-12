@@ -140,7 +140,8 @@ async function main() {
         .option('-f, --force', `Force even if not ready`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
-            await substrateetl.init_chainInfos()
+            await substrateetl.init_chainInfos();
+            await substrateetl.init_asset_info();
             let logDT = opt.logDT ? opt.logDT : "2023-03-10";
             let endDT = opt.logDT && opt.endDT ? opt.endDT : "2023-03-16";
             let paraID = opt.paraID ? opt.paraID : 0;
