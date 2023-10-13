@@ -7023,7 +7023,7 @@ module.exports = class Indexer extends AssetManager {
             o.pkExtra = (a.pkExtra != undefined) ? a.pkExtra : null;
             o.traceID = a.traceID
             //dedupEvents[a.k] = o;
-            if (o.s == "Substrate" && o.p == "ExtrinsicIndex"){
+            if ((o.p == "Substrate" && o.s == "ExtrinsicIndex")){
                 if (extrinsicIndex == null) {
                     extrinsicIndex = 0
                 }else if (o.pv == "0"){
@@ -7056,7 +7056,8 @@ module.exports = class Indexer extends AssetManager {
             for (const a of aa){
                 let traceID = a.traceID
                 let isFinalState = (traceID == finalStates[fullStoragekey])
-                //console.log(`k=${fullStoragekey}(${a.s}:${a.p}). traceID=${traceID}, isFinalState=${isFinalState}, finalized=${finalized}`)
+                let extrinsic_id = a.extrinsic_id
+                //console.log(`k=${fullStoragekey}(${a.s}:${a.p}). traceID=${traceID}, extrinsic_id=${extrinsic_id}, isFinalState=${isFinalState}, finalized=${finalized}`)
                 let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
                 if (!a2) continue;
                 let p = a2.p;
@@ -7151,6 +7152,7 @@ module.exports = class Indexer extends AssetManager {
                             block_hash: blockHash,
                             ts: blockTS,
                             trace_id: traceID,
+                            extrinsic_id: extrinsic_id,
                             k: a2.k,
                             v: a2.v,
                             section: a2.p,
