@@ -6350,7 +6350,7 @@ module.exports = class Indexer extends AssetManager {
 
 
     async processBlockEvents(chainID, block, eventsRaw, unused0 = false, unused1 = false, unused2 = false, autoTraces = false, finalized = false, unused = false, isTip = false, tracesPresent = false) {
-        //processExtrinsic + processBlockAndReceipt 
+        //processExtrinsic + processBlockAndReceipt
         if (!block) return;
         if (!block.extrinsics) return;
         let blockNumber = block.header.number;
@@ -7003,11 +7003,13 @@ module.exports = class Indexer extends AssetManager {
         this.chainParser.setParserContext(blockTS, blockNumber, blockHash, chainID)
 
         let dedupEvents = {};
+        let finalStates = {};
         if (!autoTraces || (!Array.isArray(autoTraces))) {
             console.log("processTraceFromAuto not ", autoTraces);
             return;
         }
         // (s) dedup the events
+        let extrinsicIndex = null;
         for (const a of autoTraces) {
             let o = {}
             o.bn = blockNumber;
@@ -7020,8 +7022,26 @@ module.exports = class Indexer extends AssetManager {
             o.pv = a.pv;
             o.pkExtra = (a.pkExtra != undefined) ? a.pkExtra : null;
             o.traceID = a.traceID
-            dedupEvents[a.k] = o;
+            //dedupEvents[a.k] = o;
+            if (o.s == "Substrate" && o.p == "ExtrinsicIndex"){
+                if (extrinsicIndex == null) {
+                    extrinsicIndex = 0
+                }else if (o.pv == "0"){
+                    extrinsicIndex = null
+                }else {
+                    extrinsicIndex++
+                }
+            }
+            o.extrinsic_id = `${blockNumber}-${extrinsicIndex}`
+            if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
+            let fullStoragekey = a.k
+            if (dedupEvents[fullStoragekey] == undefined){
+                dedupEvents[fullStoragekey] = []
+            }
+            dedupEvents[fullStoragekey].push(o) // all traces with the same key
+            finalStates[fullStoragekey] = a.traceID
         }
+
         let relayChain = paraTool.getRelayChainByChainID(chainID);
         let paraID = paraTool.getParaIDfromChainID(chainID);
         let id = this.getIDByChainID(chainID);
@@ -7031,157 +7051,166 @@ module.exports = class Indexer extends AssetManager {
         let assetupdates = [];
         let idx = 0;
 
-        for (const dedupK of Object.keys(dedupEvents)) {
-            let a = dedupEvents[dedupK];
-            let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
-            if (!a2) continue;
-            let p = a2.p;
-            let s = a2.s;
-            let pallet_section = `${p}:${s}`
-            if (finalized) {
-                let c = null
-                if (a2.asset) {
-                    let prinfo = await this.computePriceUSD({
-                        val: a2.free,
-                        asset: a2.asset,
-                        chainID: this.chainID,
-                        ts: null
-                    })
-                    if (prinfo) {
-                        let assetInfo = prinfo.assetInfo;
-                        c = {
+        for (const fullStoragekey of Object.keys(dedupEvents)) {
+            let aa = dedupEvents[fullStoragekey];  // all traces with the same key
+            for (const a of aa){
+                let traceID = a.traceID
+                let isFinalState = (traceID == finalStates[fullStoragekey])
+                //console.log(`k=${fullStoragekey}(${a.s}:${a.p}). traceID=${traceID}, isFinalState=${isFinalState}, finalized=${finalized}`)
+                let [a2, _] = this.parse_trace_from_auto(a, traceType, blockNumber, blockHash, api);
+                if (!a2) continue;
+                let p = a2.p;
+                let s = a2.s;
+                let pallet_section = `${p}:${s}`
+                if (finalized) {
+                    let c = null
+                    if (a2.asset) {
+                        let prinfo = await this.computePriceUSD({
+                            val: a2.free,
+                            asset: a2.asset,
+                            chainID: this.chainID,
+                            ts: null
+                        })
+                        if (prinfo) {
+                            let assetInfo = prinfo.assetInfo;
+                            c = {
+                                relay_chain: relayChain,
+                                para_id: paraID,
+                                id: assetInfo.id,
+                                chain_name: assetInfo.chainName,
+                                block_number: blockNumber,
+                                ts: blockTS,
+                                asset: a2.asset,
+                                xcm_interior_key: assetInfo.xcmInteriorKey,
+                                decimals: assetInfo.decimals,
+                                symbol: assetInfo.symbol,
+                                asset_name: assetInfo.assetName,
+                                asset_type: assetInfo.assetType,
+                                price_usd: assetInfo.priceUSD
+                            }
+                            let flds = []
+                            try {
+                                if (s == "TotalIssuance" && a2.totalIssuance) {
+                                    flds.push(["totalIssuance", "total_issuance"])
+                                } else {
+                                    if (a2.free) {
+                                        flds.push(["free", "free"])
+                                    }
+                                    if (a2.reserved) {
+                                        flds.push(["reserved", "reserved"])
+                                    }
+                                    if (a2.frozen) {
+                                        flds.push(["frozen", "frozen"])
+                                    }
+                                    if (a2.miscFrozen) {
+                                        flds.push(["miscFrozen", "misc_frozen"])
+                                    }
+                                    if (a2.feeFrozen) {
+                                        flds.push(["feeFrozen", "fee_frozen"])
+                                    }
+                                }
+                                for (const fmap of flds) {
+                                    let f = fmap[0] // e.g. totalIssuance
+                                    let f2 = fmap[1] // e.g. total_issuance
+                                    c[f2] = a2[f] / 10 ** c.decimals;
+                                    c[`${f2}_raw`] = a2[f].toString();
+                                    c[`${f2}_usd`] = c[f2] * c.price_usd;
+                                }
+                                //only update account balance / asset issuance with final states
+                                if (isFinalState && (p == "Tokens" || p == "System" || p == "Balances" || p == "Assets") && (s == "Account" || s == "Accounts" || s == "TotalIssuance")) {
+                                    if (a2.accountID) {
+                                        c.address_ss58 = a2.accountID;
+                                        c.address_pubkey = paraTool.getPubKey(a2.accountID);
+                                        balanceupdates.push({
+                                            insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                                            json: c
+                                        });
+                                        //console.log("BALANCEUPDATE", c);
+                                    } else if (a2.totalIssuance) {
+                                        assetupdates.push({
+                                            insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
+                                            json: c
+                                        });
+                                        //console.log("CASSETUPDATE", c);
+                                    }
+                                }
+                            } catch (err) {
+                                console.log(' BROKE', err);
+                            }
+                        }
+                    }
+                    if (this.suppress_trace(id, a2.p, a2.s)) {
+
+                    } else {
+                        let t = {
                             relay_chain: relayChain,
                             para_id: paraID,
-                            id: assetInfo.id,
-                            chain_name: assetInfo.chainName,
+                            id: id,
+                            chain_name: chainName,
                             block_number: blockNumber,
+                            block_hash: blockHash,
                             ts: blockTS,
-                            asset: a2.asset,
-                            xcm_interior_key: assetInfo.xcmInteriorKey,
-                            decimals: assetInfo.decimals,
-                            symbol: assetInfo.symbol,
-                            asset_name: assetInfo.assetName,
-                            asset_type: assetInfo.assetType,
-                            price_usd: assetInfo.priceUSD
+                            trace_id: traceID,
+                            k: a2.k,
+                            v: a2.v,
+                            section: a2.p,
+                            storage: a2.s
+                        };
+                        if (a2.pk_extra) t.pk_extra = a2.pk_extra;
+                        if (a2.pv) t.pv = a2.pv;
+                        if (a2.accountID) {
+                            t.address_ss58 = a2.accountID;
+                            t.address_pubkey = paraTool.getPubKey(a2.accountID);
                         }
-                        let flds = []
-                        try {
-                            if (s == "TotalIssuance" && a2.totalIssuance) {
-                                flds.push(["totalIssuance", "total_issuance"])
-                            } else {
-                                if (a2.free) {
-                                    flds.push(["free", "free"])
-                                }
-                                if (a2.reserved) {
-                                    flds.push(["reserved", "reserved"])
-                                }
-                                if (a2.frozen) {
-                                    flds.push(["frozen", "frozen"])
-                                }
-                                if (a2.miscFrozen) {
-                                    flds.push(["miscFrozen", "misc_frozen"])
-                                }
-                                if (a2.feeFrozen) {
-                                    flds.push(["feeFrozen", "fee_frozen"])
+                        if (a2.asset) {
+                            t.asset = a2.asset;
+                        }
+                        if (c) {
+                            for (const f of Object.keys(c)) {
+                                if (t[f] == undefined) {
+                                    t[f] = c[f];
                                 }
                             }
-                            for (const fmap of flds) {
-                                let f = fmap[0] // e.g. totalIssuance
-                                let f2 = fmap[1] // e.g. total_issuance
-                                c[f2] = a2[f] / 10 ** c.decimals;
-                                c[`${f2}_raw`] = a2[f].toString();
-                                c[`${f2}_usd`] = c[f2] * c.price_usd;
-                            }
-                            if ((p == "Tokens" || p == "System" || p == "Balances" || p == "Assets") && (s == "Account" || s == "Accounts" || s == "TotalIssuance")) {
-                                if (a2.accountID) {
-                                    c.address_ss58 = a2.accountID;
-                                    c.address_pubkey = paraTool.getPubKey(a2.accountID);
-                                    balanceupdates.push({
-                                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-                                        json: c
-                                    });
-                                    //console.log("BALANCEUPDATE", c);
-                                } else if (a2.totalIssuance) {
-                                    assetupdates.push({
-                                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-                                        json: c
-                                    });
-                                    //console.log("CASSETUPDATE", c);
-                                }
-                            }
-                        } catch (err) {
-                            console.log(' BROKE', err);
+                        }
+                        //Check?
+                        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama){
+                            traces.push({
+                                insertId: `${relayChain}-${paraID}-${blockNumber}-${traceID}`,
+                                json: t
+                            });
                         }
                     }
                 }
-                if (this.suppress_trace(id, a2.p, a2.s)) {
-
+                //temp local list blacklist for easier debugging
+                if (pallet_section == '...') {
+                    continue
+                }
+                //console.log(`processTrace ${pallet_section}`, a2)
+                if (a2.mpType && a2.mpIsSet) {
+                    await this.chainParser.processMP(this, p, s, a2, finalized)
+                } else if (a2.mpIsEmpty) {
+                    // we can safely skip the empty mp here - so that it doens't count towards not handled
+                } else if (a2.accountID && a2.asset) {
+                    let chainID = this.chainID
+                    let rAssetkey = a2.asset
+                    let fromAddress = paraTool.getPubKey(a2.accountID)
+                    await this.chainParser.processAccountAsset(this, p, s, a2, rAssetkey, fromAddress)
+                } else if (a2.asset) {
+                    await this.chainParser.processAsset(this, p, s, a2)
+                } else if (a2.lptokenID) {
+                    // decorate here
+                    a2.asset = a2.lptokenID
+                    await this.chainParser.processAsset(this, p, s, a2)
                 } else {
-                    let t = {
-                        relay_chain: relayChain,
-                        para_id: paraID,
-                        id: id,
-                        chain_name: chainName,
-                        block_number: blockNumber,
-                        block_hash: blockHash,
-                        ts: blockTS,
-                        trace_id: `${blockNumber}-${idx}`,
-                        k: a2.k,
-                        v: a2.v,
-                        section: a2.p,
-                        storage: a2.s
-                    };
-                    if (a2.pk_extra) t.pk_extra = a2.pk_extra;
-                    if (a2.pv) t.pv = a2.pv;
-                    if (a2.accountID) {
-                        t.address_ss58 = a2.accountID;
-                        t.address_pubkey = paraTool.getPubKey(a2.accountID);
+                    if (this.unhandledTraceMap[pallet_section] == undefined) {
+                        //console.log(`(not handled) ${pallet_section}`);
+                        if (this.debugLevel >= paraTool.debugTracing) console.log(`(not handled) ${pallet_section}`, JSON.stringify(a2));
+                        this.unhandledTraceMap[pallet_section] = 0;
                     }
-                    if (a2.asset) {
-                        t.asset = a2.asset;
-                    }
-                    if (c) {
-                        for (const f of Object.keys(c)) {
-                            if (t[f] == undefined) {
-                                t[f] = c[f];
-                            }
-                        }
-                    }
-                    traces.push({
-                        insertId: `${relayChain}-${paraID}-${blockNumber}-${idx}`,
-                        json: t
-                    });
+                    this.unhandledTraceMap[pallet_section]++
                 }
+                idx++;
             }
-            //temp local list blacklist for easier debugging
-            if (pallet_section == '...') {
-                continue
-            }
-            //console.log(`processTrace ${pallet_section}`, a2)
-            if (a2.mpType && a2.mpIsSet) {
-                await this.chainParser.processMP(this, p, s, a2, finalized)
-            } else if (a2.mpIsEmpty) {
-                // we can safely skip the empty mp here - so that it doens't count towards not handled
-            } else if (a2.accountID && a2.asset) {
-                let chainID = this.chainID
-                let rAssetkey = a2.asset
-                let fromAddress = paraTool.getPubKey(a2.accountID)
-                await this.chainParser.processAccountAsset(this, p, s, a2, rAssetkey, fromAddress)
-            } else if (a2.asset) {
-                await this.chainParser.processAsset(this, p, s, a2)
-            } else if (a2.lptokenID) {
-                // decorate here
-                a2.asset = a2.lptokenID
-                await this.chainParser.processAsset(this, p, s, a2)
-            } else {
-                if (this.unhandledTraceMap[pallet_section] == undefined) {
-                    //console.log(`(not handled) ${pallet_section}`);
-                    if (this.debugLevel >= paraTool.debugTracing) console.log(`(not handled) ${pallet_section}`, JSON.stringify(a2));
-                    this.unhandledTraceMap[pallet_section] = 0;
-                }
-                this.unhandledTraceMap[pallet_section]++
-            }
-            idx++;
         }
 
         if (this.BQ_SUBSTRATEETL_KEY && ((balanceupdates.length > 0) || (assetupdates.length > 0) || (traces.length > 0)) && isTip) {

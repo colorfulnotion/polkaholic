@@ -168,6 +168,7 @@ module.exports = class Crawler extends Indexer {
     }
 
     async crawlTrace(chain, blockHash, blockNumber, timeoutMS = 20000) {
+        console.log(`crawlTrace** blockHash=${blockHash}. BN=${blockNumber}`)
         try {
             let headers = {
                 "Content-Type": "application/json"
@@ -190,6 +191,7 @@ module.exports = class Crawler extends Indexer {
                 return (false);
             }
             let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
+            console.log(`crawlTrace[${blockNumber}]** cmd=${cmd}`)
             const {
                 stdout,
                 stderr
@@ -197,6 +199,7 @@ module.exports = class Crawler extends Indexer {
                 maxBuffer: 1024 * 64000
             });
             let traceData = JSON.parse(stdout);
+            console.log(`traceData`, traceData)
             if ((!traceData) || (!traceData.result) || (!traceData.result.blockTrace)) {
                 console.log("NO data", traceData);
                 return false;
@@ -922,8 +925,8 @@ module.exports = class Crawler extends Indexer {
     async indexChainRandom(lookbackBackfillDays = 60, audit = true, backfill = true, write_bq_log = true, update_chain_assets = true) {
         // pick a chainID that the node is also crawling
         let hostname = this.hostname;
-        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1 
-and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) ) 
+        var sql = `select chainID, min(from_unixtime(indexTS)) as indexDTLast, count(*) from indexlog where indexed=0 and readyForIndexing = 1
+and ( lastAttemptStartDT is null or lastAttemptStartDT < date_sub(Now(), interval POW(5, attempted) MINUTE) )
 group by chainID having count(*) < 500 order by rand() desc`;
         console.log(sql);
         var chains = await this.poolREADONLY.query(sql);
@@ -1408,6 +1411,10 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 let r = null
                 try {
                     r = this.build_block_from_row(row);
+                    let finalizedHash = null;
+                    if (r["feed"] != undefined && r["feed"].hash){
+                        finalizedHash = r["feed"].hash
+                    }
                     if (r["block"] == false || r["feed"] == false) {
                         console.log("fetch blockNumber", blockNumber);
                         await this.nukeBlock(chainID, blockNumber);
@@ -1416,18 +1423,32 @@ group by chainID having count(*) < 500 order by rand() desc`;
                             blockNumber
                         };
                         let x = await this.crawl_block_trace(chain, t2)
+                        finalizedHash = x.blockHash
                         await this.index_block(chain, blockNumber, x.blockHash);
                         out.push(`(${blockNumber}, 1)`)
                         r = null;
+                    }
+                    if (r["trace"] == false){
+                        console.log(`trace missing BN=${blockNumber}, finalizedHash=${finalizedHash}`)
+                        await this.crawlTrace(chain, finalizedHash, blockNumber);
+                    }else{
+                        console.log(`trace found BN=${blockNumber}`)
                     }
                 } catch (err) {
                     console.log(err, "build_block");
                 }
                 let result = {}
                 if (r) {
-                    result["blockraw"] = r["block"];
-                    result["events"] = r["events"];
-                    result["feed"] = r["feed"];
+                    result["blockraw"] = r["block"]; //raw encoded extrinsic + header
+                    result["events"] = r["events"];  // decoded events
+                    result["feed"] = r["feed"]; // decoded extrinsics
+                    //result["autotrace"] = r["autotrace"] // this is the decorated version
+                    if (r["trace"] == undefined || r["trace"] == false){
+                        //need to issue crawlTrace here..
+                        console.log(`TODO: crawlTrace+decorate relayChain=${relayChain}. paraID=${paraID}, blockNumber=${blockNumber}`);
+                        //let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
+                        //await this.processTraceFromAuto(blockTS, blockNumber, blockHash, this.chainID, autoTraces, traceType, this.api, isFinalized, true); // use result from rawtrace to decorate
+                    }
                     if (result["blockraw"] && result["events"] && result["feed"]) {
                         const compressedData = JSON.stringify(result);
                         const fileName = this.gs_substrate_file_name(relayChain, paraID, blockNumber);
@@ -1843,6 +1864,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
         return (false);
     }
 
+    //TODO: crawltrace
     async crawlBlocks(chainID) {
         if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
             this.readyToCrawlParachains = true;
@@ -1955,6 +1977,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         let traceBlock = await this.api.rpc.state.traceBlock(blockHash, "state", "", "Put");
                         let traceBlockJSON = traceBlock.toJSON();
                         if (traceBlockJSON) {
+                            //TODO: check traceBlockJSON
                             await this.store_stateTraceBlock_gs(chain.chainID, blockNumber, traceBlockJSON);
                             if (traceBlockJSON.blockTrace && traceBlockJSON.blockTrace.events) {
                                 let events = []

@@ -49,6 +49,7 @@ module.exports = class AssetManager extends EvmManager {
     metadata = {};
 
     skipStorageKeys = {};
+    skipPalletStorageKeys = {};
     accounts = {};
     chainParser = null; // initiated by setup_chainParser (=> chainParserInit)
     chainParserChainID = null;
@@ -250,6 +251,12 @@ module.exports = class AssetManager extends EvmManager {
                 palletName: p.palletName,
                 storageName: p.storageName
             };
+        }
+        //customSK
+        //0x3a65787472696e7369635f696e646578 Substrate:ExtrinsicIndex
+        storageKeysMap["3a65787472696e7369635f696e646578"] = {
+            palletName: "Substrate",
+            storageName: "ExtrinsicIndex"
         }
         this.storageKeys = storageKeysMap
     }
@@ -454,10 +461,12 @@ module.exports = class AssetManager extends EvmManager {
     async get_skipStorageKeys() {
         if (Object.keys(this.skipStorageKeys).length > 0) return;
         this.skipStorageKeys = {};
+        this.skipPalletStorageKeys = {};
         var storageKeysList = await this.poolREADONLY.query(`select palletName, storageName, storageKey from chainPalletStorage where skip = 1`);
         if (storageKeysList.length > 0) {
             for (const sk of storageKeysList) {
                 this.skipStorageKeys[`${sk.storageKey}`] = sk;
+                this.skipPalletStorageKeys[`${sk.palletName}${sk.storageName}`] = sk;
             }
         }
     }
@@ -899,6 +908,20 @@ module.exports = class AssetManager extends EvmManager {
                         sks.push(`('${palletName}', '${storageName}', '${chainID}', '${storageKey}', ${mysql.escape(modifier)}, ${mysql.escape(type0)}, ${mysql.escape(fallback)}, ${mysql.escape(docs)}, Now())`)
                     }
                 }
+            }
+            //customSK
+            //0x3a65787472696e7369635f696e646578 Substrate:ExtrinsicIndex
+            this.storageKeys["3a65787472696e7369635f696e646578"] = {
+                palletName: "Substrate",
+                storageName: "ExtrinsicIndex"
+            }
+            this.storageKeys["3a7472616e73616374696f6e5f6c6576656c3a"] = {
+                palletName: "Substrate",
+                storageName: "TransactionLevel"
+            }
+            this.storageKeys["3a696e747261626c6f636b5f656e74726f7079"] = {
+                palletName: "Substrate",
+                storageName: ":intrablock_entropy"
             }
         }
         if (sks.length > 0) {
@@ -3121,11 +3144,27 @@ module.exports = class AssetManager extends EvmManager {
         }
     }
 
+    supress_skipped_trace(id, section, storage){
+        if (this.skipPalletStorageKeys[`${section}${storage}`] != undefined){
+            return (true);
+        }
+        return (false);
+    }
+
     suppress_trace(id, section, storage) {
         switch (section) {
             case "Dmp":
             case "Hrmp":
             case "ParachainSystem":
+            case "ParaInclusion":
+            case "ParaInherent":
+            case "Paras":
+                return (true);
+        }
+        switch (storage) {
+            case ":intrablock_entropy":
+            case "transactionLevel":
+            case "ExtrinsicIndex":
                 return (true);
         }
         return (false);
