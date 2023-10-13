@@ -4548,7 +4548,55 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         return o;
     }
 
+    async validate_trace(tableChain, bn0, bn1){
+
+        let start = paraTool.blockNumberToHex(bn0);
+        let end = paraTool.blockNumberToHex(bn1);
+
+        console.log("FETCHING", bn0, bn1, start, end, `len=${end-start+1}`);
+        let [rows] = await tableChain.getRows({
+            start: start,
+            end: end
+        });
+
+        let expectedBNs = {}
+        let missingBNs = [];
+        for (let i = bn0; i <= bn1; i++) {
+          expectedBNs[`${i}`] = 0;
+        }
+        let observedRows = []
+        let observedTracesBN = []
+        for (const row of rows) {
+            let bn = parseInt(row.id.substr(2), 16);
+            let r = this.build_block_from_row(row);
+            observedRows[bn] = r
+            if (r.trace != false){
+                expectedBNs[bn] = 1
+                observedTracesBN[bn] = 1
+            }
+        }
+        for (let i = bn0; i <= bn1; i++){
+            if (expectedBNs[i] == 0){
+                console.log(`BN=${i} missing!`)
+                missingBNs.push(i)
+                /*
+                let t2 = {
+                    chainID,
+                    i
+                };
+                let x = await this.crawl_block_trace(chain, t2)
+                */
+            }
+        }
+
+        return {
+            missingBNs: missingBNs,
+            verifiedRows: rows
+        }
+    }
+
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        let verbose = true
         let supressedFound = {}
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -4615,50 +4663,18 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let jmp = 50;
         let numTraces = 0;
 
-        //let decimals
         //TEST:
         //bnStart = 17663809
         //bnEnd = 17663810
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-            let expectedBNs = {}
-            let missingBNs = [];
+
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
-            for (let i = bn0; i <= bn1; i++) {
-              expectedBNs[`${i}`] = 0;
-            }
-            let start = paraTool.blockNumberToHex(bn0);
-            let end = paraTool.blockNumberToHex(bn1);
-            console.log("FETCHING", bn0, bn1, start, end);
-            let [rows] = await tableChain.getRows({
-                start: start,
-                end: end
-            });
-            let observedRows = []
-            let observedTracesBN = []
-            for (const row of rows) {
-                let bn = parseInt(row.id.substr(2), 16);
-                let r = this.build_block_from_row(row);
-                observedRows[bn] = r
-                if (r.trace != false){
-                    expectedBNs[bn] = 1
-                    observedTracesBN[bn] = 1
-                }
-            }
-            for (let i = bn0; i <= bn1; i++){
-                if (expectedBNs[i] == 0){
-                    console.log(`BN=${i} missing!`)
-                    missingBNs.push(i)
-                    /*
-                    let t2 = {
-                        chainID,
-                        i
-                    };
-                    let x = await this.crawl_block_trace(chain, t2)
-                    */
-                }
-            }
 
+            let res = await this.validate_trace(tableChain, bn0, bn1)
+            let rows = []
+            let missingBNs = res.missingBNs
+            let verifiedRows = res.verifiedRows
             if (missingBNs.length > 0){
                 console.log(`missingBNs`, missingBNs)
                 const Crawler = require("./crawler");
@@ -4673,14 +4689,20 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     };
                     let x = await crawler.crawl_block_trace(chain, t2);
                 }
+
+                let newRes = await this.validate_trace(tableChain, bn0, bn1)
+                missingBNs = newRes.missingBNs
+                verifiedRows = newRes.verifiedRows
+                if (missingBNs.length > 0){
+                    console.log(`Fetch failed missingBN=${missingBNs}`)
+                    process.exit(1, `validate_trace error`)
+                }
             }
-            //console.log(`observedBNs`, observedBNs)
-            console.log(`observedBNs Key[${Object.keys(observedBNs).length}]`, Object.keys(observedBNs))
-            console.log(`observedRows Key[${Object.keys(observedRows).length}]`, Object.keys(observedRows))
-            console.log(`observedTracesBN Key[${Object.keys(observedTracesBN).length}]`, Object.keys(observedTracesBN))
-            continue
+
+            //continue
             //TODO: fetch from gs?
-            for (const row of rows) {
+            console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
+            for (const row of verifiedRows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
                 let blockTS = b.blockTS
@@ -4689,14 +4711,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let bn = parseInt(row.id.substr(2), 16);
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(blockTS);
                 let traces = r.trace;
-                if (traces == false){
-                    //fetch missing traces
-                    let t2 = {
-                        chainID,
-                        bn
-                    };
-                    //let x = await this.crawl_block_trace(chain, t2)
-                }
                 let extrinsicIndex = null;
                 if (traces.length > 0) {
                     numTraces += traces.length;
@@ -4805,7 +4819,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         } else if (o.section == "unknown" || o.storage == "unknown") {
                             // Skip unknown
                         } else {
-                            //console.log(`trace`, o);
+                            if (verbose) console.log(`trace`, o);
                             fs.writeSync(f, JSON.stringify(o) + NL);
                         }
                     }
