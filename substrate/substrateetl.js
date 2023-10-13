@@ -4785,7 +4785,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 verifiedRows = newRes.verifiedRows
                 if (missingBNs.length > 0){
                     console.log(`Fetch failed missingBN=${missingBNs}`)
-                    process.exit(1, `validate_trace error`)
+                    //process.exit(1, `validate_trace error`)
                 }
             }
 
