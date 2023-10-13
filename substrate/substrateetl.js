@@ -4577,21 +4577,107 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
         for (let i = bn0; i <= bn1; i++){
             if (expectedBNs[i] == 0){
-                console.log(`BN=${i} missing!`)
+                //console.log(`BN=${i} missing!`)
                 missingBNs.push(i)
-                /*
-                let t2 = {
-                    chainID,
-                    i
-                };
-                let x = await this.crawl_block_trace(chain, t2)
-                */
             }
         }
 
         return {
             missingBNs: missingBNs,
             verifiedRows: rows
+        }
+    }
+
+    async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        let verbose = true
+        let supressedFound = {}
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama){
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
+        let chain = await this.getChain(chainID);
+        const tableChain = this.getTableChain(chainID);
+
+        await this.get_skipStorageKeys();
+        console.log(`backfill_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID})`)
+        // 1. get bnStart, bnEnd for logDT
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
+        logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+
+        let minLogDT = `${logDT} 00:00:00`;
+        let maxLogDT = `${logDT} 23:59:59`;
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
+        console.log(sql1);
+        let bnRanges = await this.poolREADONLY.query(sql1)
+        let {
+            bnStart,
+            bnEnd
+        } = bnRanges[0];
+
+        let specversions = [];
+        var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
+        this.specVersions[chainID.toString()] = [];
+        for (const specVersion of specVersionRecs) {
+            this.specVersions[chainID].push(specVersion);
+            specversions.push({
+                spec_version: specVersion.specVersion,
+                block_number: specVersion.blockNumber,
+                block_hash: specVersion.blockHash,
+                block_time: specVersion.blockTS,
+                spec: specVersion.spec
+            });
+            this.specVersion = specVersion.specVersion;
+        }
+
+        await this.setupAPI(chain)
+        let api = this.api;
+        let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
+        await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
+        // 4. do table scan 50 blocks at a time
+        let NL = "\r\n";
+        let jmp = 50;
+        let numTraces = 0;
+
+
+        //TEST:
+        //bnStart = 17663809
+        //bnEnd = 17663810
+        let jmpIdx = 0
+        let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
+        for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+            jmpIdx ++
+            console.log(`${jmpIdx}/${jmpTotal}`)
+            let bn1 = bn0 + jmp - 1;
+            if (bn1 > bnEnd) bn1 = bnEnd;
+
+            let res = await this.validate_trace(tableChain, bn0, bn1)
+            let rows = []
+            let missingBNs = res.missingBNs
+            let verifiedRows = res.verifiedRows
+            if (missingBNs.length > 0){
+                console.log(`missingBNs:${missingBNs.length}`, missingBNs)
+                const Crawler = require("./crawler");
+                let crawler = new Crawler();
+                await crawler.setupAPI(chain);
+                await crawler.assetManagerInit();
+                await crawler.setupChainAndAPI(chainID);
+                for (const targetBN of missingBNs){
+                    let t2 = {
+                        chainID,
+                        blockNumber: targetBN
+                    };
+                    let x = await crawler.crawl_block_trace(chain, t2);
+                }
+
+                let newRes = await this.validate_trace(tableChain, bn0, bn1)
+                missingBNs = newRes.missingBNs
+                if (missingBNs.length > 0){
+                    console.log(`Fetch failed missingBN=${missingBNs}, continue`)
+                    //process.exit(1, `validate_trace error`)
+                }
+            }
         }
     }
 
@@ -4634,6 +4720,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let dir = "/tmp";
         let tbl = "traces";
         let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        console.log(`writting to ${fn}`)
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
 
@@ -4666,8 +4753,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         //TEST:
         //bnStart = 17663809
         //bnEnd = 17663810
+        let jmpIdx = 0
+        let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-
+            jmpIdx ++
+            console.log(`${jmpIdx}/${jmpTotal}`)
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
 
@@ -4701,7 +4791,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
             //continue
             //TODO: fetch from gs?
-            console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
+            //console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
             for (const row of verifiedRows) {
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
