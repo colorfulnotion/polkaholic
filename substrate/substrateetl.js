@@ -4620,8 +4620,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         //bnStart = 17663809
         //bnEnd = 17663810
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+            let expectedBNs = {}
+            let missingBNs = [];
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
+            for (let i = bn0; i <= bn1; i++) {
+              expectedBNs[`${i}`] = 0;
+            }
             let start = paraTool.blockNumberToHex(bn0);
             let end = paraTool.blockNumberToHex(bn1);
             console.log("FETCHING", bn0, bn1, start, end);
@@ -4629,6 +4634,51 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 start: start,
                 end: end
             });
+            let observedRows = []
+            let observedTracesBN = []
+            for (const row of rows) {
+                let bn = parseInt(row.id.substr(2), 16);
+                let r = this.build_block_from_row(row);
+                observedRows[bn] = r
+                if (r.trace != false){
+                    expectedBNs[bn] = 1
+                    observedTracesBN[bn] = 1
+                }
+            }
+            for (let i = bn0; i <= bn1; i++){
+                if (expectedBNs[i] == 0){
+                    console.log(`BN=${i} missing!`)
+                    missingBNs.push(i)
+                    /*
+                    let t2 = {
+                        chainID,
+                        i
+                    };
+                    let x = await this.crawl_block_trace(chain, t2)
+                    */
+                }
+            }
+
+            if (missingBNs.length > 0){
+                console.log(`missingBNs`, missingBNs)
+                const Crawler = require("./crawler");
+                let crawler = new Crawler();
+                await crawler.setupAPI(chain);
+                await crawler.assetManagerInit();
+                await crawler.setupChainAndAPI(chainID);
+                for (const targetBN of missingBNs){
+                    let t2 = {
+                        chainID,
+                        blockNumber: targetBN
+                    };
+                    let x = await crawler.crawl_block_trace(chain, t2);
+                }
+            }
+            //console.log(`observedBNs`, observedBNs)
+            console.log(`observedBNs Key[${Object.keys(observedBNs).length}]`, Object.keys(observedBNs))
+            console.log(`observedRows Key[${Object.keys(observedRows).length}]`, Object.keys(observedRows))
+            console.log(`observedTracesBN Key[${Object.keys(observedTracesBN).length}]`, Object.keys(observedTracesBN))
+            continue
             //TODO: fetch from gs?
             for (const row of rows) {
                 let r = this.build_block_from_row(row);
@@ -4639,6 +4689,14 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let bn = parseInt(row.id.substr(2), 16);
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(blockTS);
                 let traces = r.trace;
+                if (traces == false){
+                    //fetch missing traces
+                    let t2 = {
+                        chainID,
+                        bn
+                    };
+                    //let x = await this.crawl_block_trace(chain, t2)
+                }
                 let extrinsicIndex = null;
                 if (traces.length > 0) {
                     numTraces += traces.length;
@@ -4663,7 +4721,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     */
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
-                        //console.log(`t`, t)
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
                         if (o.section == "Substrate" && o.storage == "ExtrinsicIndex"){
                             if (extrinsicIndex == null) {
@@ -4738,17 +4795,17 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
                             if (supressedFound[`${o.section}:${o.storage}`] == undefined){
                                 supressedFound[`${o.section}:${o.storage}`] = 1
-                                console.log(`supressed ${o.section}:${o.storage}`);
+                                //console.log(`supressed ${o.section}:${o.storage}`);
                             }
                         } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
                             if (supressedFound[`${o.section}:${o.storage}`] == undefined){
                                 supressedFound[`${o.section}:${o.storage}`] = 1
-                                console.log(`supressed skipped trace ${o.section}:${o.storage}`);
+                                //console.log(`supressed skipped trace ${o.section}:${o.storage}`);
                             }
                         } else if (o.section == "unknown" || o.storage == "unknown") {
                             // Skip unknown
                         } else {
-                            console.log(`trace`, o);
+                            //console.log(`trace`, o);
                             fs.writeSync(f, JSON.stringify(o) + NL);
                         }
                     }
