@@ -190,7 +190,7 @@ module.exports = class Crawler extends Indexer {
                 console.log("CANNOT GET TRACE -- no backfill", chain.RPCBackfill);
                 return (false);
             }
-            let cmd = `curl --silent -H "Content-Type: application/json" --max-time 1800 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
+            let cmd = `curl --silent -H "Content-Type: application/json" --max-time 180 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
             console.log(`crawlTrace[${blockNumber}]** cmd=${cmd}`)
             const {
                 stdout,
