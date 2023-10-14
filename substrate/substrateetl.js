@@ -4683,6 +4683,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let verbose = true
+        let isBackFill = false
         let supressedFound = {}
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -4765,7 +4766,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let rows = []
             let missingBNs = res.missingBNs
             let verifiedRows = res.verifiedRows
-            if (missingBNs.length > 0){
+            if (missingBNs.length > 0 && isBackFill){
                 console.log(`missingBNs`, missingBNs)
                 const Crawler = require("./crawler");
                 let crawler = new Crawler();
@@ -4921,7 +4922,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         try {
             fs.closeSync(f);
             let logDTp = logDT.replaceAll("-", "")
-            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field block_time --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
             console.log(cmd);
             if (!debug) await exec(cmd);
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
