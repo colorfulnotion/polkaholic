@@ -3144,8 +3144,8 @@ module.exports = class AssetManager extends EvmManager {
         }
     }
 
-    supress_skipped_trace(id, section, storage){
-        if (this.skipPalletStorageKeys[`${section}${storage}`] != undefined){
+    supress_skipped_trace(id, section, storage) {
+        if (this.skipPalletStorageKeys[`${section}${storage}`] != undefined) {
             return (true);
         }
         return (false);

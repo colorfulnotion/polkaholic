@@ -7023,19 +7023,19 @@ module.exports = class Indexer extends AssetManager {
             o.pkExtra = (a.pkExtra != undefined) ? a.pkExtra : null;
             o.traceID = a.traceID
             //dedupEvents[a.k] = o;
-            if ((o.p == "Substrate" && o.s == "ExtrinsicIndex")){
+            if ((o.p == "Substrate" && o.s == "ExtrinsicIndex")) {
                 if (extrinsicIndex == null) {
                     extrinsicIndex = 0
-                }else if (o.pv == "0"){
+                } else if (o.pv == "0") {
                     extrinsicIndex = null
-                }else {
+                } else {
                     extrinsicIndex++
                 }
             }
             o.extrinsic_id = `${blockNumber}-${extrinsicIndex}`
             if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
             let fullStoragekey = a.k
-            if (dedupEvents[fullStoragekey] == undefined){
+            if (dedupEvents[fullStoragekey] == undefined) {
                 dedupEvents[fullStoragekey] = []
             }
             dedupEvents[fullStoragekey].push(o) // all traces with the same key
@@ -7052,8 +7052,8 @@ module.exports = class Indexer extends AssetManager {
         let idx = 0;
 
         for (const fullStoragekey of Object.keys(dedupEvents)) {
-            let aa = dedupEvents[fullStoragekey];  // all traces with the same key
-            for (const a of aa){
+            let aa = dedupEvents[fullStoragekey]; // all traces with the same key
+            for (const a of aa) {
                 let traceID = a.traceID
                 let isFinalState = (traceID == finalStates[fullStoragekey])
                 let extrinsic_id = a.extrinsic_id
@@ -7175,7 +7175,7 @@ module.exports = class Indexer extends AssetManager {
                             }
                         }
                         //Check?
-                        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama){
+                        if (chainID == paraTool.chainIDPolkadot || chainID == paraTool.chainIDKusama) {
                             traces.push({
                                 insertId: `${relayChain}-${paraID}-${blockNumber}-${traceID}`,
                                 json: t

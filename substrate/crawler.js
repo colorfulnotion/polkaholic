@@ -1412,7 +1412,7 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 try {
                     r = this.build_block_from_row(row);
                     let finalizedHash = null;
-                    if (r["feed"] != undefined && r["feed"].hash){
+                    if (r["feed"] != undefined && r["feed"].hash) {
                         finalizedHash = r["feed"].hash
                     }
                     if (r["block"] == false || r["feed"] == false) {
@@ -1428,10 +1428,10 @@ group by chainID having count(*) < 500 order by rand() desc`;
                         out.push(`(${blockNumber}, 1)`)
                         r = null;
                     }
-                    if (r["trace"] == false){
+                    if (r["trace"] == false) {
                         console.log(`trace missing BN=${blockNumber}, finalizedHash=${finalizedHash}`)
                         await this.crawlTrace(chain, finalizedHash, blockNumber);
-                    }else{
+                    } else {
                         console.log(`trace found BN=${blockNumber}`)
                     }
                 } catch (err) {
@@ -1440,10 +1440,10 @@ group by chainID having count(*) < 500 order by rand() desc`;
                 let result = {}
                 if (r) {
                     result["blockraw"] = r["block"]; //raw encoded extrinsic + header
-                    result["events"] = r["events"];  // decoded events
+                    result["events"] = r["events"]; // decoded events
                     result["feed"] = r["feed"]; // decoded extrinsics
                     //result["autotrace"] = r["autotrace"] // this is the decorated version
-                    if (r["trace"] == undefined || r["trace"] == false){
+                    if (r["trace"] == undefined || r["trace"] == false) {
                         //need to issue crawlTrace here..
                         console.log(`TODO: crawlTrace+decorate relayChain=${relayChain}. paraID=${paraID}, blockNumber=${blockNumber}`);
                         //let autoTraces = await this.processTraceAsAuto(blockTS, blockNumber, blockHash, this.chainID, trace, traceType, this.api, isFinalized);
