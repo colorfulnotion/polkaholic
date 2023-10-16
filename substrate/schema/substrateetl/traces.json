@@ -1,75 +1,81 @@
 [
-      {
-        "mode": "REQUIRED",
-        "name": "relay_chain",
-        "type": "STRING"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "para_id",
-        "type": "STRING"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "id",
-        "type": "STRING"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "chain_name",
-        "type": "STRING"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "trace_id",
-        "type": "STRING"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "ts",
-        "type": "TIMESTAMP"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "block_number",
-        "type": "INTEGER"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "block_hash",
-        "type": "STRING"
-      },
-      {
-        "mode": "REQUIRED",
-        "name": "k",
-        "type": "STRING"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "v",
-        "type": "STRING"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "section",
-        "type": "STRING"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "storage",
-        "type": "STRING"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "pk_extra",
-        "type": "JSON"
-      },
-      {
-        "mode": "NULLABLE",
-        "name": "pv",
-        "type": "JSON"
-      },
-    {
+  {
+    "mode": "REQUIRED",
+    "name": "relay_chain",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "para_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "chain_name",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "trace_id",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "extrinsic_id",
+    "type": "STRING",
+    "description": "Extrinsic ID of extrinsic"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "ts",
+    "type": "TIMESTAMP"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "block_number",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "block_hash",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "k",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "v",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "section",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "pk_extra",
+    "type": "JSON"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "pv",
+    "type": "JSON"
+  },
+  {
     "mode": "NULLABLE",
     "name": "symbol",
     "type": "STRING"
@@ -111,10 +117,15 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "flags",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "free",
     "type": "FLOAT"
   },
-    {
+  {
     "mode": "NULLABLE",
     "name": "free_usd",
     "type": "FLOAT"
@@ -203,17 +214,5 @@
     "mode": "NULLABLE",
     "name": "price_usd",
     "type": "FLOAT"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "extrinsic_hash",
-    "type": "STRING",
-    "description": "Hash of extrinsic data -- because of account reaping, may not be unique"
-  },
-  {
-    "mode": "NULLABLE",
-    "name": "extrinsic_id",
-    "type": "STRING",
-    "description": "Extrinsic ID of extrinsic"
   }
 ]
