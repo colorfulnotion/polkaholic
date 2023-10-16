@@ -4588,6 +4588,47 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async batch_crawl_trace(crawler, chainID, missingBNs){
+        let i = 0;
+        let n = 0;
+        let batchSize = 10;
+        while (i < missingBNs.length) {
+            // Create an array to hold promises for current batch
+            let crawlPromises = [];
+            let currBatch = missingBNs.slice(i, i + batchSize);
+            if (currBatch.length > 0) {
+                console.log(`currBatch#${n} len=${currBatch.length}`)
+                for (const targetBN of currBatch){
+                    let t2 = {
+                        chainID,
+                        blockNumber: targetBN
+                    };
+                    crawlPromises.push(crawler.crawl_block_trace(chain, t2))
+                }
+                //concurrent crawl
+                let crawlStates;
+                try {
+                    crawlStates = await Promise.allSettled(crawlPromises);
+                    //{ status: 'fulfilled', value: ... },
+                    //{ status: 'rejected', reason: Error: '.....'}
+                } catch (e) {
+                    console.log("crawlStates ERR", e);
+                }
+                for (i = 0; i < crawlStates.length; i += 1) {
+                    let crawlState = crawlStates[i]
+                    if (crawlState['status'] == 'fulfilled') {
+                        //
+                    } else {
+                        let errReason = crawlState['reason']
+                        console.log(`NOT OK`, errReason)
+                    }
+                }
+                i += batchSize;
+                n++;
+            }
+        }
+    }
+
     async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let verbose = true
         let supressedFound = {}
@@ -4637,13 +4678,22 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
         // 4. do table scan 50 blocks at a time
         let NL = "\r\n";
-        let jmp = 50;
+        let jmp = 100;
         let numTraces = 0;
 
+
+        //Fetching missing traces
+        const Crawler = require("./crawler");
+        let crawler = new Crawler();
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
 
         //TEST:
         //bnStart = 17663809
         //bnEnd = 17663810
+
+        let maxQueueSize = 100;
         let missingBNAll = [];
         let jmpIdx = 0
         let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
@@ -4658,39 +4708,17 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let missingBNs = res.missingBNs
             let verifiedRows = res.verifiedRows
             if (missingBNs.length > 0) {
-                console.log(`missingBNs:${missingBNs.length}`, missingBNs)
                 missingBNAll.push(...missingBNs)
-                /*
-                const Crawler = require("./crawler");
-                let crawler = new Crawler();
-                await crawler.setupAPI(chain);
-                await crawler.assetManagerInit();
-                await crawler.setupChainAndAPI(chainID);
-                for (const targetBN of missingBNs){
-                    let t2 = {
-                        chainID,
-                        blockNumber: targetBN
-                    };
-                    let x = await crawler.crawl_block_trace(chain, t2);
+                console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
+                if (missingBNAll.length >= maxQueueSize){
+                    await this.batch_crawl_trace(crawler, chainID, missingBNAll)
                 }
-
-                let newRes = await this.validate_trace(tableChain, bn0, bn1)
-                missingBNs = newRes.missingBNs
-                if (missingBNs.length > 0){
-                    console.log(`Fetch failed missingBN=${missingBNs}, continue`)
-                    //process.exit(1, `validate_trace error`)
-                }
-                */
+                missingBNAll = []
             }
         }
 
-        //Fetching missing traces
-        const Crawler = require("./crawler");
-        let crawler = new Crawler();
-        await crawler.setupAPI(chain);
-        await crawler.assetManagerInit();
-        await crawler.setupChainAndAPI(chainID);
         console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
+        /*
         for (const targetBN of missingBNAll) {
             let t2 = {
                 chainID,
@@ -4698,45 +4726,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             };
             //let x = await crawler.crawl_block_trace(chain, t2);
         }
+        */
+        await this.batch_crawl_trace(crawler, chainID, missingBNAll)
 
-        let i = 0;
-        let n = 0;
-        let batchSize = 10;
-        while (i < missingBNAll.length) {
-            // Create an array to hold promises for current batch
-            let crawlPromises = [];
-            let currBatch = missingBNAll.slice(i, i + batchSize);
-            if (currBatch.length > 0) {
-                console.log(`currBatch#${n} len=${currBatch.length}`)
-                for (const targetBN of currBatch){
-                    let t2 = {
-                        chainID,
-                        blockNumber: targetBN
-                    };
-                    crawlPromises.push(crawler.crawl_block_trace(chain, t2))
-                }
-                //concurrent crawl
-                let crawlStates;
-                try {
-                    crawlStates = await Promise.allSettled(crawlPromises);
-                    //{ status: 'fulfilled', value: ... },
-                    //{ status: 'rejected', reason: Error: '.....'}
-                } catch (e) {
-                    console.log("crawlStates ERR", e);
-                }
-                for (i = 0; i < crawlStates.length; i += 1) {
-                    let crawlState = crawlStates[i]
-                    if (crawlState['status'] == 'fulfilled') {
-                        //
-                    } else {
-                        let errReason = crawlState['reason']
-                        console.log(`NOT OK`, errReason)
-                    }
-                }
-                i += batchSize;
-                n++;
-            }
-        }
     }
 
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
