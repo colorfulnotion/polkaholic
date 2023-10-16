@@ -4588,7 +4588,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async batch_crawl_trace(crawler, chainID, missingBNs){
+    async batch_crawl_trace(crawler, chain, missingBNs){
         let i = 0;
         let n = 0;
         let batchSize = 10;
@@ -4597,10 +4597,10 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let crawlPromises = [];
             let currBatch = missingBNs.slice(i, i + batchSize);
             if (currBatch.length > 0) {
-                console.log(`currBatch#${n} len=${currBatch.length}`)
+                console.log(`currBatch#${n} len=${currBatch.length}`, currBatch)
                 for (const targetBN of currBatch){
                     let t2 = {
-                        chainID,
+                        chainID: chain.chainID,
                         blockNumber: targetBN
                     };
                     crawlPromises.push(crawler.crawl_block_trace(chain, t2))
@@ -4614,8 +4614,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 } catch (e) {
                     console.log("crawlStates ERR", e);
                 }
-                for (i = 0; i < crawlStates.length; i += 1) {
-                    let crawlState = crawlStates[i]
+                for (let j = 0; j < crawlStates.length; j++) {
+                    let crawlState = crawlStates[j]
                     if (crawlState['status'] == 'fulfilled') {
                         //
                     } else {
@@ -4693,7 +4693,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         //bnStart = 17663809
         //bnEnd = 17663810
 
-        let maxQueueSize = 100;
+        let maxQueueSize = 50;
         let missingBNAll = [];
         let jmpIdx = 0
         let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
@@ -4711,23 +4711,14 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 missingBNAll.push(...missingBNs)
                 console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
                 if (missingBNAll.length >= maxQueueSize){
-                    await this.batch_crawl_trace(crawler, chainID, missingBNAll)
+                    await this.batch_crawl_trace(crawler, chain, missingBNAll)
+                    missingBNAll = []
                 }
-                missingBNAll = []
             }
         }
 
         console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
-        /*
-        for (const targetBN of missingBNAll) {
-            let t2 = {
-                chainID,
-                blockNumber: targetBN
-            };
-            //let x = await crawler.crawl_block_trace(chain, t2);
-        }
-        */
-        await this.batch_crawl_trace(crawler, chainID, missingBNAll)
+        await this.batch_crawl_trace(crawler, chain, missingBNAll)
 
     }
 
