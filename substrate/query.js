@@ -6633,7 +6633,7 @@ module.exports = class Query extends AssetManager {
 	}
         address = paraTool.getPubKey(address);
         let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
-        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
+        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, convert(srcURLs using utf8) as srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
         let contracts = await this.poolREADONLY.query(sql);
         if (contracts.length == 0) {
             // return not found error
