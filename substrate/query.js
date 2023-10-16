@@ -6625,7 +6625,12 @@ module.exports = class Query extends AssetManager {
         }
     }
 
-    async getWASMContract(address, chainID = null) {
+    async getWASMContract(address, chainIDorChainName = null) {
+	let chainID = this.network_to_chainID(chainIDorChainName);
+	if ( chainID == null ) {
+            // return not found error
+            throw new paraTool.NotFoundError(`Unknown network: ${chainIDorChainName}`)
+	}
         address = paraTool.getPubKey(address);
         let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
         let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
@@ -6641,7 +6646,11 @@ module.exports = class Query extends AssetManager {
             contract.id = id;
             contract.chainName = chainName;
             let chain = await this.getChain(contract.chainID);
-            contract.authors = contract.authors ? JSON.parse(contract.authors) : [];
+            try {
+		contract.authors = contract.authors ? JSON.parse(contract.authors) : [];
+	    } catch (err) {
+
+	    }
             contract.addressPubKey = contract.address
             contract.address = paraTool.getAddress(contract.addressPubKey, chain.ss58Format);
             contract.metadata = contract.metadata ? JSON.parse(contract.metadata) : null;
