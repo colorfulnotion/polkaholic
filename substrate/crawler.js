@@ -274,7 +274,7 @@ module.exports = class Crawler extends Indexer {
             let trace = false
             if (chain.RPCBackfill && (chain.RPCBackfill.length > 0)) {
                 trace = await this.crawlTrace(chain, blockHash, block.number, 60000 * (t.attempted + 1));
-                console.log("crawl_block_trace trace", trace.length);
+                console.log(`[${block.number}] crawl_block_trace trace`, trace.length);
             } else {
                 console.log(`crawl_block_trace chain.RPCBackfill MISSING`, chain.RPCBackfill);
             }
