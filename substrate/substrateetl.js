@@ -64,6 +64,17 @@ module.exports = class SubstrateETL extends AssetManager {
         super("manager")
     }
 
+    getAllTimeFormat(logDT) {
+        //2020-12-01 -> [TS, '20221201', '2022-12-01', '2022-11-30']
+        //20201201 -> [TS, '20221201', '2022-12-01', '2022-11-30']
+        let logTS = paraTool.logDT_hr_to_ts(logDT, 0)
+        let logYYYYMMDD = logDT.replaceAll('-', '')
+        let [currDT, _c] = paraTool.ts_to_logDT_hr(logTS)
+        let logYYYY_MM_DD = currDT.replaceAll('-', '/')
+        let [prevDT, _p] = paraTool.ts_to_logDT_hr(logTS - 86400)
+        return [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD]
+    }
+
     getTimeFormat(logDT) {
         //2020-12-01 -> [TS, '20221201', '2022-12-01', '2022-11-30']
         //20201201 -> [TS, '20221201', '2022-12-01', '2022-11-30']
@@ -4722,7 +4733,63 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
     }
 
+    async loadDailyTraceFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
+
+        let projectID = `${this.project}`
+        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+
+        let dir = "/tmp";
+        let tbl = "traces";
+        //let localfn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        let bucket = "crypto_substrate_traces_etl"
+        let remotefn = `gs://${bucket}/${relayChain}/${paraID}/${logYYYY_MM_DD}/${relayChain}_trace${paraID}_${logYYYYMMDD}.json`
+        //bq load  --project_id=substrate-etl --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.traces0$20231001' gs://crypto_substrate_traces_etl/polkadot/0/2023/10/01/polkadot_trace0_20231001.json schema/substrateetl/traces.json
+
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logYYYYMMDD}' ${remotefn} schema/substrateetl/${tbl}.json`;
+        console.log(cmd);
+        if (!dryRun) {
+            let {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            console.log(stdout, stderr);
+        }
+    }
+
+    async cpDailyTraceToGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+
+        let dir = "/tmp";
+        let tbl = "traces";
+        let localfn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        let bucket = "crypto_substrate_traces_etl"
+        let remoteDir = `gs://${bucket}/${relayChain}/${paraID}/${logYYYY_MM_DD}/${relayChain}_trace${paraID}_${logYYYYMMDD}.json`
+        let gsReplaceLoadCmd = `gsutil -m cp -r ${localfn} ${remoteDir}`
+        console.log(gsReplaceLoadCmd)
+        let errCnt = 0
+        if (!dryRun) {
+            try {
+                let res = await exec(gsReplaceLoadCmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`cpHourlyETLToGS res`, gsReplaceLoadCmd)
+            } catch (e) {
+                console.log(`cpHourlyETLToGS ERROR ${e.toString()}`)
+                errCnt++
+            }
+        }
+        return true
+    }
+
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        /*
+        await this.cpDailyTraceToGS(logDT, paraID, relayChain, false)
+        await this.loadDailyTraceFromGS(logDT, paraID, relayChain, false)
+        return
+        */
         let verbose = true
         let isBackFill = false
         let supressedFound = {}
@@ -4761,6 +4828,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         // 2. setup directories for tbls on date
         let dir = "/tmp";
         let tbl = "traces";
+        let logDTp = logDT.replaceAll("-", "")
         let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
         console.log(`writting to ${fn}`)
         let f = fs.openSync(fn, 'w', 0o666);
@@ -4959,18 +5027,28 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
 
-        let debug = false //TODO: make this false once ready
+        let dryRun = false
         try {
             fs.closeSync(f);
-            let logDTp = logDT.replaceAll("-", "")
+            await this.cpDailyTraceToGS(logDT, paraID, relayChain, dryRun)
+            await this.loadDailyTraceFromGS(logDT, paraID, relayChain, dryRun)
+            /*
             let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
             console.log(cmd);
-            if (!debug) await exec(cmd);
+            */
+            if (!dryRun) {
+                try {
+                    fs.unlinkSync(fn);
+                    console.log(`Deleted file: ${fn}`);
+                } catch (error) {
+                    console.error(`Error deleting file: ${fn}`, error);
+                }
+            }
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
             let loaded = (logDT == todayDT) ? 0 : 1;
             let sql = `insert into blocklog (logDT, chainID, numTraces, traceMetricsStatus, traceMetricsDT) values ('${logDT}', '${chainID}', '${numTraces}', 'AuditRequired', Now() ) on duplicate key update numTraces = values(numTraces), traceMetricsStatus = values(traceMetricsStatus), traceMetricsDT = values(traceMetricsDT)`
             console.log(sql);
-            if (!debug) {
+            if (!dryRun) {
                 this.batchedSQL.push(sql);
                 await this.update_batchedSQL();
             }
