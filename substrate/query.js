@@ -6559,8 +6559,6 @@ module.exports = class Query extends AssetManager {
                 chainID: null
             };
 
-            console.log(sql, wasmCodes);
-
             for (const w of wasmCodes) {
                 if (w.wasm) {
                     if (wasmCode.chainID == null || (w.chainID < wasmCode.chainID) || (w.status == "Verified")) {
@@ -6595,7 +6593,8 @@ module.exports = class Query extends AssetManager {
                 }
                 if (w.srcURLs) {
                     wasmCode.srcURLs = w.srcURLs
-                    let srcURLs = wasmCode.srcURLs ? JSON.parse(w.srcURLs) : [];
+                    // contract.srcURLs
+                    let srcURLs = wasmCode.srcURLs ? this.get_srcURLs(JSON.parse(w.srcURLs)) : [];
                     for (const srcUrl of srcURLs) {
                         if (covered[srcUrl]) {} else if (srcUrl.includes(".zip") || srcUrl.includes("Cargo.lock") || srcUrl.includes("Cargo.toml") || srcUrl.includes(".contract")) {
                             covered[srcUrl] = true;
@@ -6618,17 +6617,42 @@ module.exports = class Query extends AssetManager {
                     }
                 }
             }
-            console.log("RESP", wasmCode);
             return wasmCode
         } catch (err) {
             console.log("PROB", err)
         }
     }
 
-    async getWASMContract(address, chainID = null) {
+    get_srcURLs(arr) {
+        if (!arr) return [];
+
+        function compareStrings(a, b) {
+            // Count the number of "/" characters in each string
+            const countA = (a.match(/\//g) || []).length;
+            const countB = (b.match(/\//g) || []).length;
+
+            // Compare the number of "/" characters first
+            if (countA !== countB) {
+                return countA - countB;
+            } else {
+                // If the number of "/" characters is the same, sort alphabetically
+                return a.localeCompare(b);
+            }
+        }
+
+        // Use the custom sorting function to sort the array
+        return arr.sort(compareStrings);
+    }
+
+    async getWASMContract(address, chainIDorChainName = null) {
+        let chainID = this.network_to_chainID(chainIDorChainName);
+        if (chainID == null) {
+            // return not found error
+            throw new paraTool.NotFoundError(`Unknown network: ${chainIDorChainName}`)
+        }
         address = paraTool.getPubKey(address);
         let w = (chainID) ? ` and contract.chainID = '${chainID}'` : "";
-        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
+        let sql = `select address, address_ss58, contract.chainID, contract.extrinsicHash, contract.extrinsicID, instantiateBN, contract.codeHash, convert(constructor using utf8) as constructor, convert(salt using utf8) as salt, blockTS, deployer, deployer_ss58, convert(wasm using utf8) as wasm, codeStoredBN, codeStoredTS, convert(metadata using utf8) as metadata, convert(srcURLs using utf8) as srcURLs, verifier, convert(authors using utf8) authors, contractName, language, compiler, version, status, verifyDT from contract left join wasmCode on contract.codeHash = wasmCode.codeHash and contract.chainID = wasmCode.chainID where address = '${address}' ${w}`
         let contracts = await this.poolREADONLY.query(sql);
         if (contracts.length == 0) {
             // return not found error
@@ -6641,7 +6665,12 @@ module.exports = class Query extends AssetManager {
             contract.id = id;
             contract.chainName = chainName;
             let chain = await this.getChain(contract.chainID);
-            contract.authors = contract.authors ? JSON.parse(contract.authors) : [];
+            try {
+                contract.authors = contract.authors ? JSON.parse(contract.authors) : [];
+            } catch (err) {
+
+            }
+            contract.srcURLs = this.get_srcURLs(contract.srcURLs)
             contract.addressPubKey = contract.address
             contract.address = paraTool.getAddress(contract.addressPubKey, chain.ss58Format);
             contract.metadata = contract.metadata ? JSON.parse(contract.metadata) : null;
@@ -6815,6 +6844,7 @@ module.exports = class Query extends AssetManager {
             try {
                 r.metadata = JSON.parse(r.metadata);
                 r.srcURLs = JSON.parse(r.srcURLs);
+
             } catch (err) {
 
             }

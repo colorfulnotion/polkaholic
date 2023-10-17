@@ -391,6 +391,27 @@ app.get('/wasmcontracts/:chainID_or_chainName', async (req, res) => {
     }
 })
 
+// Usage: https://api.polkaholic.io/wasmcontract/XRcGZzdH841dHySiM62BfJDbQfXXYex3U7LYooRJt8EgJeX
+app.get('/wasmcontract/:chainID_or_chainName/:contractAddress', async (req, res) => {
+    try {
+        let contractAddress = req.params["contractAddress"] ? req.params["contractAddress"] : null;
+        let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"] : null;
+        console.log("contractAddress", contractAddress, "chainID", chainID_or_chainName);
+        let contract = await query.getWASMContract(contractAddress, chainID_or_chainName);
+        if (contract) {
+            res.write(JSON.stringify(contract));
+            await query.tallyAPIKey(getapikey(req));
+            res.end();
+        } else {
+            res.sendStatus(404);
+        }
+    } catch (err) {
+        return res.status(400).json({
+            error: err.toString()
+        });
+    }
+})
+
 // Get information on verification status of any codeHash, whether uploaded or not
 app.get('/info/:network/:codeHash?', async (req, res) => {
     try {

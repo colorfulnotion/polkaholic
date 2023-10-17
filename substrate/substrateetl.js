@@ -2285,7 +2285,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             }
             if (rows.length > 0) {
                 await this.insertBTRows(tblRealtime, rows, "balances");
-		rows = []
+                rows = []
             }
 
             console.log("writing", `${chainID}#${logDT}#${jobID} with PUBKEY${encodedAssetChain}`, bqRows.length);
@@ -4548,7 +4548,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         return o;
     }
 
-    async validate_trace(tableChain, bn0, bn1){
+    async validate_trace(tableChain, bn0, bn1) {
 
         let start = paraTool.blockNumberToHex(bn0);
         let end = paraTool.blockNumberToHex(bn1);
@@ -4562,7 +4562,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let expectedBNs = {}
         let missingBNs = [];
         for (let i = bn0; i <= bn1; i++) {
-          expectedBNs[`${i}`] = 0;
+            expectedBNs[`${i}`] = 0;
         }
         let observedRows = []
         let observedTracesBN = []
@@ -4570,13 +4570,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let bn = parseInt(row.id.substr(2), 16);
             let r = this.build_block_from_row(row);
             observedRows[bn] = r
-            if (r.trace != false){
+            if (r.trace != false) {
                 expectedBNs[bn] = 1
                 observedTracesBN[bn] = 1
             }
         }
-        for (let i = bn0; i <= bn1; i++){
-            if (expectedBNs[i] == 0){
+        for (let i = bn0; i <= bn1; i++) {
+            if (expectedBNs[i] == 0) {
                 //console.log(`BN=${i} missing!`)
                 missingBNs.push(i)
             }
@@ -4588,12 +4588,53 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async batch_crawl_trace(crawler, chain, missingBNs) {
+        let i = 0;
+        let n = 0;
+        let batchSize = 10;
+        while (i < missingBNs.length) {
+            // Create an array to hold promises for current batch
+            let crawlPromises = [];
+            let currBatch = missingBNs.slice(i, i + batchSize);
+            if (currBatch.length > 0) {
+                console.log(`currBatch#${n} len=${currBatch.length}`, currBatch)
+                for (const targetBN of currBatch) {
+                    let t2 = {
+                        chainID: chain.chainID,
+                        blockNumber: targetBN
+                    };
+                    crawlPromises.push(crawler.crawl_block_trace(chain, t2))
+                }
+                //concurrent crawl
+                let crawlStates;
+                try {
+                    crawlStates = await Promise.allSettled(crawlPromises);
+                    //{ status: 'fulfilled', value: ... },
+                    //{ status: 'rejected', reason: Error: '.....'}
+                } catch (e) {
+                    console.log("crawlStates ERR", e);
+                }
+                for (let j = 0; j < crawlStates.length; j++) {
+                    let crawlState = crawlStates[j]
+                    if (crawlState['status'] == 'fulfilled') {
+                        //
+                    } else {
+                        let errReason = crawlState['reason']
+                        console.log(`NOT OK`, errReason)
+                    }
+                }
+                i += batchSize;
+                n++;
+            }
+        }
+    }
+
     async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let verbose = true
         let supressedFound = {}
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
-        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama){
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
             console.log(`chainID=${chainID} NOT supported`)
             return
         }
@@ -4637,17 +4678,27 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
         // 4. do table scan 50 blocks at a time
         let NL = "\r\n";
-        let jmp = 50;
+        let jmp = 100;
         let numTraces = 0;
 
+
+        //Fetching missing traces
+        const Crawler = require("./crawler");
+        let crawler = new Crawler();
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
 
         //TEST:
         //bnStart = 17663809
         //bnEnd = 17663810
+
+        let maxQueueSize = 50;
+        let missingBNAll = [];
         let jmpIdx = 0
         let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-            jmpIdx ++
+            jmpIdx++
             console.log(`${jmpIdx}/${jmpTotal}`)
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -4656,37 +4707,28 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let rows = []
             let missingBNs = res.missingBNs
             let verifiedRows = res.verifiedRows
-            if (missingBNs.length > 0){
-                console.log(`missingBNs:${missingBNs.length}`, missingBNs)
-                const Crawler = require("./crawler");
-                let crawler = new Crawler();
-                await crawler.setupAPI(chain);
-                await crawler.assetManagerInit();
-                await crawler.setupChainAndAPI(chainID);
-                for (const targetBN of missingBNs){
-                    let t2 = {
-                        chainID,
-                        blockNumber: targetBN
-                    };
-                    let x = await crawler.crawl_block_trace(chain, t2);
-                }
-
-                let newRes = await this.validate_trace(tableChain, bn0, bn1)
-                missingBNs = newRes.missingBNs
-                if (missingBNs.length > 0){
-                    console.log(`Fetch failed missingBN=${missingBNs}, continue`)
-                    //process.exit(1, `validate_trace error`)
+            if (missingBNs.length > 0) {
+                missingBNAll.push(...missingBNs)
+                console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
+                if (missingBNAll.length >= maxQueueSize) {
+                    await this.batch_crawl_trace(crawler, chain, missingBNAll)
+                    missingBNAll = []
                 }
             }
         }
+
+        console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
+        await this.batch_crawl_trace(crawler, chain, missingBNAll)
+
     }
 
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let verbose = true
+        let isBackFill = false
         let supressedFound = {}
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
-        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama){
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
             console.log(`chainID=${chainID} NOT supported`)
             return
         }
@@ -4756,7 +4798,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let jmpIdx = 0
         let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
         for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-            jmpIdx ++
+            jmpIdx++
             console.log(`${jmpIdx}/${jmpTotal}`)
             let bn1 = bn0 + jmp - 1;
             if (bn1 > bnEnd) bn1 = bnEnd;
@@ -4765,14 +4807,14 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let rows = []
             let missingBNs = res.missingBNs
             let verifiedRows = res.verifiedRows
-            if (missingBNs.length > 0){
+            if (missingBNs.length > 0 && isBackFill) {
                 console.log(`missingBNs`, missingBNs)
                 const Crawler = require("./crawler");
                 let crawler = new Crawler();
                 await crawler.setupAPI(chain);
                 await crawler.assetManagerInit();
                 await crawler.setupChainAndAPI(chainID);
-                for (const targetBN of missingBNs){
+                for (const targetBN of missingBNs) {
                     let t2 = {
                         chainID,
                         blockNumber: targetBN
@@ -4783,9 +4825,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let newRes = await this.validate_trace(tableChain, bn0, bn1)
                 missingBNs = newRes.missingBNs
                 verifiedRows = newRes.verifiedRows
-                if (missingBNs.length > 0){
+                if (missingBNs.length > 0) {
                     console.log(`Fetch failed missingBN=${missingBNs}`)
-                    process.exit(1, `validate_trace error`)
+                    //process.exit(1, `validate_trace error`)
                 }
             }
 
@@ -4826,16 +4868,16 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
-                        if (o.section == "Substrate" && o.storage == "ExtrinsicIndex"){
+                        if (o.section == "Substrate" && o.storage == "ExtrinsicIndex") {
                             if (extrinsicIndex == null) {
                                 extrinsicIndex = 0
-                            }else if (o.pv == "0"){
+                            } else if (o.pv == "0") {
                                 extrinsicIndex = null
-                            }else {
+                            } else {
                                 extrinsicIndex++
                             }
                         }
-                        if (o.section == "System" && o.storage == "Account" && o.pk_extra){
+                        if (o.section == "System" && o.storage == "Account" && o.pk_extra) {
                             try {
                                 o.address_ss58 = JSON.parse(o.pk_extra)[0]
                                 o.address_pubkey = paraTool.getPubKey(o.address_ss58);
@@ -4852,7 +4894,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                 if (a2.frozen != undefined) {
                                     flds.push(["frozen", "frozen"])
                                 }
-                                if (a2.flags != undefined){
+                                if (a2.flags != undefined) {
                                     o["flags"] = paraTool.dechexToIntStr(a2.flags)
                                 }
                                 /*
@@ -4864,11 +4906,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                 }
                                 */
                                 let p = await this.computePriceUSD({
-                                    assetChain:assetChain,
+                                    assetChain: assetChain,
                                     ts: blockTS
                                 })
                                 let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
-                                if (priceUSD > 0){
+                                if (priceUSD > 0) {
                                     o.price_usd = priceUSD
                                 }
                                 for (const fmap of flds) {
@@ -4876,13 +4918,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                     let f2 = fmap[1] // e.g. total_issuance
                                     o[f2] = a2[f] / 10 ** chainDecimals;
                                     o[`${f2}_raw`] = paraTool.dechexToIntStr(a2[f]);
-                                    if (priceUSD){
+                                    if (priceUSD) {
                                         o[`${f2}_usd`] = o[f2] * priceUSD;
                                     }
                                 }
 
-                                } catch (e){
-                                    console.log(`error~`, e)
+                            } catch (e) {
+                                console.log(`error~`, e)
                             }
                         }
 
@@ -4892,17 +4934,17 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
                         o.relay_chain = relayChain
                         o.para_id = paraID
-                        o.id =  chain_identification
+                        o.id = chain_identification
                         o.chain_name = chain_name
                         o.extrinsic_id = `${bn}-${extrinsicIndex}`;
                         if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
                         if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
-                            if (supressedFound[`${o.section}:${o.storage}`] == undefined){
+                            if (supressedFound[`${o.section}:${o.storage}`] == undefined) {
                                 supressedFound[`${o.section}:${o.storage}`] = 1
                                 //console.log(`supressed ${o.section}:${o.storage}`);
                             }
                         } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
-                            if (supressedFound[`${o.section}:${o.storage}`] == undefined){
+                            if (supressedFound[`${o.section}:${o.storage}`] == undefined) {
                                 supressedFound[`${o.section}:${o.storage}`] = 1
                                 //console.log(`supressed skipped trace ${o.section}:${o.storage}`);
                             }
@@ -4921,7 +4963,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         try {
             fs.closeSync(f);
             let logDTp = logDT.replaceAll("-", "")
-            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field block_time --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
             console.log(cmd);
             if (!debug) await exec(cmd);
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
