@@ -4588,7 +4588,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async batch_crawl_trace(crawler, chain, missingBNs){
+    async batch_crawl_trace(crawler, chain, missingBNs) {
         let i = 0;
         let n = 0;
         let batchSize = 10;
@@ -4598,7 +4598,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let currBatch = missingBNs.slice(i, i + batchSize);
             if (currBatch.length > 0) {
                 console.log(`currBatch#${n} len=${currBatch.length}`, currBatch)
-                for (const targetBN of currBatch){
+                for (const targetBN of currBatch) {
                     let t2 = {
                         chainID: chain.chainID,
                         blockNumber: targetBN
@@ -4710,7 +4710,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             if (missingBNs.length > 0) {
                 missingBNAll.push(...missingBNs)
                 console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
-                if (missingBNAll.length >= maxQueueSize){
+                if (missingBNAll.length >= maxQueueSize) {
                     await this.batch_crawl_trace(crawler, chain, missingBNAll)
                     missingBNAll = []
                 }

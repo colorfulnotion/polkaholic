@@ -396,7 +396,7 @@ app.get('/wasmcontract/:chainID_or_chainName/:contractAddress', async (req, res)
     try {
         let contractAddress = req.params["contractAddress"] ? req.params["contractAddress"] : null;
         let chainID_or_chainName = req.params["chainID_or_chainName"] ? req.params["chainID_or_chainName"] : null;
-	console.log("contractAddress", contractAddress, "chainID", chainID_or_chainName);
+        console.log("contractAddress", contractAddress, "chainID", chainID_or_chainName);
         let contract = await query.getWASMContract(contractAddress, chainID_or_chainName);
         if (contract) {
             res.write(JSON.stringify(contract));
