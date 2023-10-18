@@ -3195,20 +3195,28 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     async dump_networkmetrics(network, logDT) {}
 
     getLogDTRange2(startLogDT = null, endLogDT = null, isAscending = true) {
-        // Ensure startLogDT is set to the start of the day
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0);
         let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
+
+        let endLogTS;
+        if (endLogDT !== null) {
+            endLogTS = paraTool.logDT_hr_to_ts(endLogDT, 0);
+        }
+
+        // Handle case where startLogDT > endLogDT
+        if (startLogDT !== null && endLogDT !== null && startLogTS > endLogTS) {
+            return [startLogDT];
+        }
 
         if (startLogDT == null) {
             startLogDT = "2023-02-01";
         }
 
-        // Ensure ts (based on endLogDT) is set to the start of the day
         let ts = this.getCurrentTS();
         ts = ts - (ts % 86400);
 
-        if (endLogDT != undefined) {
-            let endTS = paraTool.logDT_hr_to_ts(endLogDT, 0) + 86400;
+        if (endLogDT !== null) {
+            let endTS = endLogTS + 86400;
             if (ts > endTS) ts = endTS;
         }
 
@@ -3217,7 +3225,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         while (true) {
             let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
             logDTRange.push(logDT);
-            if (logDT == startDT) {
+            if (logDT === startDT) {
                 break;
             }
             ts = ts - 86400;
@@ -4770,7 +4778,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async loadDailyTraceFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
-
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
