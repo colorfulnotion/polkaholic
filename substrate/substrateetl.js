@@ -4701,7 +4701,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+    async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false) {
         let verbose = true
         let supressedFound = {}
         let projectID = `${this.project}`
@@ -4765,30 +4765,51 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         //bnStart = 17663809
         //bnEnd = 17663810
 
-        let maxQueueSize = 50;
+        let maxQueueSize = (isHead)? 1: 50;
         let missingBNAll = [];
         let jmpIdx = 0
         let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
-        for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-            jmpIdx++
-            console.log(`${jmpIdx}/${jmpTotal}`)
-            let bn1 = bn0 + jmp - 1;
-            if (bn1 > bnEnd) bn1 = bnEnd;
+        if (!isDecending){
+            for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+                jmpIdx++
+                console.log(`${jmpIdx}/${jmpTotal}`)
+                let bn1 = bn0 + jmp - 1;
+                if (bn1 > bnEnd) bn1 = bnEnd;
 
-            let res = await this.validate_trace(tableChain, bn0, bn1)
-            let rows = []
-            let missingBNs = res.missingBNs
-            let verifiedRows = res.verifiedRows
-            if (missingBNs.length > 0) {
-                missingBNAll.push(...missingBNs)
-                console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
-                if (missingBNAll.length >= maxQueueSize) {
-                    await this.batch_crawl_trace(crawler, chain, missingBNAll)
-                    missingBNAll = []
+                let res = await this.validate_trace(tableChain, bn0, bn1)
+                let rows = []
+                let missingBNs = res.missingBNs
+                let verifiedRows = res.verifiedRows
+                if (missingBNs.length > 0) {
+                    missingBNAll.push(...missingBNs)
+                    console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
+                    if (missingBNAll.length >= maxQueueSize) {
+                        await this.batch_crawl_trace(crawler, chain, missingBNAll)
+                        missingBNAll = []
+                    }
+                }
+            }
+        }else{
+            for (let bn0 = bnEnd; bn0 >= bnStart; bn0 -= jmp) {
+                jmpIdx++
+                console.log(`${jmpIdx}/${jmpTotal}`)
+                let bn1 = bn0 - jmp + 1;
+                if (bn1 < bnStart) bn1 = bnStart;
+
+                let res = await this.validate_trace(tableChain, bn1, bn0)
+                let rows = []
+                let missingBNs = res.missingBNs
+                let verifiedRows = res.verifiedRows
+                if (missingBNs.length > 0) {
+                    missingBNAll.push(...missingBNs)
+                    console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
+                    if (missingBNAll.length >= maxQueueSize) {
+                        await this.batch_crawl_trace(crawler, chain, missingBNAll)
+                        missingBNAll = []
+                    }
                 }
             }
         }
-
         console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
         await this.batch_crawl_trace(crawler, chain, missingBNAll)
 

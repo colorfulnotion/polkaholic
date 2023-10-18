@@ -138,36 +138,35 @@ async function main() {
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .option('-f, --force', `Force even if not ready`, false)
+        .option('-d, --desc', `Descending order`, false)
+        .option('-h, --head', `Running at head`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             //await substrateetl.init_chainInfos();
             //await substrateetl.init_asset_info();
+            let [currDT, _c] = paraTool.ts_to_logDT_hr(paraTool.getCurrentTS())
             let logDT = opt.logDT ? opt.logDT : "2023-03-10";
             let endDT = opt.logDT && opt.endDT ? opt.endDT : "2023-03-16";
             let paraID = opt.paraID ? opt.paraID : 0;
             let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
             let force = opt.force;
-            let dumpType = 'trace'
+            let isDesc = opt.desc;
+            let isHead = opt.head;
+            let dumpType = 'trace';
+            if (isHead){
+                logDT = currDT;
+                isDesc = true;
+            }
             console.log(`logDT=${logDT}, endDT=${endDT}`)
             if (logDT && relayChain && paraID != undefined) {
                 if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange2(logDT, endDT)
                     console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange) {
-                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
-                                relayChain,
-                                paraID
-                            }))) {
-                            await substrateetl.backfill_trace(dt, paraID, relayChain);
-                        }
+                        await substrateetl.backfill_trace(dt, paraID, relayChain, isDesc, isHead);
                     }
                 } else {
-                    if (force || (await substrateetl.is_dump_ready(logDT, dumpType, {
-                            relayChain,
-                            paraID
-                        }))) {
-                        await substrateetl.backfill_trace(logDT, paraID, relayChain);
-                    }
+                    await substrateetl.backfill_trace(logDT, paraID, relayChain, isDesc, isHead);
                 }
                 process.exit(0);
             }
