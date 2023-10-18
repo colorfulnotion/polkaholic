@@ -3094,7 +3094,7 @@ module.exports = class Indexer extends AssetManager {
         await this.update_batchedSQL();
     }
 
-    // parse trace without any handparse
+    // parse trace without any deep indexing
     parse_trace_as_auto(e, traceType, traceIdx, bn, blockHash, api) {
         let o = {}
         //o.bn = bn;
@@ -3286,6 +3286,7 @@ module.exports = class Indexer extends AssetManager {
         return [o, parsev];
     }
 
+    // decorate the autoTraces with "deep indexing"
     parse_trace_from_auto(e, traceType, bn, blockHash, api) {
         //console.log(`e`, e)
         let o = {}
@@ -6496,6 +6497,7 @@ module.exports = class Indexer extends AssetManager {
         this.hashesRowsToInsert.push(substrateBlockHashRec)
 
         // (2) record block in BT chain${chainID} feed
+        // MK TODO..
         let cres = {
             key: paraTool.blockNumberToHex(blockNumber),
             data: {

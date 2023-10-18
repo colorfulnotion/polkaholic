@@ -4784,6 +4784,10 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         return true
     }
 
+    /*
+    Give a paraID, relayChain combination, dump_trace will fetch rawblocks(including traces)
+    from bigtable and generate flat traces records that are required to build substrate-etl:crypto_polkadot.traces0
+    */
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         /*
         await this.cpDailyTraceToGS(logDT, paraID, relayChain, false)
@@ -4824,6 +4828,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             bnStart,
             bnEnd
         } = bnRanges[0];
+        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, len=${bnEnd-bnStart+1}`)
 
         // 2. setup directories for tbls on date
         let dir = "/tmp";

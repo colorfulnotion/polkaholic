@@ -424,7 +424,6 @@ module.exports = class Crawler extends Indexer {
         try {
             const tableChain = this.getTableChain(chainID);
             await tableChain.insert([cres]);
-
             var sql = false;
             sql = `insert into block${chainID} (blockNumber, crawlTrace, lastTraceDT) values (${bn}, 0, Now()) on duplicate key update crawlTrace = values(crawlTrace), lastTraceDT = values(lastTraceDT)`
             this.batchedSQL.push(sql);
@@ -1669,9 +1668,16 @@ group by chainID having count(*) < 500 order by rand() desc`;
             // if we didn't get a trace, or if we are using onfinality endpoint
             if ((chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) || (chain.WSEndpointSelfHosted)) &&
                 ((trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality")))) {
+                console.log(`processFinalizedHead finalizedHash=${finalizedHash}, BN=${bn}, blockTS=${blockTS}`)
                 let trace2 = await this.crawlTrace(chain, finalizedHash, bn);
-                if (trace2.length > 0) {
+                if (trace2.length > 0 && blockTS > 0) {
                     trace = trace2;
+                    let t = {
+                        blockNumber: bn,
+                        blockHash: finalizedHash,
+                        blockTS: blockTS
+                    }
+                    await this.save_trace(chainID, t, trace)
                 }
             }
 
