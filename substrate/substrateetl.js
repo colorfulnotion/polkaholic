@@ -3194,6 +3194,42 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
     async dump_networkmetrics(network, logDT) {}
 
+    getLogDTRange2(startLogDT = null, endLogDT = null, isAscending = true) {
+        // Ensure startLogDT is set to the start of the day
+        let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0);
+        let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
+
+        if (startLogDT == null) {
+            startLogDT = "2023-02-01";
+        }
+
+        // Ensure ts (based on endLogDT) is set to the start of the day
+        let ts = this.getCurrentTS();
+        ts = ts - (ts % 86400);
+
+        if (endLogDT != undefined) {
+            let endTS = paraTool.logDT_hr_to_ts(endLogDT, 0) + 86400;
+            if (ts > endTS) ts = endTS;
+        }
+
+        let logDTRange = [];
+
+        while (true) {
+            let [logDT, _] = paraTool.ts_to_logDT_hr(ts);
+            logDTRange.push(logDT);
+            if (logDT == startDT) {
+                break;
+            }
+            ts = ts - 86400;
+        }
+
+        if (isAscending) {
+            return logDTRange.reverse();
+        } else {
+            return logDTRange;
+        }
+    }
+
     getLogDTRange(startLogDT = null, endLogDT = null, isAscending = true) {
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0)
         let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
@@ -4667,7 +4703,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             bnStart,
             bnEnd
         } = bnRanges[0];
-
+        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, len=${bnEnd-bnStart+1}`)
         let specversions = [];
         var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
         this.specVersions[chainID.toString()] = [];

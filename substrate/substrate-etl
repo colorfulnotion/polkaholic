@@ -150,7 +150,7 @@ async function main() {
             let dumpType = 'trace'
             if (logDT && relayChain && paraID != undefined) {
                 if (endDT) {
-                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
+                    let logDTRange = substrateetl.getLogDTRange2(logDT, endDT)
                     console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange) {
                         if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
