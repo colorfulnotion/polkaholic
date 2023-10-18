@@ -5108,7 +5108,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         } else if (o.section == "unknown" || o.storage == "unknown") {
                             // Skip unknown
                         } else {
-                            if (verbose) console.log(`trace`, o);
+                            if (verbose) console.log(`trace ${o.trace_id} ${o.section}:${o.storage}`);
                             fs.writeSync(f, JSON.stringify(o) + NL);
                         }
                     }
