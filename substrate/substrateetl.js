@@ -3194,6 +3194,23 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
     async dump_networkmetrics(network, logDT) {}
 
+    validateDT(ts, logDT){
+        if (ts == undefined){
+            console.log(`TS missing!`)
+            return false
+        }
+        let [targetDT, _] = paraTool.ts_to_logDT_hr(ts);
+        let blockDT2 = targetDT.replaceAll("-", "")
+        let blockDT = logDT.replaceAll("-", "")
+        if (blockDT2 == blockDT){
+            return true
+        }else{
+            console.log(`Mistmatch TS=${ts}, logDT=${logDT}`)
+            return false
+        }
+    }
+
+
     getLogDTRange2(startLogDT = null, endLogDT = null, isAscending = true) {
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0);
         let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
@@ -4954,6 +4971,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let r = this.build_block_from_row(row);
                 let b = r.feed;
                 let blockTS = b.blockTS
+
+                if (!this.validateDT(blockTS, logDT)) continue
+
                 let block_hash = b.hash
                 let hdr = b.header;
                 let bn = parseInt(row.id.substr(2), 16);
