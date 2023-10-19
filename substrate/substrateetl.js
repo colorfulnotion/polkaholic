@@ -3221,10 +3221,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
 
         // Handle case where startLogDT > endLogDT
+        if (startLogDT && endLogDT && startLogDT === endLogDT) {
+            return [startLogDT];
+        }
         if (startLogDT !== null && endLogDT !== null && startLogTS > endLogTS) {
             return [startLogDT];
         }
-
         if (startLogDT == null) {
             startLogDT = "2023-02-01";
         }
@@ -4701,6 +4703,98 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd) {
+      let NL = "\r\n";
+      let jmp = 100;
+      let numTraces = 0;
+      let maxQueueSize = (isHead) ? 1 : 50;
+      let missingBNAll = [];
+      let jmpIdx = 0;
+      let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
+
+      // Setup Crawler
+      const Crawler = require("./crawler");
+      let crawler = new Crawler();
+      await crawler.setupAPI(chain);
+      await crawler.assetManagerInit();
+      await crawler.setupChainAndAPI(chainID);
+
+      // Loop logic that varies based on isDecending flag
+      let start = isDecending ? bnEnd : bnStart;
+      let end = isDecending ? bnStart : bnEnd;
+      let step = isDecending ? -jmp : jmp;
+
+      for (let bn0 = start; (isDecending ? bn0 >= end : bn0 <= end); bn0 += step) {
+        jmpIdx++;
+        console.log(`${jmpIdx}/${jmpTotal}`);
+        let bn1 = bn0 + (isDecending ? -jmp + 1 : jmp - 1);
+        if (isDecending ? bn1 < end : bn1 > end) bn1 = end;
+
+        let res = await this.validate_trace(tableChain, Math.min(bn0, bn1), Math.max(bn0, bn1));
+        let missingBNs = res.missingBNs;
+
+        if (missingBNs.length > 0) {
+          missingBNAll.push(...missingBNs);
+          console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs);
+          if (missingBNAll.length >= maxQueueSize) {
+            await this.batch_crawl_trace(crawler, chain, missingBNAll);
+            missingBNAll = [];
+          }
+        }
+      }
+      console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll);
+      await this.batch_crawl_trace(crawler, chain, missingBNAll);
+    }
+
+    async backfill_trace_range(paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false, targetBNStart = false, targetBNEnd = false) {
+        let verbose = true
+        let supressedFound = {}
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
+        let chain = await this.getChain(chainID);
+        const tableChain = this.getTableChain(chainID);
+
+        await this.get_skipStorageKeys();
+        console.log(`backfill_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, (projectID=${projectID})`)
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd, DATE_FORMAT(blockDT, '%Y-%m-%d') as blkDT from block${chainID} where blockNumber >= '${targetBNStart}' and blockNumber <= '${targetBNEnd}' group by blkDT order by blkDT`
+        console.log(sql1);
+        let bnRanges = await this.poolREADONLY.query(sql1)
+        let {
+            blkDT
+        } = bnRanges[0];
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(blkDT)
+        let logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+        let bnStart = targetBNStart
+        let bnEnd = targetBNEnd
+        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, blkDT=${blkDT}, len=${bnEnd-bnStart+1}`)
+        let specversions = [];
+        var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
+        this.specVersions[chainID.toString()] = [];
+        for (const specVersion of specVersionRecs) {
+            this.specVersions[chainID].push(specVersion);
+            specversions.push({
+                spec_version: specVersion.specVersion,
+                block_number: specVersion.blockNumber,
+                block_hash: specVersion.blockHash,
+                block_time: specVersion.blockTS,
+                spec: specVersion.spec
+            });
+            this.specVersion = specVersion.specVersion;
+        }
+
+        await this.setupAPI(chain)
+        let api = this.api;
+        let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
+        await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
+
+        await this.fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd)
+
+    }
+
     async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false) {
         let verbose = true
         let supressedFound = {}
@@ -4721,14 +4815,15 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
-        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}'`
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd,  DATE_FORMAT(blockDT, '%Y-%m-%d') as blkDT from block${chainID} where blockDT >= '${minLogDT}' and blockDT <= '${maxLogDT}' group by blkDT order by blkDT`
         console.log(sql1);
         let bnRanges = await this.poolREADONLY.query(sql1)
         let {
             bnStart,
-            bnEnd
+            bnEnd,
+            blkDT
         } = bnRanges[0];
-        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, len=${bnEnd-bnStart+1}`)
+        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, blkDT=${blkDT}, len=${bnEnd-bnStart+1}`)
         let specversions = [];
         var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
         this.specVersions[chainID.toString()] = [];
@@ -4760,10 +4855,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await crawler.setupAPI(chain);
         await crawler.assetManagerInit();
         await crawler.setupChainAndAPI(chainID);
-
-        //TEST:
-        //bnStart = 17663809
-        //bnEnd = 17663810
 
         let maxQueueSize = (isHead)? 1: 50;
         let missingBNAll = [];
@@ -4812,7 +4903,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
         console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
         await this.batch_crawl_trace(crawler, chain, missingBNAll)
-
     }
 
     async loadDailyTraceFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
@@ -4990,13 +5080,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             //console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
             for (const row of verifiedRows) {
                 let r = this.build_block_from_row(row);
-                let b = r.feed;
-                let blockTS = b.blockTS
-
-                if (!this.validateDT(blockTS, logDT)) continue
-
-                let block_hash = b.hash
+                let b = (r.feed)? r.feed: r.block ;
+                //console.log(`r`, JSON.stringify(r))
+                //console.log(`block`, b)
                 let hdr = b.header;
+                let blockTS = b.blockTS
+                let block_hash = b.hash
+                if (!this.validateDT(blockTS, logDT)) continue
                 let bn = parseInt(row.id.substr(2), 16);
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(blockTS);
                 let traces = r.trace;
@@ -5034,12 +5124,22 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                 extrinsicIndex++
                             }
                         }
+                        try {
+                            let pk_extra = JSON.parse(o.pk_extra)
+                            let pv = JSON.parse(o.pv)
+                            o.pk_extra = pk_extra
+                            o.pv = pv
+                        } catch (e){
+
+                        }
                         if (o.section == "System" && o.storage == "Account" && o.pk_extra) {
                             try {
-                                o.address_ss58 = JSON.parse(o.pk_extra)[0]
+                                //o.pk_extra = JSON.parse(o.pk_extra)
+                                //console.log(`System:Account o`, o)
+                                o.address_ss58 = o.pk_extra[0]
                                 o.address_pubkey = paraTool.getPubKey(o.address_ss58);
                                 //17624544-650: '{"nonce":1,"consumers":3,"providers":1,"sufficients":0,"data":{"free":51430786398441,"reserved":200410000000,"frozen":19477059680539,"flags":"0x800000000000000000005443b495716c"}}
-                                let accountStruct = JSON.parse(o.pv)
+                                let accountStruct = o.pv
                                 let a2 = accountStruct.data
                                 let flds = []
                                 if (a2.free != undefined) {
@@ -5109,6 +5209,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             // Skip unknown
                         } else {
                             if (verbose) console.log(`trace ${o.trace_id} ${o.section}:${o.storage}`);
+                            //if (verbose) console.log(`trace`, o);
                             fs.writeSync(f, JSON.stringify(o) + NL);
                         }
                     }

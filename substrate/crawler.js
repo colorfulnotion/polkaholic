@@ -196,9 +196,15 @@ module.exports = class Crawler extends Indexer {
                 stdout,
                 stderr
             } = await exec(cmd, {
-                maxBuffer: 1024 * 64000
+                maxBuffer: 1024 * 6400000
             });
-            let traceData = JSON.parse(stdout);
+            let traceData;
+            try {
+                traceData = JSON.parse(stdout);
+            } catch (e){
+                console.log(`traceData error JSON.parse(stdout)`, e)
+            }
+
             console.log(`traceData`, traceData)
             if ((!traceData) || (!traceData.result) || (!traceData.result.blockTrace)) {
                 console.log("NO data", traceData);

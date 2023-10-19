@@ -137,6 +137,8 @@ async function main() {
         .option('-p, --paraID <paraID>', 'Para ID', null, myParseInt)
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-start, --startBN <startBN>', 'startBN', null)
+        .option('-end, --endBN <endBN>', 'endBN', null)
         .option('-f, --force', `Force even if not ready`, false)
         .option('-d, --desc', `Descending order`, false)
         .option('-h, --head', `Running at head`, false)
@@ -147,6 +149,11 @@ async function main() {
             let [currDT, _c] = paraTool.ts_to_logDT_hr(paraTool.getCurrentTS())
             let logDT = opt.logDT ? opt.logDT : "2023-03-10";
             let endDT = opt.logDT && opt.endDT ? opt.endDT : "2023-03-16";
+
+            let startBN = opt.startBN ? paraTool.dechexToInt(opt.startBN) : null;
+            let endBN = opt.startBN && opt.endBN ? paraTool.dechexToInt(opt.endBN) : null;
+            if (startBN != undefined && endBN == undefined) endBN = startBN+1
+
             let paraID = opt.paraID ? opt.paraID : 0;
             let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
             let force = opt.force;
@@ -157,9 +164,12 @@ async function main() {
                 logDT = currDT;
                 isDesc = true;
             }
-            console.log(`logDT=${logDT}, endDT=${endDT}`)
+            console.log(`logDT=${logDT}, endDT=${endDT}, startBN=${startBN}, endBN=${endBN}`)
             if (logDT && relayChain && paraID != undefined) {
-                if (endDT) {
+                if (startBN != null){
+                    console.log(`startBN=${startBN}, endBN=${endBN}`)
+                    await substrateetl.backfill_trace_range(paraID, relayChain, isDesc, isHead, startBN, endBN);
+                } else if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange2(logDT, endDT)
                     console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange) {
