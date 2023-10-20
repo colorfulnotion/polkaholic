@@ -3210,7 +3210,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-
     getLogDTRange2(startLogDT = null, endLogDT = null, isAscending = true) {
         let startLogTS = paraTool.logDT_hr_to_ts(startLogDT, 0);
         let [startDT, _] = paraTool.ts_to_logDT_hr(startLogTS);
@@ -3220,7 +3219,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             endLogTS = paraTool.logDT_hr_to_ts(endLogDT, 0);
         }
 
-        // Handle case where startLogDT > endLogDT
         if (startLogDT && endLogDT && startLogDT === endLogDT) {
             return [startLogDT];
         }
@@ -3235,8 +3233,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         ts = ts - (ts % 86400);
 
         if (endLogDT !== null) {
-            let endTS = endLogTS + 86400;
-            if (ts > endTS) ts = endTS;
+            if (ts > endLogTS) ts = endLogTS;
         }
 
         let logDTRange = [];
@@ -5132,6 +5129,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         } catch (e){
 
                         }
+                        if (o.section == "Staking" && o.storage == "Nominators") {
+                            console.log(`Staking:Nominators, o`, o)
+                        }
                         if (o.section == "System" && o.storage == "Account" && o.pk_extra) {
                             try {
                                 //o.pk_extra = JSON.parse(o.pk_extra)
@@ -5154,14 +5154,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                 if (a2.flags != undefined) {
                                     o["flags"] = paraTool.dechexToIntStr(a2.flags)
                                 }
-                                /*
-                                if (a2.miscFrozen) {
+                                if (a2.miscFrozen != undefined) {
                                     flds.push(["miscFrozen", "misc_frozen"])
                                 }
-                                if (a2.feeFrozen) {
+                                if (a2.feeFrozen != undefined) {
                                     flds.push(["feeFrozen", "fee_frozen"])
                                 }
-                                */
                                 let p = await this.computePriceUSD({
                                     assetChain: assetChain,
                                     ts: blockTS
@@ -5178,6 +5176,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                     if (priceUSD) {
                                         o[`${f2}_usd`] = o[f2] * priceUSD;
                                     }
+                                }
+                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined){
+                                    o[`frozen`] = Math.max(o[`misc_frozen`], o[`fee_frozen`])
+                                    o[`frozen_raw`] = Math.max(o[`misc_frozen_raw`], o[`fee_frozen_raw`])
+                                    o[`frozen_usd`] = Math.max(o[`misc_frozen_usd`], o[`fee_frozen_usd`])
                                 }
 
                             } catch (e) {
