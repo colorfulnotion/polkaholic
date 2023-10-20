@@ -212,6 +212,8 @@ async function main() {
         .option('-l, --logDT <logDT>', 'Date', null)
         .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
         .option('-f, --force', `Force even if not ready`, false)
+        .option('-start, --startBN <startBN>', 'startBN', null)
+        .option('-end, --endBN <endBN>', 'endBN', null)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             await substrateetl.init_chainInfos();
@@ -222,8 +224,15 @@ async function main() {
             let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
             let force = opt.force;
             let dumpType = 'trace'
+            let startBN = opt.startBN ? paraTool.dechexToInt(opt.startBN) : null;
+            let endBN = opt.startBN && opt.endBN ? paraTool.dechexToInt(opt.endBN) : null;
+            if (startBN != undefined && endBN == undefined) endBN = startBN+1
+
             if (logDT && relayChain && paraID != undefined) {
-                if (endDT) {
+                if (startBN != null){
+                    console.log(`dump_trace_debug startBN=${startBN}, endBN=${endBN}`)
+                    await substrateetl.dump_trace_debug(paraID, relayChain, startBN, endBN);
+                } else if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange2(logDT, endDT)
                     console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange) {

@@ -287,6 +287,7 @@ module.exports = class Crawler extends Indexer {
 
             // 3. store finalized state, blockHash + blockTS in mysql + block + trace BT
             let traceType = trace ? "state_traceBlock" : false
+            console.log(`crawl_block_trace ${bn}`, block)
             let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, null, null, null);
             if (success) {
                 return {
