@@ -531,6 +531,30 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
+    async get_random_crawl_trace_ready(relayChain, paraID, lookbackDays = 60) {
+        let w = "";
+        if (paraID >= 0 && relayChain) {
+            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+            w = ` and chainID = ${chainID}`
+        }
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from blocklog where logDT >= "${balanceStartDT}" and logDT >= date_sub(Now(), interval ${lookbackDays} day) and crawlTraceStatus not in ('Audited', 'AuditRequired', 'Ignore') ${w} order by rand() limit 1`;
+        console.log("get_random_crawl_trace_ready", sql);
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length == 0) return ([null, null]);
+        let {
+            indexTS,
+            chainID
+        } = recs[0];
+        let [logDT, _] = paraTool.ts_to_logDT_hr(indexTS);
+        paraID = paraTool.getParaIDfromChainID(chainID);
+        relayChain = paraTool.getRelayChainByChainID(chainID);
+        return {
+            logDT,
+            paraID,
+            relayChain
+        };
+    }
+
     async get_random_trace_ready(relayChain, paraID, lookbackDays = 60) {
         let w = "";
         if (paraID >= 0 && relayChain) {
@@ -551,6 +575,32 @@ module.exports = class SubstrateETL extends AssetManager {
         let sql0 = `update blocklog set attempted = attempted + 1 where chainID = '${chainID}' and logDT = '${logDT}'`
         this.batchedSQL.push(sql0);
         await this.update_batchedSQL();
+        return {
+            logDT,
+            paraID,
+            relayChain
+        };
+    }
+
+    async get_random_staking_ready(relayChain, paraID, lookbackDays = 60) {
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let supportedChains = [paraTool.chainIDPolkadot, paraTool.chainIDKusama]
+        if (!supportedChains.includes(chainID)){
+            return {
+                logDT: false,
+                paraID: false,
+                relayChain: false
+            }
+        }
+        let sql = `select DATE_FORMAT(blockDT, '%Y-%m-%d') logDT from era${chainID} where  DATE_FORMAT(blockDT, '%Y-%m-%d') >= "${balanceStartDT}" and  DATE_FORMAT(blockDT, '%Y-%m-%d') >= date_sub(Now(), interval ${lookbackDays} day) and crawlNominatorStatus not in ('Audited', 'AuditRequired') order by rand() limit 1`;
+        console.log("get_random_trace_ready", sql);
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length == 0) return ([null, null]);
+        let {
+            logDT
+        } = recs[0];
+        paraID = paraTool.getParaIDfromChainID(chainID);
+        relayChain = paraTool.getRelayChainByChainID(chainID);
         return {
             logDT,
             paraID,
@@ -3417,6 +3467,15 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     if (status == 'Ready' || status == 'NotReady') return (true);
                 }
                 break;
+            case "staking":
+                sql = `select * from era0 where  DATE_FORMAT(blockDT, '%Y-%m-%d') = '${logDT}';`
+                recs = await this.poolREADONLY.query(sql)
+                console.log("staking ready", sql);
+                if (recs.length == 1) {
+                    status = recs[0].crawlTraceStatus
+                    if (status == 'Ready' || status == 'NotReady') return (true);
+                }
+                break;
             case "identity":
                 sql = `select identityMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
                 recs = await this.poolREADONLY.query(sql)
@@ -5260,8 +5319,31 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async dump_staking(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        let verbose = true
+        let isBackFill = false
+        let supressedFound = {}
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
+        let chain = await this.getChain(chainID);
+        let chainInfo = await this.getChainFullInfo(chainID)
+        let chainDecimals = chainInfo.decimals
+        let asset = this.getChainAsset(chainID);
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        console.log(`chainDecimals`, chainDecimals, `assetChain`, assetChain)
+
+        let chain_identification = this.getIDByChainID(chainID)
+        let chain_name = this.getChainName(chainID)
+        let eraBlocks = await this.getEraBlocks()
+        console.log(eraBlocks)
+    }
+
     /*
-    Give a paraID, relayChain combination, dump_trace will fetch rawblocks(including traces)
+    Given a paraID, relayChain combination, dump_trace will fetch rawblocks(including traces)
     from bigtable and generate flat traces records that are required to build substrate-etl:crypto_polkadot.traces0
     */
     async dump_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {

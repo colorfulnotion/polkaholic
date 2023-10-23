@@ -665,6 +665,16 @@ module.exports = class PolkaholicDB {
     }
 
 
+    async getEraBlocks(chainID = paraTool.chainIDPolkadot) {
+        let eraBlocks = await this.poolREADONLY.query(`SELECT era, block_number, DATE_FORMAT(blockDT, '%Y-%m-%d') AS blockDT, blockTS, blockhash from era${chainID} order by era`)
+        let res = {}
+        let eraCnt = 0
+        for (const v of eraBlocks) {
+            res[era.blockDT].push(v)
+        }
+        return res
+    }
+
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
         let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, blocksArchived, chain.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
 unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,
