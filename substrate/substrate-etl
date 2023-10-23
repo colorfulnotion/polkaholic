@@ -146,7 +146,7 @@ async function main() {
             let substrateetl = new SubstrateETL();
             //await substrateetl.init_chainInfos();
             //await substrateetl.init_asset_info();
-            let [currDT, _c] = paraTool.ts_to_logDT_hr(paraTool.getCurrentTS())
+            let [currDT, _c] = paraTool.ts_to_logDT_hr(paraTool.getCurrentTS()-900)
             let logDT = opt.logDT ? opt.logDT : "2023-03-10";
             let endDT = opt.logDT && opt.endDT ? opt.endDT : "2023-03-16";
 
@@ -159,7 +159,7 @@ async function main() {
             let force = opt.force;
             let isDesc = opt.desc;
             let isHead = opt.head;
-            let dumpType = 'trace';
+            let dumpType = 'tracebackfill';
             if (isHead){
                 logDT = currDT;
                 isDesc = true;
@@ -173,10 +173,20 @@ async function main() {
                     let logDTRange = substrateetl.getLogDTRange2(logDT, endDT)
                     console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
                     for (const dt of logDTRange) {
-                        await substrateetl.backfill_trace(dt, paraID, relayChain, isDesc, isHead);
+                        if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
+                                relayChain,
+                                paraID
+                            }))) {
+                            await substrateetl.backfill_trace(dt, paraID, relayChain, isDesc, isHead);
+                        }
                     }
                 } else {
-                    await substrateetl.backfill_trace(logDT, paraID, relayChain, isDesc, isHead);
+                    if (force || (await substrateetl.is_dump_ready(dt, dumpType, {
+                            relayChain,
+                            paraID
+                        }))) {
+                        await substrateetl.backfill_trace(logDT, paraID, relayChain, isDesc, isHead);
+                    }
                 }
                 process.exit(0);
             }

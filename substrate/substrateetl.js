@@ -3381,6 +3381,15 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     if (status == 'Ready') return (true);
                 }
                 break;
+            case "tracebackfill":
+                sql = `select crawlTraceStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
+                recs = await this.poolREADONLY.query(sql)
+                console.log("tracebackfill ready", sql);
+                if (recs.length == 1) {
+                    status = recs[0].crawlTraceStatus
+                    if (status == 'Ready' || status == 'NotReady') return (true);
+                }
+                break;
             case "identity":
                 sql = `select identityMetricsStatus from blocklog where chainID = '${chainID}' and logDT = '${logDT}'`
                 recs = await this.poolREADONLY.query(sql)
@@ -4704,8 +4713,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
       let NL = "\r\n";
       let jmp = 100;
       let numTraces = 0;
-      let maxQueueSize = (isHead) ? 1 : 50;
+      let maxQueueSize = (isHead || isDecending)? 1: 50;
       let missingBNAll = [];
+      let isMissing = false;
       let jmpIdx = 0;
       let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
 
@@ -4732,6 +4742,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
         if (missingBNs.length > 0) {
           missingBNAll.push(...missingBNs);
+          isMissing = true
           console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs);
           if (missingBNAll.length >= maxQueueSize) {
             await this.batch_crawl_trace(crawler, chain, missingBNAll);
@@ -4741,6 +4752,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
       }
       console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll);
       await this.batch_crawl_trace(crawler, chain, missingBNAll);
+      return isMissing
     }
 
     async backfill_trace_range(paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false, targetBNStart = false, targetBNEnd = false) {
@@ -4793,6 +4805,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async backfill_trace(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false) {
+
         let verbose = true
         let supressedFound = {}
         let projectID = `${this.project}`
@@ -4809,6 +4822,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         // 1. get bnStart, bnEnd for logDT
         let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+        let [latestDT, _c] = paraTool.ts_to_logDT_hr(paraTool.getCurrentTS())
+        let isCompleteDay = (currDT != latestDT)
+        console.log(`currDT=${currDT}. latestDT=${latestDT}, isCompleteDay=${isCompleteDay}`)
 
         let minLogDT = `${logDT} 00:00:00`;
         let maxLogDT = `${logDT} 23:59:59`;
@@ -4840,66 +4856,81 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let api = this.api;
         let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
         await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
-        // 4. do table scan 50 blocks at a time
-        let NL = "\r\n";
-        let jmp = 100;
-        let numTraces = 0;
 
+        if (false){
+            // 4. do table scan 50 blocks at a time
+            let NL = "\r\n";
+            let jmp = 100;
+            let numTraces = 0;
 
-        //Fetching missing traces
-        const Crawler = require("./crawler");
-        let crawler = new Crawler();
-        await crawler.setupAPI(chain);
-        await crawler.assetManagerInit();
-        await crawler.setupChainAndAPI(chainID);
+            //Fetching missing traces
+            const Crawler = require("./crawler");
+            let crawler = new Crawler();
+            await crawler.setupAPI(chain);
+            await crawler.assetManagerInit();
+            await crawler.setupChainAndAPI(chainID);
 
-        let maxQueueSize = (isHead || isDecending)? 1: 50;
-        let missingBNAll = [];
-        let jmpIdx = 0
-        let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
-        if (!isDecending){
-            for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-                jmpIdx++
-                console.log(`${jmpIdx}/${jmpTotal}`)
-                let bn1 = bn0 + jmp - 1;
-                if (bn1 > bnEnd) bn1 = bnEnd;
+            let maxQueueSize = (isHead || isDecending)? 1: 50;
+            let missingBNAll = [];
+            let errorBNAll = [];
+            let jmpIdx = 0
+            let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
+            if (!isDecending){
+                for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
+                    jmpIdx++
+                    console.log(`${jmpIdx}/${jmpTotal}`)
+                    let bn1 = bn0 + jmp - 1;
+                    if (bn1 > bnEnd) bn1 = bnEnd;
 
-                let res = await this.validate_trace(tableChain, bn0, bn1)
-                let rows = []
-                let missingBNs = res.missingBNs
-                let verifiedRows = res.verifiedRows
-                if (missingBNs.length > 0) {
-                    missingBNAll.push(...missingBNs)
-                    console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
-                    if (missingBNAll.length >= maxQueueSize) {
-                        await this.batch_crawl_trace(crawler, chain, missingBNAll)
-                        missingBNAll = []
+                    let res = await this.validate_trace(tableChain, bn0, bn1)
+                    let rows = []
+                    let missingBNs = res.missingBNs
+                    let verifiedRows = res.verifiedRows
+                    if (missingBNs.length > 0) {
+                        missingBNAll.push(...missingBNs)
+                        console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
+                        if (missingBNAll.length >= maxQueueSize) {
+                            await this.batch_crawl_trace(crawler, chain, missingBNAll)
+                            missingBNAll = []
+                        }
+                    }
+                }
+            }else{
+                for (let bn0 = bnEnd; bn0 >= bnStart; bn0 -= jmp) {
+                    jmpIdx++
+                    console.log(`${jmpIdx}/${jmpTotal}`)
+                    let bn1 = bn0 - jmp + 1;
+                    if (bn1 < bnStart) bn1 = bnStart;
+
+                    let res = await this.validate_trace(tableChain, bn1, bn0)
+                    let rows = []
+                    let missingBNs = res.missingBNs
+                    let verifiedRows = res.verifiedRows
+                    if (missingBNs.length > 0) {
+                        missingBNAll.push(...missingBNs)
+                        console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
+                        if (missingBNAll.length >= maxQueueSize) {
+                            await this.batch_crawl_trace(crawler, chain, missingBNAll)
+                            missingBNAll = []
+                        }
                     }
                 }
             }
-        }else{
-            for (let bn0 = bnEnd; bn0 >= bnStart; bn0 -= jmp) {
-                jmpIdx++
-                console.log(`${jmpIdx}/${jmpTotal}`)
-                let bn1 = bn0 - jmp + 1;
-                if (bn1 < bnStart) bn1 = bnStart;
+            console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
+            await this.batch_crawl_trace(crawler, chain, missingBNAll)
+        }
 
-                let res = await this.validate_trace(tableChain, bn1, bn0)
-                let rows = []
-                let missingBNs = res.missingBNs
-                let verifiedRows = res.verifiedRows
-                if (missingBNs.length > 0) {
-                    missingBNAll.push(...missingBNs)
-                    console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
-                    if (missingBNAll.length >= maxQueueSize) {
-                        await this.batch_crawl_trace(crawler, chain, missingBNAll)
-                        missingBNAll = []
-                    }
-                }
+        let isMissing = await this.fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd)
+        if (!isMissing && isCompleteDay ){
+            // mark crawlTraceStatus as audited
+            let sql = `insert into blocklog (logDT, chainID, crawlTraceStatus, crawlTraceDT) values ('${logDT}', '${chainID}', 'Audited', Now() ) on duplicate key update crawlTraceStatus = values(crawlTraceStatus), crawlTraceDT = values(crawlTraceDT)`
+            console.log(sql);
+            let dryRun = false
+            if (!dryRun) {
+                this.batchedSQL.push(sql);
+                await this.update_batchedSQL();
             }
         }
-        console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
-        await this.batch_crawl_trace(crawler, chain, missingBNAll)
     }
 
     async loadDailyTraceFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {

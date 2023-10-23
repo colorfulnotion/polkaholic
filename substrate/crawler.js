@@ -295,7 +295,8 @@ module.exports = class Crawler extends Indexer {
                     block,
                     events,
                     trace,
-                    blockHash
+                    blockHash,
+                    blockTS
                 };
             }
         } catch (err) {
