@@ -531,6 +531,33 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
+    async get_random_trace_ready(relayChain, paraID, lookbackDays = 60) {
+        let w = "";
+        if (paraID >= 0 && relayChain) {
+            let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+            w = ` and chainID = ${chainID}`
+        }
+        let sql = `select UNIX_TIMESTAMP(logDT) indexTS, chainID from blocklog where logDT >= "${balanceStartDT}" and logDT >= date_sub(Now(), interval ${lookbackDays} day) and crawlTraceStatus = "Audited" and traceMetricsStatus not in ('Audited', 'AuditRequired') ${w} order by rand() limit 1`;
+        console.log("get_random_trace_ready", sql);
+        let recs = await this.poolREADONLY.query(sql);
+        if (recs.length == 0) return ([null, null]);
+        let {
+            indexTS,
+            chainID
+        } = recs[0];
+        let [logDT, _] = paraTool.ts_to_logDT_hr(indexTS);
+        paraID = paraTool.getParaIDfromChainID(chainID);
+        relayChain = paraTool.getRelayChainByChainID(chainID);
+        let sql0 = `update blocklog set attempted = attempted + 1 where chainID = '${chainID}' and logDT = '${logDT}'`
+        this.batchedSQL.push(sql0);
+        await this.update_batchedSQL();
+        return {
+            logDT,
+            paraID,
+            relayChain
+        };
+    }
+
     async get_random_accountmetrics_ready(relayChain, paraID, lookbackDays = 3000) {
         let w = "";
         if (paraID >= 0 && relayChain) {
@@ -4857,77 +4884,17 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
         await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
 
-        if (false){
-            // 4. do table scan 50 blocks at a time
-            let NL = "\r\n";
-            let jmp = 100;
-            let numTraces = 0;
-
-            //Fetching missing traces
-            const Crawler = require("./crawler");
-            let crawler = new Crawler();
-            await crawler.setupAPI(chain);
-            await crawler.assetManagerInit();
-            await crawler.setupChainAndAPI(chainID);
-
-            let maxQueueSize = (isHead || isDecending)? 1: 50;
-            let missingBNAll = [];
-            let errorBNAll = [];
-            let jmpIdx = 0
-            let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
-            if (!isDecending){
-                for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-                    jmpIdx++
-                    console.log(`${jmpIdx}/${jmpTotal}`)
-                    let bn1 = bn0 + jmp - 1;
-                    if (bn1 > bnEnd) bn1 = bnEnd;
-
-                    let res = await this.validate_trace(tableChain, bn0, bn1)
-                    let rows = []
-                    let missingBNs = res.missingBNs
-                    let verifiedRows = res.verifiedRows
-                    if (missingBNs.length > 0) {
-                        missingBNAll.push(...missingBNs)
-                        console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
-                        if (missingBNAll.length >= maxQueueSize) {
-                            await this.batch_crawl_trace(crawler, chain, missingBNAll)
-                            missingBNAll = []
-                        }
-                    }
-                }
-            }else{
-                for (let bn0 = bnEnd; bn0 >= bnStart; bn0 -= jmp) {
-                    jmpIdx++
-                    console.log(`${jmpIdx}/${jmpTotal}`)
-                    let bn1 = bn0 - jmp + 1;
-                    if (bn1 < bnStart) bn1 = bnStart;
-
-                    let res = await this.validate_trace(tableChain, bn1, bn0)
-                    let rows = []
-                    let missingBNs = res.missingBNs
-                    let verifiedRows = res.verifiedRows
-                    if (missingBNs.length > 0) {
-                        missingBNAll.push(...missingBNs)
-                        console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs)
-                        if (missingBNAll.length >= maxQueueSize) {
-                            await this.batch_crawl_trace(crawler, chain, missingBNAll)
-                            missingBNAll = []
-                        }
-                    }
-                }
-            }
-            console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll)
-            await this.batch_crawl_trace(crawler, chain, missingBNAll)
-        }
-
         let isMissing = await this.fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd)
         if (!isMissing && isCompleteDay ){
             // mark crawlTraceStatus as audited
             let sql = `insert into blocklog (logDT, chainID, crawlTraceStatus, crawlTraceDT) values ('${logDT}', '${chainID}', 'Audited', Now() ) on duplicate key update crawlTraceStatus = values(crawlTraceStatus), crawlTraceDT = values(crawlTraceDT)`
+            let sql2 = `update blocklog set traceMetricsStatus = 'Ready' where logDT = '${logDT}' and chainID = '${chainID}' and traceMetricsStatus not in ('AuditRequired', 'Audited')`
             console.log(sql);
+            console.log(sql2);
             let dryRun = false
             if (!dryRun) {
                 this.batchedSQL.push(sql);
+                this.batchedSQL.push(sql2);
                 await this.update_batchedSQL();
             }
         }
