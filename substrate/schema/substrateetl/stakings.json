@@ -1,0 +1,77 @@
+[
+  {
+    "mode": "NULLABLE",
+    "name": "address_ss58",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "address_pubkey",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "section",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "storage",
+    "type": "STRING"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_number",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "block_hash",
+    "type": "STRING"
+  },
+  {
+    "mode": "REQUIRED",
+    "name": "ts",
+    "type": "TIMESTAMP"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "era",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "submitted_in",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "suppressed",
+    "type": "BOOLEAN"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "validator_total",
+    "type": "NUMERIC"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "validator_own",
+    "type": "NUMERIC"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "validator_commission",
+    "type": "NUMERIC"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "targets",
+    "type": "JSON"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "pv",
+    "type": "JSON"
+  }
+]
