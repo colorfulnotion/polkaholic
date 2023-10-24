@@ -52,17 +52,17 @@
   {
     "mode": "NULLABLE",
     "name": "validator_total",
-    "type": "NUMERIC"
+    "type": "FLOAT"
   },
   {
     "mode": "NULLABLE",
     "name": "validator_own",
-    "type": "NUMERIC"
+    "type": "FLOAT"
   },
   {
     "mode": "NULLABLE",
     "name": "validator_commission",
-    "type": "NUMERIC"
+    "type": "FLOAT"
   },
   {
     "mode": "NULLABLE",

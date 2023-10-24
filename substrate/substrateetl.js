@@ -582,9 +582,10 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async get_random_staking_ready(relayChain, paraID, lookbackDays = 60) {
+    async get_random_staking_ready(relayChain, paraID, lookbackDays = 1000) {
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let supportedChains = [paraTool.chainIDPolkadot, paraTool.chainIDKusama]
+        let stakingStartDT = "2020-05-01"
         if (!supportedChains.includes(chainID)){
             return {
                 logDT: false,
@@ -592,7 +593,7 @@ module.exports = class SubstrateETL extends AssetManager {
                 relayChain: false
             }
         }
-        let sql = `select DATE_FORMAT(blockDT, '%Y-%m-%d') logDT from era${chainID} where  DATE_FORMAT(blockDT, '%Y-%m-%d') >= "${balanceStartDT}" and  DATE_FORMAT(blockDT, '%Y-%m-%d') >= date_sub(Now(), interval ${lookbackDays} day) and crawlNominatorStatus not in ('Audited', 'AuditRequired') order by rand() limit 1`;
+        let sql = `select DATE_FORMAT(blockDT, '%Y-%m-%d') logDT from era${chainID} where  DATE_FORMAT(blockDT, '%Y-%m-%d') >= "${stakingStartDT}" and  DATE_FORMAT(blockDT, '%Y-%m-%d') >= date_sub(Now(), interval ${lookbackDays} day) and crawlNominatorStatus not in ('Audited', 'AuditRequired') order by rand() limit 1`;
         console.log("get_random_trace_ready", sql);
         let recs = await this.poolREADONLY.query(sql);
         if (recs.length == 0) return ([null, null]);
@@ -3471,7 +3472,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 sql = `select * from era0 where  DATE_FORMAT(blockDT, '%Y-%m-%d') = '${logDT}';`
                 recs = await this.poolREADONLY.query(sql)
                 console.log("staking ready", sql);
-                if (recs.length == 1) {
+                if (recs.length >= 1) {
                     status = recs[0].crawlNominatorStatus
                     if (status == 'Ready' || status == 'NotReady') return (true);
                 }
@@ -4959,6 +4960,30 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async loadDailyStakingFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
+        let projectID = `${this.project}`
+        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+
+        let dir = "/tmp";
+        let tbl = "stakings";
+        //let localfn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        let bucket = "crypto_substrate_stakings"
+        let remotefn = `gs://${bucket}/${relayChain}/${paraID}/${logYYYY_MM_DD}/${relayChain}_stakings${paraID}_${logYYYYMMDD}.json`
+        //bq load  --project_id=substrate-etl --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.traces0$20231001' gs://crypto_substrate_traces_etl/polkadot/0/2023/10/01/polkadot_trace0_20231001.json schema/substrateetl/traces.json
+
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logYYYYMMDD}' ${remotefn} schema/substrateetl/${tbl}.json`;
+        console.log(cmd);
+        if (!dryRun) {
+            let {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            console.log(stdout, stderr);
+        }
+    }
+
     async loadDailyTraceFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
@@ -4981,6 +5006,32 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             } = await exec(cmd);
             console.log(stdout, stderr);
         }
+    }
+
+    async cpDailyStakingToGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
+
+        let dir = "/tmp";
+        let tbl = "stakings";
+        let localfn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        let bucket = "crypto_substrate_stakings"
+        let remoteDir = `gs://${bucket}/${relayChain}/${paraID}/${logYYYY_MM_DD}/${relayChain}_stakings${paraID}_${logYYYYMMDD}.json`
+        let gsReplaceLoadCmd = `gsutil -m cp -r ${localfn} ${remoteDir}`
+        console.log(gsReplaceLoadCmd)
+        let errCnt = 0
+        if (!dryRun) {
+            try {
+                let res = await exec(gsReplaceLoadCmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`cpDailyStakingToGS res`, gsReplaceLoadCmd)
+            } catch (e) {
+                console.log(`cpDailyStakingToGS ERROR ${e.toString()}`)
+                errCnt++
+            }
+        }
+        return true
     }
 
     async cpDailyTraceToGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
@@ -5330,6 +5381,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             console.log(`chainID=${chainID} NOT supported`)
             return
         }
+        //await this.cpDailyStakingToGS(logDT, paraID, relayChain, false)
+        //await this.loadDailyStakingFromGS(logDT, paraID, relayChain, false)
         let chain = await this.getChain(chainID);
         let chainInfo = await this.getChainFullInfo(chainID)
         let chainDecimals = chainInfo.decimals
@@ -5348,7 +5401,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         // 2. setup directories for tbls on date
         let NL = "\r\n";
         let dir = "/tmp";
-        let tbl = "staking";
+        let tbl = "stakings";
         let logDTp = logDT.replaceAll("-", "")
         let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
         console.log(`writting to ${fn}`)
@@ -5356,7 +5409,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
         let wsEndpoint = this.get_wsendpoint(chain);
         if (chainID == paraTool.chainIDPolkadot){
-            wsEndpoint = "wss://rpc.polkadot.io"
+            //wsEndpoint = "wss://rpc.polkadot.io"
         }
         let chainName = chain.chainName;
         let id = chain.id;
@@ -5481,7 +5534,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             targets: targets,
                             pv: pv
                         }
-                        console.log(rec)
+                        //console.log(rec)
                         fs.writeSync(f, JSON.stringify(rec) + NL);
                         validator_num++
                     }
@@ -5496,8 +5549,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let nominator_num_page = 0;
                 let nominator_done = false
                 let nominator_num = 0
-
-                //return
 
                 while (!nominator_done) {
                     let query = null
@@ -5537,7 +5588,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             targets: pv.targets,
                             pv: pv
                         }
-                        console.log(rec)
+                        //console.log(rec)
                         fs.writeSync(f, JSON.stringify(rec) + NL);
                         nominator_num++
                     }
@@ -5548,15 +5599,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
 
-        let dryRun =  true
+        let dryRun =  false
         try {
             fs.closeSync(f);
-            //await this.cpDailyStakingToGS(logDT, paraID, relayChain, dryRun)
-            //await this.loadDailyTraceFromGS(logDT, paraID, relayChain, dryRun)
-            /*
-            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
-            console.log(cmd);
-            */
+            await this.cpDailyStakingToGS(logDT, paraID, relayChain, dryRun)
+            //await this.loadDailyStakingFromGS(logDT, paraID, relayChain, dryRun)
             if (!dryRun) {
                 try {
                     fs.unlinkSync(fn);
@@ -5569,10 +5616,10 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             for (const era of Object.keys(stakingStats)){
                 let eraStat = stakingStats[era]
                 let loaded = (logDT == todayDT) ? 0 : 1;
-                let sql = `insert into era${chainID} (era, block_number, numNominators, numValidators, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.block_number}', 'AuditRequired', Now() ) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT)`
+                let sql = `insert into era${chainID} (era, block_number, numNominators, numValidators, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.numNominators}', 'AuditRequired', Now() ) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT)`
                 console.log(sql);
                 if (!dryRun) {
-                    //this.batchedSQL.push(sql);
+                    this.batchedSQL.push(sql);
                 }
             }
             if (!dryRun) await this.update_batchedSQL();
