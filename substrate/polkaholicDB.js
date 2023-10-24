@@ -670,7 +670,8 @@ module.exports = class PolkaholicDB {
         let res = {}
         let eraCnt = 0
         for (const v of eraBlocks) {
-            res[era.blockDT].push(v)
+            if (res[v.blockDT] == undefined) res[v.blockDT] = []
+            res[v.blockDT].push(v)
         }
         return res
     }

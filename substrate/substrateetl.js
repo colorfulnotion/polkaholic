@@ -3472,7 +3472,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 recs = await this.poolREADONLY.query(sql)
                 console.log("staking ready", sql);
                 if (recs.length == 1) {
-                    status = recs[0].crawlTraceStatus
+                    status = recs[0].crawlNominatorStatus
                     if (status == 'Ready' || status == 'NotReady') return (true);
                 }
                 break;
@@ -5320,6 +5320,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_staking(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(logDT)
         let verbose = true
         let isBackFill = false
         let supressedFound = {}
@@ -5335,11 +5336,250 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let asset = this.getChainAsset(chainID);
         let assetChain = paraTool.makeAssetChain(asset, chainID);
         console.log(`chainDecimals`, chainDecimals, `assetChain`, assetChain)
-
         let chain_identification = this.getIDByChainID(chainID)
         let chain_name = this.getChainName(chainID)
         let eraBlocks = await this.getEraBlocks()
-        console.log(eraBlocks)
+        let targetEras = eraBlocks[currDT]
+        if (targetEras == undefined){
+            console.log(`NO WORK: ${currDT}`)
+            return
+        }
+
+        // 2. setup directories for tbls on date
+        let NL = "\r\n";
+        let dir = "/tmp";
+        let tbl = "staking";
+        let logDTp = logDT.replaceAll("-", "")
+        let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        console.log(`writting to ${fn}`)
+        let f = fs.openSync(fn, 'w', 0o666);
+
+        let wsEndpoint = this.get_wsendpoint(chain);
+        if (chainID == paraTool.chainIDPolkadot){
+            wsEndpoint = "wss://rpc.polkadot.io"
+        }
+        let chainName = chain.chainName;
+        let id = chain.id;
+
+        var provider = new WsProvider(wsEndpoint);
+        const api = await ApiPromise.create({
+            provider
+        });
+        let disconnectedCnt = 0;
+        provider.on('disconnected', () => {
+            disconnectedCnt++;
+            console.log(`*CHAIN API DISCONNECTED [DISCONNECTIONS=${disconnectedCnt}]`, chainID);
+            if (disconnectedCnt > 5) {
+                console.log(`*CHAIN API DISCONNECTION max reached!`, chainID);
+                process.exit(1);
+            }
+        });
+
+        /*
+        {
+          era: 1237,
+          block_number: 17818516,
+          blockDT: '2023-10-21',
+          blockTS: 1697888178,
+          blockhash: '0x810953b1f4aedadccd38c09d40563d73392dc2b74d575e08ceab5c6758fdcaca'
+        }
+        */
+        let perPagelimit = 1000
+
+        let stakingStats = {}
+        for (const era of targetEras){
+            console.log(`era`, era)
+            let validatorPrefMap = {}
+            let finalizedBlockHash = era.blockhash
+            let eraBN = era.block_number
+            let eraNumber = era.era
+            let blockTS = era.blockTS
+            let apiAt = await api.at(finalizedBlockHash)
+            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
+
+            stakingStats[eraNumber] = {
+                block_number: eraBN,
+                era: eraNumber
+            }
+            for (const user of validator_pref) {
+                let pub = user[0].slice(-32);
+                let pubkey = u8aToHex(pub);
+                let prefix = 0
+                let address_ss58 = encodeAddress(pub, prefix);
+                var pref = JSON.parse(JSON.stringify(user[1]))
+                pref.commission = pref.commission / 1000000000
+                validatorPrefMap[address_ss58] = {
+                    commission: pref.commission,
+                    blocked: pref.blocked
+                }
+            }
+            let isPaged = true
+            if (isPaged){
+                let validator_num_last_key = '';
+                let validator_num_page = 0;
+                let validator_done = false
+                let validator_num = 0
+                while (!validator_done) {
+                    let query = null
+                    if (apiAt.query.staking.erasStakers != undefined) {
+                        console.log(`validator_num_page=${validator_num_page}. pageSize=${perPagelimit}, startKey=${validator_num_last_key}`)
+                        query = await apiAt.query.staking.erasStakers.entriesPaged({
+                            args: [eraNumber],
+                            pageSize: perPagelimit,
+                            startKey: validator_num_last_key
+                        })
+                    }
+                    if (query.length == 0) {
+                        console.log(`Query Staking:ErasStakers Completed:`, validator_num)
+                        stakingStats[eraNumber].numValidators = validator_num
+                        break
+                    } else {
+                        console.log(`Staking:ErasStakers page: `, validator_num_page++);
+                        validator_num_last_key = query[query.length - 1][0];
+                    }
+                    for (const user of query) {
+                        let pub = user[0].slice(-32);
+                        let pubkey = u8aToHex(pub);
+                        let prefix = 0
+
+                        let address_ss58 = encodeAddress(pub, prefix);
+
+                        var pv = JSON.parse(JSON.stringify(user[1]))
+                        //console.log(`address_ss58=${address_ss58}, pv`, pv)
+                        pv.total =  paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
+                        pv.own =  paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
+                        let others = []
+                        let targets = []
+                        for (const other of pv.others){
+                            //other.value_raw = other.value
+                            other.value = other.value / 10 ** chainDecimals;
+                            if (other.value > 0){
+                                others.push(other)
+                                targets.push(other.who)
+                            }else{
+                                console.log(`SKIP others`, other)
+                            }
+                        }
+                        pv.others = others
+                        pv.nominatorLen = others.length
+                        let validator_commission = null;
+                        if (validatorPrefMap[address_ss58]!= undefined){
+                            validator_commission = validatorPrefMap[address_ss58].commission
+                        }
+                        let rec = {
+                            address_pubkey: pubkey,
+                            address_ss58: address_ss58,
+                            section: "Staking",
+                            storage: "ErasStakers",
+                            block_number: eraBN,
+                            block_hash: finalizedBlockHash,
+                            ts: blockTS,
+                            era: eraNumber,
+                            validator_total: pv.total,
+                            validator_own: pv.own,
+                            validator_commission: validator_commission,
+                            targets: targets,
+                            pv: pv
+                        }
+                        console.log(rec)
+                        fs.writeSync(f, JSON.stringify(rec) + NL);
+                        validator_num++
+                    }
+                    if (query.length > 0) {} else {
+                        validator_done = true;
+                    }
+
+
+                }
+
+                let nominator_num_last_key = '';
+                let nominator_num_page = 0;
+                let nominator_done = false
+                let nominator_num = 0
+
+                //return
+
+                while (!nominator_done) {
+                    let query = null
+                    if (apiAt.query.staking.nominators != undefined) {
+                        console.log(`nominator_num_page=${nominator_num_page}. pageSize=${perPagelimit}, startKey=${nominator_num_last_key}`)
+                        query = await apiAt.query.staking.nominators.entriesPaged({
+                            args: [],
+                            pageSize: perPagelimit,
+                            startKey: nominator_num_last_key
+                        })
+                    }
+                    if (query.length == 0) {
+                        console.log(`Query Completed:`, nominator_num)
+                        stakingStats[eraNumber].numNominators = nominator_num
+                        break
+                    } else {
+                        console.log(`Staking:Nominators page: `, nominator_num_page++);
+                        nominator_num_last_key = query[query.length - 1][0];
+                    }
+                    for (const user of query) {
+                        let pub = user[0].slice(-32);
+                        let pubkey = u8aToHex(pub);
+                        let prefix = 0
+                        var pv = JSON.parse(JSON.stringify(user[1]))
+                        let address_ss58 = encodeAddress(pub, prefix);
+                        let rec = {
+                            address_pubkey: pubkey,
+                            address_ss58: address_ss58,
+                            section: "Staking",
+                            storage: "Nominators",
+                            block_number: eraBN,
+                            block_hash: finalizedBlockHash,
+                            ts: blockTS,
+                            era: eraNumber,
+                            submitted_in: pv.submittedIn,
+                            suppressed: pv.suppressed,
+                            targets: pv.targets,
+                            pv: pv
+                        }
+                        console.log(rec)
+                        fs.writeSync(f, JSON.stringify(rec) + NL);
+                        nominator_num++
+                    }
+                    if (query.length > 0) {} else {
+                        nominator_done = true;
+                    }
+                }
+            }
+        }
+
+        let dryRun =  true
+        try {
+            fs.closeSync(f);
+            //await this.cpDailyStakingToGS(logDT, paraID, relayChain, dryRun)
+            //await this.loadDailyTraceFromGS(logDT, paraID, relayChain, dryRun)
+            /*
+            let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+            console.log(cmd);
+            */
+            if (!dryRun) {
+                try {
+                    fs.unlinkSync(fn);
+                    console.log(`Deleted file: ${fn}`);
+                } catch (error) {
+                    console.error(`Error deleting file: ${fn}`, error);
+                }
+            }
+            let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
+            for (const era of Object.keys(stakingStats)){
+                let eraStat = stakingStats[era]
+                let loaded = (logDT == todayDT) ? 0 : 1;
+                let sql = `insert into era${chainID} (era, block_number, numNominators, numValidators, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.block_number}', 'AuditRequired', Now() ) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT)`
+                console.log(sql);
+                if (!dryRun) {
+                    //this.batchedSQL.push(sql);
+                }
+            }
+            if (!dryRun) await this.update_batchedSQL();
+        } catch (err) {
+            console.log("dump_trace", err);
+        }
+
     }
 
     /*
