@@ -2125,7 +2125,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
     get_wsendpoint(chain) {
         let wsEndpoint = chain.WSEndpoint;
         let alts = {
-            0: ['wss://1rpc.io/dot', 'wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://polkadot-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io', 'wss://polkadot.public.curie.radiumblock.co/ws'],
+            0: ['wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io', 'wss://polkadot.public.curie.radiumblock.co/ws'], //wss://1rpc.io/dot , 'wss://polkadot-rpc-tn.dwellir.com'
             2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
             22023: ['wss://moonriver.public.blastapi.io', 'wss://wss.api.moonriver.moonbeam.network', 'wss://moonriver.api.onfinality.io/public-ws', 'wss://moonriver.unitedbloc.com:2001'],
             2004: ['wss://1rpc.io/glmr', 'wss://moonbeam.public.blastapi.io', 'wss://wss.api.moonbeam.network', 'wss://moonbeam.api.onfinality.io/public-ws', 'wss://moonbeam.unitedbloc.com:3001'],
