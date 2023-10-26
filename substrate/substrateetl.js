@@ -582,7 +582,7 @@ module.exports = class SubstrateETL extends AssetManager {
         };
     }
 
-    async get_random_staking_ready(relayChain, paraID, lookbackDays = 1000) {
+    async get_random_staking_ready(relayChain, paraID, lookbackDays = 2000) {
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let supportedChains = [paraTool.chainIDPolkadot, paraTool.chainIDKusama]
         let stakingStartDT = "2020-05-01"
@@ -5430,30 +5430,107 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
         /*
         {
-          era: 1237,
-          block_number: 17818516,
-          blockDT: '2023-10-21',
-          blockTS: 1697888178,
-          blockhash: '0x810953b1f4aedadccd38c09d40563d73392dc2b74d575e08ceab5c6758fdcaca'
+          era: 1240,
+          block_number: 17861531,
+          blockDT: '2023-10-24',
+          blockTS: 1698147378,
+          blockhash: '0x57d960d04c277916b5554a39995d69fb7fb633fc3f68cd5bc0cf2f3aea98aecd',
+          era1Hash: '0x093598783ad0cb471e43472d46addee7d22212c2608d882934680c330b75fb22',
+          era2Hash: '0xf677980b19abdbf2880c16bafe2d8545c14a55e1252076c87b3fa75defe66f80'
         }
+        erasTotalStakes - no delay
+        erasRewardPoints - has 2 era Delay
+        erasValidatorReward - has 2 era Delay (5 session)
         */
+
         let perPagelimit = 1000
 
         let stakingStats = {}
         for (const era of targetEras){
             console.log(`era`, era)
             let validatorPrefMap = {}
-            let finalizedBlockHash = era.blockhash
+            let validatorRewardMap = {}
+            let era0Hash = era.blockhash
+            let era1Hash = (era.era1Hash)? era.era1Hash : null
+            let era2Hash = (era.era2Hash)? era.era2Hash : null
+
+            let totalStaked = null
+            let totalRewardPoints = null
+            let totalStakingRewards = null
+            let numPointsEarners = null;
+
             let eraBN = era.block_number
             let eraNumber = era.era
             let blockTS = era.blockTS
-            let apiAt = await api.at(finalizedBlockHash)
+            let apiAt = await api.at(era0Hash)
+
+            var erasTotalStakes = await apiAt.query.staking.erasTotalStake(eraNumber);
+            totalStaked = paraTool.dechexToInt(erasTotalStakes.toString()) / 10 ** chainDecimals;
+
+            if (era2Hash){
+                let api2At = await api.at(era2Hash)
+                let validatorRewardQuery = await api2At.query.staking.erasValidatorReward(eraNumber); // 4 hours delay
+                totalStakingRewards = paraTool.dechexToInt(validatorRewardQuery.toString()) / 10 ** chainDecimals;
+            }
+            if (era2Hash){
+                let api2At = await api.at(era2Hash)
+                let erasRewardPointsQuery = await api2At.query.staking.erasRewardPoints(eraNumber);
+                let rewardStruct = JSON.parse(JSON.stringify(erasRewardPointsQuery))
+                totalRewardPoints = rewardStruct.total
+                let weights = []
+                let weightTotal = 0
+                let rewardIndividuals = Object.keys(rewardStruct.individual)
+                numPointsEarners = rewardIndividuals.length
+                for (const validator of rewardIndividuals){
+                    let point = rewardStruct.individual[validator]
+                    let weight = point / totalRewardPoints
+                    weightTotal += weight
+                    let vRec = {
+                        validator: validator,
+                        point: point,
+                        weight: weight,
+                    }
+                    weights.push(vRec)
+                    validatorRewardMap[validator] = vRec
+                }
+                console.log(`weightTotal:`, weightTotal)
+                let rec = {
+                    section: "Staking",
+                    storage: "ErasRewardPoints",
+                    block_number: eraBN,
+                    block_hash: era0Hash,
+                    ts: blockTS,
+                    era: eraNumber,
+                    total_staked: totalStaked,
+                    total_reward_points: totalRewardPoints,
+                    total_staking_rewards: totalStakingRewards,
+                    pv: weights
+                }
+                //console.log(rec)
+                /*
+                {
+                  total: 22781120,
+                  individual: {
+                    '111B8CxcmnWbuDLyGvgUmRezDCK1brRZmvUuQ6SrFdMyc3S': 77500,
+                    '114SUbKCXjmb9czpWTtS3JANSmNRwVa4mmsMrWYpRG1kDH5': 75700,
+                    '11BgR7fH8Sq6CcGcXxZrhyrBM2PUpDmhnGZpxPGvVGXEiPT': 77900,
+                    ...
+                }
+                */
+            }
             var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
 
             stakingStats[eraNumber] = {
                 block_number: eraBN,
-                era: eraNumber
+                era: eraNumber,
+                totalStaked: totalStaked,
+                totalRewardPoints: totalRewardPoints,
+                totalStakingRewards: totalStakingRewards,
+                numPointsEarners: numPointsEarners,
             }
+
+            console.log(`stakingStats`, stakingStats);
+
             for (const user of validator_pref) {
                 let pub = user[0].slice(-32);
                 let pubkey = u8aToHex(pub);
@@ -5466,6 +5543,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     blocked: pref.blocked
                 }
             }
+
+            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber-1);
+
+            //return
+
             let isPaged = true
             if (isPaged){
                 let validator_num_last_key = '';
@@ -5483,7 +5565,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         })
                     }
                     if (query.length == 0) {
-                        console.log(`Query Staking:ErasStakers Completed:`, validator_num)
+                        console.log(`Query staking:erasStakers Completed: validators=${validator_num}, rewardsEarner = ${numPointsEarners}`)
                         stakingStats[eraNumber].numValidators = validator_num
                         break
                     } else {
@@ -5519,18 +5601,36 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         if (validatorPrefMap[address_ss58]!= undefined){
                             validator_commission = validatorPrefMap[address_ss58].commission
                         }
+
+                        let validator_reward_points = null;
+                        let validator_reward_share = null;
+                        let validator_staking_rewards = null;
+                        if (validatorRewardMap[address_ss58]!= undefined){
+                            validator_reward_points = validatorRewardMap[address_ss58].point
+                            validator_reward_share = validatorRewardMap[address_ss58].weight
+                            if (totalStakingRewards && totalRewardPoints){
+                                validator_staking_rewards = (validatorRewardMap[address_ss58].point / totalRewardPoints) * totalStakingRewards
+                            }
+                        }else{
+                            console.log(`validator not found! ${address_ss58}`)
+                            //process.exit(0)
+                        }
+
                         let rec = {
                             address_pubkey: pubkey,
                             address_ss58: address_ss58,
                             section: "Staking",
                             storage: "ErasStakers",
                             block_number: eraBN,
-                            block_hash: finalizedBlockHash,
+                            block_hash: era0Hash,
                             ts: blockTS,
                             era: eraNumber,
                             validator_total: pv.total,
                             validator_own: pv.own,
                             validator_commission: validator_commission,
+                            validator_reward_shares: validator_reward_share,
+                            validator_reward_points: validator_reward_points,
+                            validator_staking_rewards: validator_staking_rewards,
                             targets: targets,
                             pv: pv
                         }
@@ -5550,24 +5650,55 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let nominator_done = false
                 let nominator_num = 0
 
-                while (!nominator_done) {
-                    let query = null
-                    if (apiAt.query.staking.nominators != undefined) {
-                        console.log(`nominator_num_page=${nominator_num_page}. pageSize=${perPagelimit}, startKey=${nominator_num_last_key}`)
-                        query = await apiAt.query.staking.nominators.entriesPaged({
-                            args: [],
-                            pageSize: perPagelimit,
-                            startKey: nominator_num_last_key
-                        })
+                let singleBatch = false
+                if (!singleBatch){
+                    while (!nominator_done) {
+                        let query = null
+                        if (apiAt.query.staking.nominators != undefined) {
+                            console.log(`nominator_num_page=${nominator_num_page}. pageSize=${perPagelimit}, startKey=${nominator_num_last_key}`)
+                            query = await apiAt.query.staking.nominators.entriesPaged({
+                                args: [],
+                                pageSize: perPagelimit,
+                                startKey: nominator_num_last_key
+                            })
+                        }
+                        if (query.length == 0) {
+                            stakingStats[eraNumber].numNominators = nominator_num
+                            break
+                        } else {
+                            console.log(`Staking:Nominators page: `, nominator_num_page++);
+                            nominator_num_last_key = query[query.length - 1][0];
+                        }
+                        for (const user of query) {
+                            let pub = user[0].slice(-32);
+                            let pubkey = u8aToHex(pub);
+                            let prefix = 0
+                            var pv = JSON.parse(JSON.stringify(user[1]))
+                            let address_ss58 = encodeAddress(pub, prefix);
+                            let rec = {
+                                address_pubkey: pubkey,
+                                address_ss58: address_ss58,
+                                section: "Staking",
+                                storage: "Nominators",
+                                block_number: eraBN,
+                                block_hash: era0Hash,
+                                ts: blockTS,
+                                era: eraNumber,
+                                submitted_in: pv.submittedIn,
+                                suppressed: pv.suppressed,
+                                targets: pv.targets,
+                                pv: pv
+                            }
+                            //console.log(rec)
+                            fs.writeSync(f, JSON.stringify(rec) + NL);
+                            nominator_num++
+                        }
+                        if (query.length > 0) {} else {
+                            nominator_done = true;
+                        }
                     }
-                    if (query.length == 0) {
-                        console.log(`Query Completed:`, nominator_num)
-                        stakingStats[eraNumber].numNominators = nominator_num
-                        break
-                    } else {
-                        console.log(`Staking:Nominators page: `, nominator_num_page++);
-                        nominator_num_last_key = query[query.length - 1][0];
-                    }
+                } else {
+                    let query = await apiAt.query.staking.nominators.entries();
                     for (const user of query) {
                         let pub = user[0].slice(-32);
                         let pubkey = u8aToHex(pub);
@@ -5580,7 +5711,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             section: "Staking",
                             storage: "Nominators",
                             block_number: eraBN,
-                            block_hash: finalizedBlockHash,
+                            block_hash: era0Hash,
                             ts: blockTS,
                             era: eraNumber,
                             submitted_in: pv.submittedIn,
@@ -5592,9 +5723,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         fs.writeSync(f, JSON.stringify(rec) + NL);
                         nominator_num++
                     }
-                    if (query.length > 0) {} else {
-                        nominator_done = true;
-                    }
+                    console.log(`Query staking.nominators Completed:`, nominator_num)
+                    stakingStats[eraNumber].numNominators = nominator_num
                 }
             }
         }
@@ -5616,7 +5746,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             for (const era of Object.keys(stakingStats)){
                 let eraStat = stakingStats[era]
                 let loaded = (logDT == todayDT) ? 0 : 1;
-                let sql = `insert into era${chainID} (era, block_number, numNominators, numValidators, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.numNominators}', 'AuditRequired', Now() ) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT)`
+                let totalStaked = (eraStat.totalStaked) ? `'${eraStat.totalStaked}'` : `NULL`
+                let totalRewardPoints = (eraStat.totalRewardPoints) ? `'${eraStat.totalRewardPoints}'` : `NULL`
+                let totalStakingRewards = (eraStat.totalStakingRewards) ? `'${eraStat.totalStakingRewards}'` : `NULL`
+                let numPointsEarners = (eraStat.numPointsEarners) ? `'${eraStat.numPointsEarners}'` : `NULL`
+                let sql = `insert into era${chainID} (era, block_number, numValidators, numNominators, totalStaked, totalRewardPoints, totalStakingRewards, numPointsEarners, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.numNominators}', ${totalStaked}, ${totalRewardPoints}, ${totalStakingRewards}, ${numPointsEarners}, 'AuditRequired', Now()) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT), totalStaked = values(totalStaked), totalRewardPoints = values(totalRewardPoints), totalStakingRewards = values(totalStakingRewards), numPointsEarners = values(numPointsEarners)`
                 console.log(sql);
                 if (!dryRun) {
                     this.batchedSQL.push(sql);

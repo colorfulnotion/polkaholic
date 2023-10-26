@@ -259,7 +259,6 @@ async function main() {
                 if (startBN != undefined && endBN == undefined) endBN = startBN+1
                     if (isRandom && relayChain && paraID != undefined){
                     let tally = 0;
-                    console.log(`im here`)
                     while (true) {
                         let x = await substrateetl.get_random_staking_ready(relayChain, paraID);
                         let _logDT = x.logDT;

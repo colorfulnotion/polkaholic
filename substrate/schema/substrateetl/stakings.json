@@ -66,6 +66,36 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "validator_reward_shares",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "validator_reward_points",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "validator_staking_rewards",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "total_staked",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "total_reward_points",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "total_staking_rewards",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "targets",
     "type": "JSON"
   },
