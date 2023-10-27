@@ -131,6 +131,14 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('dumpchains')
+        .description("Dump chain table")
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.dump_chains();
+            process.exit(0);
+        });
+    
     program.command('backfilltrace')
         .description("backfill trace data on miss")
         .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")

@@ -283,6 +283,23 @@ module.exports = class SubstrateETL extends AssetManager {
         console.log(unknownAscii)
     }
 
+    async dump_chains() {
+	let projectID = "substrate-etl";
+        let sql = `select id, chainID as chain_id, relayChain as relay_chain, paraID as para_id from chain where blocksCovered > 10000`;
+        let recs = await this.poolREADONLY.query(sql);
+        let dir = "/tmp"
+        let tbl = "chain"
+        let fn = path.join(dir, `${tbl}.json`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let NL = "\r\n";
+        recs.forEach((e) => {
+            fs.writeSync(f, JSON.stringify(e) + NL);
+        });
+        fs.closeSync(f);
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.${tbl}' ${fn} schema/substrateetl/${tbl}.json`
+        console.log(cmd);
+    }
+
     async dump_users_tags(tagsourceTbl = 'exchanges') {
         let paraID = 0
         let relayChain = 'polkadot'
