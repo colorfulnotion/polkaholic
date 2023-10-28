@@ -144,6 +144,19 @@ let suggest = false; // disabled for now
        <% if ( account.labels.merklescience ) { %>
              <%- include('labelsmerklescience', {title: "Merkle Science", labels: account.labels.merklescience}); %>
        <% } %>
+       <% if ( account.labels.validator0 ) { %>
+             <%- include('labelsuperset', {title: "Polkadot Validator", pubkey: account.address, dashboard: 67 }); %>
+       <% } %>
+       <% if ( account.labels.nominator0 ) { %>
+             <%- include('labelsuperset', {title: "Polkadot Nominator", pubkey: account.address, dashboard: 71 }); %>
+       <% } %>
+       <% if ( account.labels.voter0 ) { %>
+             <%- include('labelsuperset', {title: "Polkadot Voter", pubkey: account.address, dashboard: 72 }); %>
+       <% } %>
+       <% if ( account.labels.poolmember0 ) { %>
+             <%- include('labelsuperset', {title: "Polkadot Nomination Pool Member", pubkey: account.address, dashboard: 77 }); %>
+       <% } %>
+       
     <% } %>
 	  <b>Public Key:</b> <code><%- account.address; %></code> <a href='/qrcode/<%= account.address; %>'><i class="fa-solid fa-qrcode"></i></a>
         </p>
