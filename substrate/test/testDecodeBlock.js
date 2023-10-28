@@ -19,6 +19,16 @@ async function main() {
     var erasRewardPoints = await apiAt.query.staking.erasRewardPoints(eraNumber-1);
 
 
+    //nominationPools.bondedPools
+    //nominationPools.poolMembers
+    //nominationPools.rewardPools
+    //nominationPools.reversePoolIdLookup
+
+    var bondedPools = await apiAt.query.nominationPools.bondedPools.entries();
+    var rewardPools = await apiAt.query.nominationPools.rewardPools.entries(); //
+    var reversePoolIdLookup = await apiAt.query.nominationPools.reversePoolIdLookup.entries();
+    var poolMember = await apiAt.query.nominationPools.poolMembers.entries(); // need pagination
+
     var totalStake = paraTool.dechexToInt(erasTotalStakes.toString()) / 10 ** 10
     var validatorReward = paraTool.dechexToInt(erasValidatorReward.toString()) / 10 ** 10
     //var erasTotalStakes = await apiAt.query.staking.erasTotalStake.entries(eraNumber-1);
