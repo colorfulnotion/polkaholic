@@ -1,0 +1,26 @@
+[
+  {
+    "description": "Address of the sender",
+    "mode": "REQUIRED",
+    "name": "chain_id",
+    "type": "STRING"
+  },
+  {
+    "description": "id of the chain",
+    "mode": "REQUIRED",
+    "name": "id",
+    "type": "STRING"
+  },
+  {
+    "description": "ParaID of chain",
+    "mode": "REQUIRED",
+    "name": "para_id",
+    "type": "INTEGER"
+  },
+  {
+    "description": "Relay Chain",
+    "mode": "REQUIRED",
+    "name": "relay_chain",
+    "type": "STRING"
+  }
+]

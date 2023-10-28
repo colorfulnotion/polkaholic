@@ -665,6 +665,17 @@ module.exports = class PolkaholicDB {
     }
 
 
+    async getEraBlocks(chainID = paraTool.chainIDPolkadot) {
+        //let eraBlocks = await this.poolREADONLY.query(`SELECT era, block_number, DATE_FORMAT(blockDT, '%Y-%m-%d') AS blockDT, blockTS, blockhash from era${chainID} order by era`)
+        let eraBlocks = await this.poolREADONLY.query(`SELECT e1.era, e1.block_number, DATE_FORMAT(e1.blockDT, '%Y-%m-%d') AS blockDT, e1.blockTS, e1.blockhash AS blockhash, e2.blockhash AS era1Hash, e3.blockhash AS era2Hash FROM era${chainID} e1 LEFT JOIN era${chainID} e2 ON e1.era + 1 = e2.era LEFT JOIN era${chainID} e3 ON e1.era + 2 = e3.era ORDER BY e1.era;`)
+        let eraDTMap = {}
+        for (const v of eraBlocks) {
+            if (eraDTMap[v.blockDT] == undefined) eraDTMap[v.blockDT] = []
+            eraDTMap[v.blockDT].push(v)
+        }
+        return eraDTMap
+    }
+
     async getChains(crawling = 1, orderBy = "valueTransfersUSD7d DESC") {
         let chains = await this.poolREADONLY.query(`select id, ss58Format as prefix, chain.chainID, chain.chainName, blocksCovered, blocksFinalized, blocksArchived, chain.symbol, lastCrawlDT, lastFinalizedDT, unix_timestamp(lastCrawlDT) as lastCrawlTS,
 unix_timestamp(lastFinalizedDT) as lastFinalizedTS,  iconUrl, numExtrinsics7d, numExtrinsics30d, numExtrinsics, numSignedExtrinsics7d, numSignedExtrinsics30d, numSignedExtrinsics, numTransfers7d, numTransfers30d, numTransfers, numEvents7d, numEvents30d, numEvents,

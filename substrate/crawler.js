@@ -190,15 +190,21 @@ module.exports = class Crawler extends Indexer {
                 console.log("CANNOT GET TRACE -- no backfill", chain.RPCBackfill);
                 return (false);
             }
-            let cmd = `curl --silent -H "Content-Type: application/json" --max-time 180 --connect-timeout 60 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
+            let cmd = `curl --silent -H "Content-Type: application/json" --max-time 240 --connect-timeout 90 -d '{"id":1,"jsonrpc":"2.0","method":"state_traceBlock","params":["${blockHash}","state","","Put"]}' "${chain.RPCBackfill}"`
             console.log(`crawlTrace[${blockNumber}]** cmd=${cmd}`)
             const {
                 stdout,
                 stderr
             } = await exec(cmd, {
-                maxBuffer: 1024 * 64000
+                maxBuffer: 1024 * 6400000
             });
-            let traceData = JSON.parse(stdout);
+            let traceData;
+            try {
+                traceData = JSON.parse(stdout);
+            } catch (e){
+                console.log(`traceData error JSON.parse(stdout)`, e)
+            }
+
             console.log(`traceData`, traceData)
             if ((!traceData) || (!traceData.result) || (!traceData.result.blockTrace)) {
                 console.log("NO data", traceData);
@@ -281,6 +287,7 @@ module.exports = class Crawler extends Indexer {
 
             // 3. store finalized state, blockHash + blockTS in mysql + block + trace BT
             let traceType = trace ? "state_traceBlock" : false
+            console.log(`crawl_block_trace ${bn}`, block)
             let success = await this.save_block_trace(chain.chainID, block, blockHash, events, trace, true, traceType, null, null, null);
             if (success) {
                 return {
@@ -288,7 +295,8 @@ module.exports = class Crawler extends Indexer {
                     block,
                     events,
                     trace,
-                    blockHash
+                    blockHash,
+                    blockTS
                 };
             }
         } catch (err) {
@@ -424,7 +432,6 @@ module.exports = class Crawler extends Indexer {
         try {
             const tableChain = this.getTableChain(chainID);
             await tableChain.insert([cres]);
-
             var sql = false;
             sql = `insert into block${chainID} (blockNumber, crawlTrace, lastTraceDT) values (${bn}, 0, Now()) on duplicate key update crawlTrace = values(crawlTrace), lastTraceDT = values(lastTraceDT)`
             this.batchedSQL.push(sql);
@@ -1669,9 +1676,16 @@ group by chainID having count(*) < 500 order by rand() desc`;
             // if we didn't get a trace, or if we are using onfinality endpoint
             if ((chain.onfinalityStatus == "Active" && chain.onfinalityID && (chain.onfinalityID.length > 0) || (chain.WSEndpointSelfHosted)) &&
                 ((trace == false || trace.length == 0 || this.APIWSEndpoint.includes("onfinality")))) {
+                console.log(`processFinalizedHead finalizedHash=${finalizedHash}, BN=${bn}, blockTS=${blockTS}`)
                 let trace2 = await this.crawlTrace(chain, finalizedHash, bn);
-                if (trace2.length > 0) {
+                if (trace2.length > 0 && blockTS > 0) {
                     trace = trace2;
+                    let t = {
+                        blockNumber: bn,
+                        blockHash: finalizedHash,
+                        blockTS: blockTS
+                    }
+                    await this.save_trace(chainID, t, trace)
                 }
             }
 
