@@ -1691,7 +1691,7 @@ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecraw
 	    "Locked6x": 6,
 	    "Locked5x": 5
 	}
-	
+
         await this.assetManagerInit();
         let chains = await this.pool.query(`select relayChain, chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
         if (chains.length == 0) {
@@ -5139,6 +5139,21 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 this.batchedSQL.push(sql2);
                 await this.update_batchedSQL();
             }
+        }
+    }
+
+    async loadFullStakingFromGS(paraID = 2000, relayChain = "polkadot", dryRun = true) {
+        let projectID = `${this.project}`
+        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.stakings${paraID}' gs://crypto_substrate_stakings/${relayChain}/* schema/substrateetl/stakings.json`
+        console.log(cmd);
+        if (!dryRun) {
+            let {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            console.log(stdout, stderr);
         }
     }
 

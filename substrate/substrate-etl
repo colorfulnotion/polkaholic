@@ -309,6 +309,9 @@ async function main() {
                             await substrateetl.dump_staking(logDT, paraID, relayChain);
                         }
                     }
+                    if (isHead){
+                        await substrateetl.loadFullStakingFromGS(paraID, relayChain, dryRun)
+                    }
                     process.exit(0);
                 }
             })
