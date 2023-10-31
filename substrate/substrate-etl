@@ -273,7 +273,7 @@ async function main() {
                     isRandom = false;
                     let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
                     await substrateetl.updateEraBlock(chainID)
-                    await substrateetl.loadFullStakingFromGS(paraID, relayChain, false)
+                    //await substrateetl.loadFullStakingFromGS(paraID, relayChain, false)
                 }
                 if (isRandom && relayChain && paraID != undefined){
                     let tally = 0;
