@@ -273,6 +273,7 @@ async function main() {
                     isRandom = false;
                     let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
                     await substrateetl.updateEraBlock(chainID)
+                    await substrateetl.loadFullStakingFromGS(paraID, relayChain, false)
                 }
                 if (isRandom && relayChain && paraID != undefined){
                     let tally = 0;
@@ -310,7 +311,7 @@ async function main() {
                         }
                     }
                     if (isHead){
-                        await substrateetl.loadFullStakingFromGS(paraID, relayChain, dryRun)
+                        await substrateetl.loadFullStakingFromGS(paraID, relayChain, false)
                     }
                     process.exit(0);
                 }
