@@ -202,6 +202,85 @@ module.exports = class SubstrateETL extends AssetManager {
         return result;
     }
 
+
+    async update_account_labels() {
+        let queries = {
+	    "validator0": {
+		bigquery: true,
+		query: "select distinct validator as account from `substrate-etl.polkadot_analytics.recent_validators0`",
+	    },
+	    "nominator0": {
+		bigquery: true,
+		query: "select distinct nominator as account from `substrate-etl.polkadot_analytics.recent_nominators0`",
+	    },
+	    "poolmember0": {
+		bigquery: true,
+		query: "select distinct address_ss58 as account from `substrate-etl.polkadot_analytics.recent_poolmembers0`"
+	    },
+	    "voter0": {
+		queryType: "defi",
+		query: "select distinct account from votes0 union all select distinct account from delegation0"
+	    }
+	}
+	for ( const [label, queryInfo] of Object.entries(queries) ) {
+	    let accounts = []
+	    let query = queryInfo.query;
+	    try {
+		if ( queryInfo.bigquery ) {
+		    const bigquery = this.get_big_query();
+		    console.log("account bigquery", query);
+		    let recs = await this.execute_bqJob(query);
+		    for ( const r of recs ) {
+			let a = r.account;
+			let pubkey = paraTool.getPubKey(a);
+			accounts.push(pubkey);
+		    }
+		} else {
+		    console.log("account mysql", query);
+		    const recs = await this.poolREADONLY.query(query)
+		    for ( const r of recs ) {
+			let a = r.account;
+			let pubkey = paraTool.getPubKey(a);
+			accounts.push(pubkey);
+		    }
+		}
+		await this.write_account_labels(label, accounts);
+	    } catch (err) {
+		console.log(err);
+	    }
+	}
+    }
+
+    // write to labels column family
+    async write_account_labels(label, accounts) {
+	console.log("write_account_labels", label, accounts.length);
+	let ts = this.getCurrentTS();
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+	let rows = [];
+	for ( const address of accounts ) {
+            if ( address.length == 66 ) {
+		let rowKey = address.toLowerCase();
+		let rec = {};
+		rec[label] = {
+		    value: "{}",
+		    timestamp: ts * 1000000
+		}
+                rows.push({
+                    key: rowKey,
+                    data: {
+                        label: rec
+                    }
+                });
+	    }
+	}
+
+	if (rows.length > 0) {
+	    console.log("write_account_labels", label, rows.length);
+            await this.insertBTRows(tblRealtime, rows, tblName);
+            rows = [];
+        }
+    }
+
     async ingestWalletAttribution() {
         /*
         //FROM Fearless-Util
@@ -241,6 +320,7 @@ module.exports = class SubstrateETL extends AssetManager {
             "replace": ["verified"]
         }, sqlDebug);
     }
+
 
     async ingestSystemAddress() {
         //FROM Fearless-Util

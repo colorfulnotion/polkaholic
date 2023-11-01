@@ -785,6 +785,14 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('labels')
+        .description(`Generate labels for account dashboards`)
+        .action(async (opt) => {
+            var substrateetl = new SubstrateETL();
+            await substrateetl.update_account_labels();
+            process.exit(0);
+        });
+
     program.command('deletetables')
         .usage("-f accounts")
         .description(`Generate delete cmd for matching substarte etl tables (Note: will only generate commands, you must manually run them)`)
