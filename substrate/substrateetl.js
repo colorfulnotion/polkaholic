@@ -5146,7 +5146,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
-        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.stakings${paraID}' gs://crypto_substrate_stakings/${relayChain}/* schema/substrateetl/stakings.json`
+        let schemaPath = `/root/go/src/github.com/colorfulnotion/polkaholic/substrate/schema/substrateetl/stakings.json`;
+        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.stakings${paraID}' gs://crypto_substrate_stakings/${relayChain}/* ${schemaPath}`
         console.log(cmd);
         if (!dryRun) {
             let {
