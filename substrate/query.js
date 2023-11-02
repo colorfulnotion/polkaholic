@@ -3543,7 +3543,7 @@ module.exports = class Query extends AssetManager {
                 column: {
                     cellLimit: 1
                 },
-                families: ["realtime", "evmcontract", "wasmcontract", "labels"],
+                families: ["realtime", "evmcontract", "wasmcontract", "label"],
                 limit: 10,
             }];
 
@@ -3839,14 +3839,16 @@ module.exports = class Query extends AssetManager {
                 break;
             }
             // TODO
-        } else if (labelData) {
+        }
+
+	if (labelData) {
             for (const labelType of Object.keys(labelData)) {
                 let cell = labelData[labelType];
                 let label = JSON.parse(cell[0].value)
                 labels[labelType] = label;
-                break;
             }
         }
+
         return [current, contract, labels];
     }
 
@@ -4336,6 +4338,7 @@ module.exports = class Query extends AssetManager {
                     })
                 }
             }
+
             return [realtime, contract, labels];
         } else {
             let families = ["realtime", "evmcontract", "wasmcontract", "label"];
@@ -4357,6 +4360,7 @@ module.exports = class Query extends AssetManager {
             } catch (err) {
                 console.log(err);
             }
+
             let w = chainID ? `and asset.chainID = '${chainID}'` : ''
             let sql = `select asset.creator, asset.assetType, asset.createdAtTx, unix_timestamp(asset.createDT) as createTS, asset.asset, asset.symbol as localSymbol, asset.assetName, asset.chainID, asset.priceUSD, asset.totalSupply, asset.numHolders, asset.decimals, token0, token1, token0Decimals, token1Decimals, token0Symbol, token1Symbol, xcmasset.symbol from asset left join xcmasset on asset.xcmInteriorKey = xcmasset.xcmInteriorKey where asset.asset = '${address}' ${w}`
             let extraRecs = await this.poolREADONLY.query(sql)

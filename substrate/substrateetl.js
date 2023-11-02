@@ -202,6 +202,85 @@ module.exports = class SubstrateETL extends AssetManager {
         return result;
     }
 
+
+    async update_account_labels() {
+        let queries = {
+	    "validator0": {
+		bigquery: true,
+		query: "select distinct validator as account from `substrate-etl.polkadot_analytics.recent_validators0`",
+	    },
+	    "nominator0": {
+		bigquery: true,
+		query: "select distinct nominator as account from `substrate-etl.polkadot_analytics.recent_nominators0`",
+	    },
+	    "poolmember0": {
+		bigquery: true,
+		query: "select distinct address_ss58 as account from `substrate-etl.polkadot_analytics.recent_poolmembers0`"
+	    },
+	    "voter0": {
+		queryType: "defi",
+		query: "select distinct account from votes0 union all select distinct account from delegation0"
+	    }
+	}
+	for ( const [label, queryInfo] of Object.entries(queries) ) {
+	    let accounts = []
+	    let query = queryInfo.query;
+	    try {
+		if ( queryInfo.bigquery ) {
+		    const bigquery = this.get_big_query();
+		    console.log("account bigquery", query);
+		    let recs = await this.execute_bqJob(query);
+		    for ( const r of recs ) {
+			let a = r.account;
+			let pubkey = paraTool.getPubKey(a);
+			accounts.push(pubkey);
+		    }
+		} else {
+		    console.log("account mysql", query);
+		    const recs = await this.poolREADONLY.query(query)
+		    for ( const r of recs ) {
+			let a = r.account;
+			let pubkey = paraTool.getPubKey(a);
+			accounts.push(pubkey);
+		    }
+		}
+		await this.write_account_labels(label, accounts);
+	    } catch (err) {
+		console.log(err);
+	    }
+	}
+    }
+
+    // write to labels column family
+    async write_account_labels(label, accounts) {
+	console.log("write_account_labels", label, accounts.length);
+	let ts = this.getCurrentTS();
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+	let rows = [];
+	for ( const address of accounts ) {
+            if ( address.length == 66 ) {
+		let rowKey = address.toLowerCase();
+		let rec = {};
+		rec[label] = {
+		    value: "{}",
+		    timestamp: ts * 1000000
+		}
+                rows.push({
+                    key: rowKey,
+                    data: {
+                        label: rec
+                    }
+                });
+	    }
+	}
+
+	if (rows.length > 0) {
+	    console.log("write_account_labels", label, rows.length);
+            await this.insertBTRows(tblRealtime, rows, tblName);
+            rows = [];
+        }
+    }
+
     async ingestWalletAttribution() {
         /*
         //FROM Fearless-Util
@@ -241,6 +320,7 @@ module.exports = class SubstrateETL extends AssetManager {
             "replace": ["verified"]
         }, sqlDebug);
     }
+
 
     async ingestSystemAddress() {
         //FROM Fearless-Util
@@ -1663,6 +1743,170 @@ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecraw
         return "Unknown"
     }
 
+    async dump_democracy(chainID, logDT = null, jobID = null, perPagelimit = 1000) {
+	let classIDtoName = {
+	    0: "Root",
+	    1: "Whitelisted Caller",
+	    10: "Staking Admin",
+	    11: "Treasurer",
+	    12: "Lease Admin",
+	    13: "Fellowship Admin",
+	    14: "General Admin",
+	    15: "Auction Admin",
+	    20: "Referendum Canceller",
+	    21: "Referendum Killer",
+	    30: "Small Tipper",
+	    31: "Big Tipper",
+	    32: "Small Spender",
+	    33: "Medium Spender",
+	    34: "Big Spender"
+	};
+
+	let convictionMap = {
+	    "Locked1x": 1,
+	    "Locked3x": 3,
+	    "Locked2x": 2,
+	    "None": .1,
+	    "Locked4x": 4,
+	    "Locked6x": 6,
+	    "Locked5x": 5
+	}
+
+        await this.assetManagerInit();
+        let chains = await this.pool.query(`select relayChain, chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
+        if (chains.length == 0) {
+            console.log("No chain found ${chainID}")
+            return false;
+        }
+        let chain = chains[0];
+        let wsEndpoint = this.get_wsendpoint(chain);
+        let chainName = chain.chainName;
+        let paraID = chain.paraID;
+        let id = chain.id;
+        let relayChain = chain.relayChain;
+        const provider = new WsProvider(wsEndpoint);
+        const api = await ApiPromise.create({
+            provider
+        });
+        let disconnectedCnt = 0;
+        provider.on('disconnected', () => {
+            disconnectedCnt++;
+            console.log(`*CHAIN API DISCONNECTED [DISCONNECTIONS=${disconnectedCnt}]`, chainID);
+            if (disconnectedCnt > 5) {
+                console.log(`*CHAIN API DISCONNECTION max reached!`, chainID);
+                process.exit(1);
+            }
+        });
+
+        const rawChainInfo = await api.registry.getChainProperties()
+        var chainInfo = JSON.parse(rawChainInfo);
+        const prefix = chainInfo.ss58Format
+        let pallet = "none"
+        let rows = [];
+        let asset = this.getChainAsset(chainID);
+        let [tblName, tblRealtime] = this.get_btTableRealtime()
+        let [finalizedBlockHash, blockTS, bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
+        if (finalizedBlockHash == null) {
+            console.log("Could not determine blockHash", chainID, logDT);
+            // log.fatal
+            return false;
+        } else {
+            console.log("FINALIZED HASH", finalizedBlockHash, blockTS, bn);
+        }
+        let bqRows = [];
+        let apiAt = await api.at(finalizedBlockHash)
+        let last_key = '';
+        let done = false;
+        let page = 0;
+	let numRecs = 0;
+
+	const allEntries = await api.query.convictionVoting.votingFor.entries();
+	let votesout = [];
+	let out = [];
+	allEntries.forEach(([{ args: [account, c] }, r]) => {
+	    let v = r.toHuman();
+	    let className = classIDtoName[c]
+	    if ( v.Casting ) {
+		let signer_ss58 = account.toString();
+		//13wTn3LdVSFdXqU4bt8ACWznfoFjeeVyaGGCBGXnBN9m7gmb  33 {"casting":{"votes":[
+		//[165,{"standard":{"vote":"0x82","balance":1000000000000}}]
+	        //],"delegations":{"votes":0,"capital":0},"prior":[0,0]}}
+		let votes = v.Casting.votes
+		for ( const vote of votes ) {
+		    let pollid = vote[0];
+		    let p = vote[1];
+		    if ( Array.isArray(vote) && vote.length == 2 ) {
+			let aye = "0";
+			let nay = "0";
+			let abstain = "0";
+			let conviction = "None"
+			let votedesc = null;
+			if ( p.Standard ) {
+			    let balance = p.Standard.balance.replaceAll(",", "");
+			    conviction = p.Standard.vote.conviction;
+			    let v = p.Standard.vote.vote;
+			    if ( v == "Aye" ) {
+				aye = balance
+				votedesc = v;
+			    } else if ( v == "Nay" ) {
+				nay = balance
+				votedesc = v;
+			    } else  {
+				console.log("STANDARD WEIRD", p)
+			    }
+			} else if ( p.Split ) {
+			    aye = p.Split.aye.replaceAll(",", "");
+			    nay = p.Split.nay.replaceAll(",", "");
+			    votedesc = "Split";
+			} else if ( p.SplitAbstain ) {
+			    aye = p.SplitAbstain.aye.replaceAll(",", "");
+			    nay = p.SplitAbstain.nay.replaceAll(",", "");
+			    abstain = p.SplitAbstain.abstain.replaceAll(",", "");
+			    votedesc = "SplitAbstain";
+			} else {
+			    console.log("WEIRD", p);
+			}
+			let mult = convictionMap[conviction] ? convictionMap[conviction] : 1;
+			aye = aye / 10**10;
+			nay = nay / 10**10;
+			abstain = abstain / 10**10;
+			let ayec = aye * mult;
+			let nayc = nay * mult;
+			votesout.push(`( ${mysql.escape(signer_ss58)}, '${c}', ${mysql.escape(pollid)}, ${mysql.escape(votedesc)},${mysql.escape(aye)}, ${mysql.escape(ayec)}, ${mysql.escape(nay)}, ${mysql.escape(nayc)}, ${mysql.escape(abstain)}, ${mysql.escape(className)}, ${mysql.escape(conviction)}, Now() )`);
+		    }
+		}
+	    }
+	    if ( v.Delegating ) {
+		let signer_ss58 = account.toString();
+		let d = v.Delegating;
+		let balance = d.balance.replaceAll(",", "") / 10**10;
+		let target = d.target;
+		let conviction = d.conviction;
+		out.push(`(${mysql.escape(signer_ss58)}, '${c}', ${mysql.escape(conviction)}, ${mysql.escape(target)}, ${mysql.escape(balance)}, ${mysql.escape(className)}, Now() )`);
+	    }
+	});
+
+	console.log("insert votes", votesout.length)
+	let vals = ["vote", "aye", "ayec", "nay", "nayc", "abstain", "className", "conviction", "lastUpdateDT"];
+        await this.upsertSQL({
+            "table": `votes${chainID}`,
+            keys: ["account", "classID", "pollID"],
+            vals: vals,
+            data: votesout,
+            replace: vals
+        });
+	console.log("insert delegation", out.length)
+	vals = ["conviction", "target", "balance", "className", "lastUpdateDT"],
+        await this.upsertSQL({
+            "table": `delegation${chainID}`,
+            keys: ["account", "classID"],
+            vals: vals,
+            data: out,
+            replace: vals
+        });
+	process.exit(0);
+    }
+
     /*
     contracts pallets do not have that much activity yet, so reindexing an entire chain to find contracts events is just wasteful.
      0. Do pagedEntries { codeStorage + contractInfo }
@@ -2142,7 +2386,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
     get_wsendpoint(chain) {
         let wsEndpoint = chain.WSEndpoint;
         let alts = {
-            0: ['wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io', 'wss://polkadot.public.curie.radiumblock.co/ws'], //wss://1rpc.io/dot , 'wss://polkadot-rpc-tn.dwellir.com'
+            0: ['wss://rpc.dotters.network/polkadot', 'wss://polkadot-rpc.dwellir.com', 'wss://rpc.ibp.network/polkadot', 'wss://rpc.polkadot.io'],
             2: ['wss://1rpc.io/ksm', 'wss://rpc.dotters.network/kusama', 'wss://kusama-rpc.dwellir.com', 'wss://kusama-rpc-tn.dwellir.com', 'wss://rpc.ibp.network/kusama', 'wss://kusama.api.onfinality.io/public-ws', 'wss://kusama-rpc.polkadot.io', 'wss://kusama.public.curie.radiumblock.co/ws'],
             22023: ['wss://moonriver.public.blastapi.io', 'wss://wss.api.moonriver.moonbeam.network', 'wss://moonriver.api.onfinality.io/public-ws', 'wss://moonriver.unitedbloc.com:2001'],
             2004: ['wss://1rpc.io/glmr', 'wss://moonbeam.public.blastapi.io', 'wss://wss.api.moonbeam.network', 'wss://moonbeam.api.onfinality.io/public-ws', 'wss://moonbeam.unitedbloc.com:3001'],
@@ -2162,6 +2406,7 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
         }
         return wsEndpoint;
     }
+
     async updateNativeBalances(chainID, logDT, jobID, perPagelimit = 1000) {
         await this.assetManagerInit();
         let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals from chain where chainID = '${chainID}'`);
@@ -4977,6 +5222,22 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async loadFullStakingFromGS(paraID = 2000, relayChain = "polkadot", dryRun = true) {
+        let projectID = `${this.project}`
+        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let schemaPath = `/root/go/src/github.com/colorfulnotion/polkaholic/substrate/schema/substrateetl/stakings.json`;
+        let cmd = `bq load  --project_id=substrate-etl --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true 'crypto_polkadot.stakings${paraID}' gs://crypto_substrate_stakings/${relayChain}/* ${schemaPath}`
+        console.log(cmd);
+        if (!dryRun) {
+            let {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            console.log(stdout, stderr);
+        }
+    }
+
     async loadDailyStakingFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
@@ -5470,11 +5731,19 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let era0Hash = era.blockhash
             let era1Hash = (era.era1Hash)? era.era1Hash : null
             let era2Hash = (era.era2Hash)? era.era2Hash : null
+            if (era2Hash == undefined){
+                let signedBlock = await api.rpc.chain.getBlock();
+                let latestBlochHash = signedBlock.block.header.hash.toHex()
+                era2Hash = latestBlochHash
+                console.log(`using latest blockHash=${latestBlochHash} as era2Hash`)
+            }
 
             let totalStaked = null
             let totalRewardPoints = null
             let totalStakingRewards = null
             let numPointsEarners = null;
+            let numPools = null;
+            let numPoolMembers = null;
 
             let eraBN = era.block_number
             let eraNumber = era.era
@@ -5484,13 +5753,14 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             var erasTotalStakes = await apiAt.query.staking.erasTotalStake(eraNumber);
             totalStaked = paraTool.dechexToInt(erasTotalStakes.toString()) / 10 ** chainDecimals;
 
+            let fetchNominationPool = (apiAt.query.nominationPools!= undefined)? true : false
+
             if (era2Hash){
                 let api2At = await api.at(era2Hash)
+
                 let validatorRewardQuery = await api2At.query.staking.erasValidatorReward(eraNumber); // 4 hours delay
                 totalStakingRewards = paraTool.dechexToInt(validatorRewardQuery.toString()) / 10 ** chainDecimals;
-            }
-            if (era2Hash){
-                let api2At = await api.at(era2Hash)
+
                 let erasRewardPointsQuery = await api2At.query.staking.erasRewardPoints(eraNumber);
                 let rewardStruct = JSON.parse(JSON.stringify(erasRewardPointsQuery))
                 totalRewardPoints = rewardStruct.total
@@ -5548,6 +5818,120 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
             console.log(`stakingStats`, stakingStats);
 
+            if (fetchNominationPool){
+                var bondedPools = await apiAt.query.nominationPools.bondedPools.entries();
+                var rewardPools = await apiAt.query.nominationPools.rewardPools.entries(); //
+                var reversePoolIdLookup = await apiAt.query.nominationPools.reversePoolIdLookup.entries();
+                var stashMap = {}
+                for (const pool of reversePoolIdLookup) {
+                    let pub = pool[0].slice(-32);
+                    let prefix = 0
+                    let stash_pubkey = u8aToHex(pub);
+                    let stash_ss58 = encodeAddress(pub, prefix);
+                    var poolID = JSON.parse(JSON.stringify(pool[1]))
+                    stashMap[poolID] = {
+                        stash_pubkey: stash_pubkey,
+                        stash_ss58: stash_ss58
+                    }
+                }
+                /*
+                {
+                  lastRecordedRewardCounter: '0x000000000000000000a42e939e39e311',
+                  lastRecordedTotalPayouts: 6069635685624,
+                  totalRewardsClaimed: 5775202029695,
+                  totalCommissionPending: 2744851094,
+                  totalCommissionClaimed: 88299684189
+                }
+                */
+                var rewardPoolsMap = {}
+                stakingStats[eraNumber].numPools = Object.keys(rewardPools).length
+                for (const pool of rewardPools) {
+                    let poolIDHex = "0x" + paraTool.reverseEndian(u8aToHex(pool[0].slice(-4)).substr(2))
+                    let poolID = paraTool.dechexToInt(poolIDHex)
+                    var poolInfo = JSON.parse(JSON.stringify(pool[1]))
+                    var rewardPoolInfo = JSON.parse(JSON.stringify(pool[1]))
+                    rewardPoolInfo.lastRecordedRewardCounter = paraTool.dechexToInt(rewardPoolInfo.lastRecordedRewardCounter);
+                    rewardPoolInfo.lastRecordedTotalPayouts = paraTool.dechexToInt(rewardPoolInfo.lastRecordedTotalPayouts) / 10 ** chainDecimals;
+                    rewardPoolInfo.totalRewardsClaimed = paraTool.dechexToInt(rewardPoolInfo.totalRewardsClaimed) / 10 ** chainDecimals;
+                    rewardPoolInfo.totalCommissionPending = paraTool.dechexToInt(rewardPoolInfo.totalCommissionPending) / 10 ** chainDecimals;
+                    rewardPoolInfo.totalCommissionClaimed = paraTool.dechexToInt(rewardPoolInfo.totalCommissionClaimed) / 10 ** chainDecimals;
+                    rewardPoolsMap[poolID] = rewardPoolInfo
+                    //console.log(`poolID=${poolID}`, rewardPoolInfo)
+                }
+                /*
+                {
+                  commission: {
+                    current: [ 10000000, '12nN4oChrJ317HGEo5oPTcKMyDfgK71jZmsniLQ33XnciRDS' ],
+                    max: 50000000,
+                    changeRate: { maxIncrease: 5000000, minDelay: 100800 },
+                    throttleFrom: 17841879
+                  },
+                  memberCounter: 2,
+                  points: 609.2629903018,
+                  roles: {
+                    depositor: '12nN4oChrJ317HGEo5oPTcKMyDfgK71jZmsniLQ33XnciRDS',
+                    root: '12nN4oChrJ317HGEo5oPTcKMyDfgK71jZmsniLQ33XnciRDS',
+                    nominator: '12nN4oChrJ317HGEo5oPTcKMyDfgK71jZmsniLQ33XnciRDS',
+                    bouncer: '12nN4oChrJ317HGEo5oPTcKMyDfgK71jZmsniLQ33XnciRDS'
+                  },
+                  state: 'Open'
+                }
+                */
+                for (const pool of bondedPools) {
+                    let stash_ss58 = null;
+                    let stash_pubkey = null;
+                    let nominationpools_rewardpools = null;
+                    let currentCommission = 0;
+                    let poolIDHex = "0x" + paraTool.reverseEndian(u8aToHex(pool[0].slice(-4)).substr(2))
+                    let poolID = paraTool.dechexToInt(poolIDHex)
+                    var poolInfo = JSON.parse(JSON.stringify(pool[1]))
+                    let poolTotal = 0;
+                    if (poolInfo.points != undefined){
+                        poolTotal = paraTool.dechexToInt(poolInfo.points) / 10 ** chainDecimals;
+                        poolInfo.points = poolTotal
+                    }
+                    if (poolInfo.commission != undefined){
+                        if (poolInfo.commission.current != undefined) {
+                            poolInfo.commission.current[0] = poolInfo.commission.current[0] / 10**9
+                            currentCommission = poolInfo.commission.current[0]
+                        }
+                        if (poolInfo.commission.max != undefined) poolInfo.commission.max = poolInfo.commission.max / 10**9
+                        if (poolInfo.commission.changeRate != undefined && poolInfo.commission.changeRate.maxIncrease != undefined) poolInfo.commission.changeRate.maxIncrease = poolInfo.commission.changeRate.maxIncrease / 10**9
+                    }
+                    if (stashMap[poolID] != undefined){
+                        stash_ss58 = stashMap[poolID].stash_ss58
+                        stash_pubkey = stashMap[poolID].stash_pubkey
+                        //poolInfo.stash = stashMap[poolID].stash_ss58
+                    }
+                    stashMap[poolID].total = poolTotal
+                    poolInfo.rewardPools = null
+                    if (rewardPoolsMap[poolID] != undefined){
+                        nominationpools_rewardpools = rewardPoolsMap[poolID]
+                        poolInfo.rewardPools = rewardPoolsMap[poolID]
+                    }
+                    //console.log(`poolID=${poolID}`, poolInfo)
+
+                    let rec = {
+                        address_pubkey: stash_pubkey,
+                        address_ss58: stash_ss58,
+                        section: "NominationPools",
+                        storage: "BondedPools",
+                        block_number: eraBN,
+                        block_hash: era0Hash,
+                        ts: blockTS,
+                        era: eraNumber,
+                        nominationpools_id: poolID,
+                        nominationpools_total: poolTotal,
+                        nominationpools_member_cnt: poolInfo.memberCounter,
+                        nominationpools_commission: currentCommission,
+                        nominationpools_rewardpools: nominationpools_rewardpools,
+                        pv: poolInfo
+                    }
+                    //console.log(rec)
+                    fs.writeSync(f, JSON.stringify(rec) + NL);
+                }
+            }
+
             for (const user of validator_pref) {
                 let pub = user[0].slice(-32);
                 let pubkey = u8aToHex(pub);
@@ -5567,6 +5951,94 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
             let isPaged = true
             if (isPaged){
+
+                let nominationPools_num_last_key = '';
+                let nominationPools_num_page = 0;
+                let nominationPools_done = false
+                let nominationPools_num = 0
+                while (!nominationPools_done && fetchNominationPool) {
+                    let query = null
+                    console.log(`nominationPools_num_page=${nominationPools_num_page}. pageSize=${perPagelimit}, startKey=${nominationPools_num_last_key}`)
+                    query = await apiAt.query.nominationPools.poolMembers.entriesPaged({
+                        args: [],
+                        pageSize: perPagelimit,
+                        startKey: nominationPools_num_last_key
+                    })
+                    if (query.length == 0) {
+                        console.log(`Query NominationPools:poolMembers Completed: poolMembers=${nominationPools_num}`)
+                        stakingStats[eraNumber].numPoolMembers = nominationPools_num
+                        break
+                    } else {
+                        console.log(`Staking:ErasStakers page: `, nominationPools_num_page++);
+                        nominationPools_num_last_key = query[query.length - 1][0];
+                    }
+                    /*
+                    {
+                      poolId: 30
+                      points: 0
+                      lastRecordedRewardCounter: 164,532,633,942,265,733
+                      unbondingEras: {
+                        1261: 1,000,000,000,000
+                      }
+                    }
+                    */
+                    for (const user of query) {
+                        let pub = user[0].slice(-32);
+                        let pubkey = u8aToHex(pub);
+                        let prefix = 0
+
+                        let address_ss58 = encodeAddress(pub, prefix);
+                        let poolID = null
+
+                        var pv = JSON.parse(JSON.stringify(user[1]))
+                        //console.log(`address_ss58=${address_ss58}, pv`, pv)
+                        if (pv.poolId != undefined) poolID = pv.poolId
+                        pv.points =  paraTool.dechexToIntStr(pv.points) / 10 ** chainDecimals;
+                        pv.lastRecordedRewardCounter =  paraTool.dechexToIntStr(pv.lastRecordedRewardCounter);
+                        let unbondingErasKey = Object.keys(pv.unbondingEras)
+                        let unbondingEras = []
+                        let unbonded = 0;
+                        for (const era of unbondingErasKey){
+                            let unbondedAmount = paraTool.dechexToIntStr(pv.unbondingEras[era]) / 10 ** chainDecimals;
+                            unbonded += unbondedAmount
+                            let res = {
+                                era: era,
+                                amount: unbondedAmount
+                            }
+                            unbondingEras.push(res)
+                        }
+                        let member_share = null;
+                        if (stashMap[poolID] != undefined && stashMap[poolID].total != undefined){
+                            member_share = pv.points / stashMap[poolID].total
+                        }
+                        pv.unbondingEras = unbondingEras
+                        if (pv.unbondingEras.length > 0){
+                            //console.log(`[${address_ss58}] unbondingEras!`, pv)
+                        }
+                        let rec = {
+                            address_pubkey: pubkey,
+                            address_ss58: address_ss58,
+                            section: "NominationPools",
+                            storage: "PoolMembers",
+                            block_number: eraBN,
+                            block_hash: era0Hash,
+                            ts: blockTS,
+                            era: eraNumber,
+                            nominationpools_id: poolID,
+                            member_bonded: pv.points,
+                            member_unbonded: unbonded,
+                            member_share : member_share,
+                            pv: pv
+                        }
+                        //console.log(rec)
+                        fs.writeSync(f, JSON.stringify(rec) + NL);
+                        nominationPools_num++
+                    }
+                    if (query.length > 0) {} else {
+                        nominationPools_done = true;
+                    }
+                }
+
                 let validator_num_last_key = '';
                 let validator_num_page = 0;
                 let validator_done = false
@@ -5767,7 +6239,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let totalRewardPoints = (eraStat.totalRewardPoints) ? `'${eraStat.totalRewardPoints}'` : `NULL`
                 let totalStakingRewards = (eraStat.totalStakingRewards) ? `'${eraStat.totalStakingRewards}'` : `NULL`
                 let numPointsEarners = (eraStat.numPointsEarners) ? `'${eraStat.numPointsEarners}'` : `NULL`
-                let sql = `insert into era${chainID} (era, block_number, numValidators, numNominators, totalStaked, totalRewardPoints, totalStakingRewards, numPointsEarners, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.numNominators}', ${totalStaked}, ${totalRewardPoints}, ${totalStakingRewards}, ${numPointsEarners}, 'AuditRequired', Now()) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT), totalStaked = values(totalStaked), totalRewardPoints = values(totalRewardPoints), totalStakingRewards = values(totalStakingRewards), numPointsEarners = values(numPointsEarners)`
+                let numPoolMembers = (eraStat.numPoolMembers) ? `'${eraStat.numPoolMembers}'` : `NULL`
+                let numPools = (eraStat.numPools) ? `'${eraStat.numPools}'` : `NULL`
+                let sql = `insert into era${chainID} (era, block_number, numValidators, numNominators, totalStaked, totalRewardPoints, totalStakingRewards, numPointsEarners, numPoolMembers, numPools, crawlNominatorStatus, crawlNominatorDT) values ('${eraStat.era}', '${eraStat.block_number}', '${eraStat.numValidators}', '${eraStat.numNominators}', ${totalStaked}, ${totalRewardPoints}, ${totalStakingRewards}, ${numPointsEarners}, ${numPoolMembers}, ${numPools}, 'AuditRequired', Now()) on duplicate key update numNominators = values(numNominators), numValidators = values(numValidators), crawlNominatorStatus = values(crawlNominatorStatus), crawlNominatorDT = values(crawlNominatorDT), totalStaked = values(totalStaked), totalRewardPoints = values(totalRewardPoints), totalStakingRewards = values(totalStakingRewards), numPointsEarners = values(numPointsEarners), numPoolMembers = values(numPoolMembers), numPools = values(numPools)`
                 console.log(sql);
                 if (!dryRun) {
                     this.batchedSQL.push(sql);

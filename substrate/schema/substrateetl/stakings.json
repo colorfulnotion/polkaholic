@@ -96,6 +96,46 @@
   },
   {
     "mode": "NULLABLE",
+    "name": "nominationpools_id",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "nominationpools_total",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "nominationpools_member_cnt",
+    "type": "INTEGER"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "nominationpools_commission",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "nominationpools_rewardpools",
+    "type": "JSON"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "member_bonded",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "member_unbonded",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
+    "name": "member_share",
+    "type": "FLOAT"
+  },
+  {
+    "mode": "NULLABLE",
     "name": "targets",
     "type": "JSON"
   },
