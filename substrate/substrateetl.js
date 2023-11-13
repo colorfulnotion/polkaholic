@@ -4029,13 +4029,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_xcm(relayChain = "polkadot", logDT = "2022-12-29") {
-
+	await this.assetManagerInit();
         // incomplete = 1: failed on origination chain
         // incomplete = 0: msgSent!
         //   destStatus = 1 : success
         //   destStatus = 0 : error
         //   destStatus = -1 : failed
-        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol, UNIX_TIMESTAMP(xcmInfolastUpdateDT) as lastUpdateTS, destStatus, isFeeItem from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 and destStatus in (1, -1) and xcmInfo is not null and symbol is not null order by sourceTS;`
+        let sql = `select extrinsicHash, extrinsicID, transferIndex, xcmIndex, paraID, paraIDDest, chainID, chainIDDest, sourceTS, CONVERT(xcmInfo using utf8) as xcmInfo, priceUSD, amountSentUSD, amountReceivedUSD, symbol, UNIX_TIMESTAMP(xcmInfolastUpdateDT) as lastUpdateTS, destStatus, isFeeItem from xcmtransfer where sourceTS >= UNIX_TIMESTAMP(DATE("${logDT}")) and sourceTS < UNIX_TIMESTAMP(DATE_ADD("${logDT}", INTERVAL 1 DAY)) and relayChain = '${relayChain}' and incomplete = 0 and destStatus in (1, -1) and xcmInfo is not null and symbol is not null order by sourceTS;`
         let xcmtransferRecs = await this.poolREADONLY.query(sql)
         let tbl = "xcmtransfers";
         // 2. setup directories for tbls on date
@@ -4055,6 +4055,16 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let d = xcmInfo.destination;
                 if (o && d && o.sender) {
                     let destination_execution_status = (r.destStatus == 1 || (d.executionStatus == "success" || d.amountReceived > 0)) ? "success" : "unknown";
+		    let senderChain = this.getChainFullInfo(o.chainID)
+		    let origination_sender_pub_key = paraTool.getPubKey(o.sender);
+		    let origination_sender_ss58 = "";
+		    if ( origination_sender_pub_key && senderChain && origination_sender_pub_key.length > 42  ) {
+			try {
+			    origination_sender_ss58 = encodeAddress(origination_sender_pub_key, senderChain.ss58Format);
+			} catch (err) {
+			    console.log("encodeFail", o.chainID, senderChain.ss58Format, origination_sender_pub_key, origination_sender_ss58, senderChain);
+			}
+		    }
 
                     xcmtransfers.push({
                         symbol: r.symbol, // xcmInfo.symbol
@@ -4066,8 +4076,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         origination_id: o.id,
                         origination_para_id: o.paraID,
                         origination_chain_name: o.chainName,
-                        origination_sender_ss58: o.sender,
-                        origination_sender_pub_key: paraTool.getPubKey(o.sender),
+                        origination_sender_ss58,
+                        origination_sender_pub_key,
                         origination_extrinsic_hash: o.extrinsicHash,
                         origination_extrinsic_id: o.extrinsicID,
                         origination_transaction_hash: o.transactionHash ? o.transactionHash : null,
