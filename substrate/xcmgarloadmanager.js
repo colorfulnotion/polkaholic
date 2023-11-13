@@ -331,8 +331,6 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         // no padding for native
         if (symbol == nativeSymbol) {
             return symbol
-        } else if (nativeSymbol == undefined){
-            symbol = `${symbol}.unknown`
         } else {
             symbol = `${symbol}.${nativeSymbol}`
         }
