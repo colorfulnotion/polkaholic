@@ -24,12 +24,13 @@ const {
 
 
 const xcmgarSourceURL = 'https://cdn.jsdelivr.net/gh/colorfulnotion/xcm-global-registry/metadata/xcmgar.json'
+const xcmgarSourceLocal = '/root/go/src/github.com/colorfulnotion/xcm-global-registry-internal/metadata/xcmgar.json'
 
 module.exports = class XCMGARLoadManager extends AssetManager {
 
     knownEvmChains = [paraTool.chainIDMoonbeam, paraTool.chainIDMoonriver, paraTool.chainIDMoonbaseBeta, paraTool.chainIDMoonbaseAlpha, paraTool.chainIDAstar, paraTool.chainIDShiden, paraTool.chainIDShibuya]
 
-    async fetchXcmGarRegistry() {
+    async fetchXcmGarRegistryURL() {
         // Storing response
         const response = await fetch(xcmgarSourceURL);
 
@@ -39,9 +40,21 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         return data
     }
 
+    async fetchXcmGarRegistryLocal() {
+        try {
+            const rawData = await fs.promises.readFile(xcmgarSourceLocal, 'utf8');
+            const data = JSON.parse(rawData);
+            console.error('xcmgarSourceLocal Res', data);
+            return data
+        } catch (error) {
+            console.error('Error reading local file:', error);
+            throw error; // Rethrow the error for the caller to handle
+        }
+    }
+
     async getLatestXcmGarRegistry(relayChain) {
         await this.init_chainInfos()
-        let registryJSON = await this.fetchXcmGarRegistry()
+        let registryJSON = await this.fetchXcmGarRegistryLocal()
         //console.log(`registryJSON***`, registryJSON)
         let xcRegistryRaw = false
         if (registryJSON['xcmRegistry'] != undefined) {
@@ -63,7 +76,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
     async getLatestLocalAssets(targetedRelaychain, targetedParaID) {
         let rawGlobalAsetMap = {}
         await this.init_chainInfos()
-        let registryJSON = await this.fetchXcmGarRegistry()
+        let registryJSON = await this.fetchXcmGarRegistryLocal()
         let chainAssets = false
         try {
             chainAssets = registryJSON['assets'][targetedRelaychain]
