@@ -341,7 +341,7 @@ module.exports = class XCMGARLoadManager extends AssetManager {
         if (xcmInteriorKeyV1 == '[{"network":"kusama"},{"parachain":2090},{"generalKey":"0x00000000"}]') {
             symbol = 'BSX.OLD'
         }
-        if (xcmInteriorKeyV1 == '[{"parachain":2001},{"generalKey":"0x0001"}]~polkadot'){
+        if (xcmInteriorKeyV1 == '[{"parachain":2001},{"generalKey":"0x0001"}]~polkadot') {
             symbol = 'BNC.para2001'
         }
         return symbol

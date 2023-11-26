@@ -205,77 +205,77 @@ module.exports = class SubstrateETL extends AssetManager {
 
     async update_account_labels() {
         let queries = {
-	    "validator0": {
-		bigquery: true,
-		query: "select distinct validator as account from `substrate-etl.polkadot_analytics.recent_validators0`",
-	    },
-	    "nominator0": {
-		bigquery: true,
-		query: "select distinct nominator as account from `substrate-etl.polkadot_analytics.recent_nominators0`",
-	    },
-	    "poolmember0": {
-		bigquery: true,
-		query: "select distinct address_ss58 as account from `substrate-etl.polkadot_analytics.recent_poolmembers0`"
-	    },
-	    "voter0": {
-		queryType: "defi",
-		query: "select distinct account from votes0 union all select distinct account from delegation0"
-	    }
-	}
-	for ( const [label, queryInfo] of Object.entries(queries) ) {
-	    let accounts = []
-	    let query = queryInfo.query;
-	    try {
-		if ( queryInfo.bigquery ) {
-		    const bigquery = this.get_big_query();
-		    console.log("account bigquery", query);
-		    let recs = await this.execute_bqJob(query);
-		    for ( const r of recs ) {
-			let a = r.account;
-			let pubkey = paraTool.getPubKey(a);
-			accounts.push(pubkey);
-		    }
-		} else {
-		    console.log("account mysql", query);
-		    const recs = await this.poolREADONLY.query(query)
-		    for ( const r of recs ) {
-			let a = r.account;
-			let pubkey = paraTool.getPubKey(a);
-			accounts.push(pubkey);
-		    }
-		}
-		await this.write_account_labels(label, accounts);
-	    } catch (err) {
-		console.log(err);
-	    }
-	}
+            "validator0": {
+                bigquery: true,
+                query: "select distinct validator as account from `substrate-etl.polkadot_analytics.recent_validators0`",
+            },
+            "nominator0": {
+                bigquery: true,
+                query: "select distinct nominator as account from `substrate-etl.polkadot_analytics.recent_nominators0`",
+            },
+            "poolmember0": {
+                bigquery: true,
+                query: "select distinct address_ss58 as account from `substrate-etl.polkadot_analytics.recent_poolmembers0`"
+            },
+            "voter0": {
+                queryType: "defi",
+                query: "select distinct account from votes0 union all select distinct account from delegation0"
+            }
+        }
+        for (const [label, queryInfo] of Object.entries(queries)) {
+            let accounts = []
+            let query = queryInfo.query;
+            try {
+                if (queryInfo.bigquery) {
+                    const bigquery = this.get_big_query();
+                    console.log("account bigquery", query);
+                    let recs = await this.execute_bqJob(query);
+                    for (const r of recs) {
+                        let a = r.account;
+                        let pubkey = paraTool.getPubKey(a);
+                        accounts.push(pubkey);
+                    }
+                } else {
+                    console.log("account mysql", query);
+                    const recs = await this.poolREADONLY.query(query)
+                    for (const r of recs) {
+                        let a = r.account;
+                        let pubkey = paraTool.getPubKey(a);
+                        accounts.push(pubkey);
+                    }
+                }
+                await this.write_account_labels(label, accounts);
+            } catch (err) {
+                console.log(err);
+            }
+        }
     }
 
     // write to labels column family
     async write_account_labels(label, accounts) {
-	console.log("write_account_labels", label, accounts.length);
-	let ts = this.getCurrentTS();
+        console.log("write_account_labels", label, accounts.length);
+        let ts = this.getCurrentTS();
         let [tblName, tblRealtime] = this.get_btTableRealtime()
-	let rows = [];
-	for ( const address of accounts ) {
-            if ( address.length == 66 ) {
-		let rowKey = address.toLowerCase();
-		let rec = {};
-		rec[label] = {
-		    value: "{}",
-		    timestamp: ts * 1000000
-		}
+        let rows = [];
+        for (const address of accounts) {
+            if (address.length == 66) {
+                let rowKey = address.toLowerCase();
+                let rec = {};
+                rec[label] = {
+                    value: "{}",
+                    timestamp: ts * 1000000
+                }
                 rows.push({
                     key: rowKey,
                     data: {
                         label: rec
                     }
                 });
-	    }
-	}
+            }
+        }
 
-	if (rows.length > 0) {
-	    console.log("write_account_labels", label, rows.length);
+        if (rows.length > 0) {
+            console.log("write_account_labels", label, rows.length);
             await this.insertBTRows(tblRealtime, rows, tblName);
             rows = [];
         }
@@ -364,7 +364,7 @@ module.exports = class SubstrateETL extends AssetManager {
     }
 
     async dump_chains() {
-	let projectID = "substrate-etl";
+        let projectID = "substrate-etl";
         let sql = `select id, chainID as chain_id, relayChain as relay_chain, paraID as para_id from chain where blocksCovered > 10000`;
         let recs = await this.poolREADONLY.query(sql);
         let dir = "/tmp"
@@ -683,7 +683,7 @@ module.exports = class SubstrateETL extends AssetManager {
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let supportedChains = [paraTool.chainIDPolkadot, paraTool.chainIDKusama]
         let stakingStartDT = "2020-05-01"
-        if (!supportedChains.includes(chainID)){
+        if (!supportedChains.includes(chainID)) {
             return {
                 logDT: false,
                 paraID: false,
@@ -959,6 +959,33 @@ FROM
         let blockTS = lastRec[0].blockTS;
         let blockHash = lastRec[0].blockHash;
         return [blockHash, blockTS, bn];
+    }
+
+    async getFinalizedAccount(api, chainID, bn, ss58) {
+        let sql = `select blockNumber, unix_timestamp(blockDT) as blockTS, blockHash from block${chainID} where blockNumber = ${bn} order by blockDT desc limit 1`;
+        let lastRec = await this.poolREADONLY.query(sql)
+        if (lastRec.length == 0) {
+            return null;
+        }
+        for (let i = 0; i < 3; i++) {
+            let _bn = lastRec[0].blockNumber;
+            let blockTS = lastRec[0].blockTS;
+            let blockHash = lastRec[0].blockHash;
+            let apiAt = await api.at(blockHash)
+            try {
+                let query = await apiAt.query.system.account(ss58);
+                console.log("gFA bn", bn, query.toHex());
+                return {
+                    blockHash,
+                    blockTS,
+                    hexString: query.toHex(),
+                    result: query.toString()
+                };
+            } catch (err) {
+                console.log(err);
+            }
+        }
+        return null;
     }
 
     canonicalizeAssetJSON(a) {
@@ -1744,33 +1771,33 @@ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecraw
     }
 
     async dump_democracy(chainID, logDT = null, jobID = null, perPagelimit = 1000) {
-	let classIDtoName = {
-	    0: "Root",
-	    1: "Whitelisted Caller",
-	    10: "Staking Admin",
-	    11: "Treasurer",
-	    12: "Lease Admin",
-	    13: "Fellowship Admin",
-	    14: "General Admin",
-	    15: "Auction Admin",
-	    20: "Referendum Canceller",
-	    21: "Referendum Killer",
-	    30: "Small Tipper",
-	    31: "Big Tipper",
-	    32: "Small Spender",
-	    33: "Medium Spender",
-	    34: "Big Spender"
-	};
+        let classIDtoName = {
+            0: "Root",
+            1: "Whitelisted Caller",
+            10: "Staking Admin",
+            11: "Treasurer",
+            12: "Lease Admin",
+            13: "Fellowship Admin",
+            14: "General Admin",
+            15: "Auction Admin",
+            20: "Referendum Canceller",
+            21: "Referendum Killer",
+            30: "Small Tipper",
+            31: "Big Tipper",
+            32: "Small Spender",
+            33: "Medium Spender",
+            34: "Big Spender"
+        };
 
-	let convictionMap = {
-	    "Locked1x": 1,
-	    "Locked3x": 3,
-	    "Locked2x": 2,
-	    "None": .1,
-	    "Locked4x": 4,
-	    "Locked6x": 6,
-	    "Locked5x": 5
-	}
+        let convictionMap = {
+            "Locked1x": 1,
+            "Locked3x": 3,
+            "Locked2x": 2,
+            "None": .1,
+            "Locked4x": 4,
+            "Locked6x": 6,
+            "Locked5x": 5
+        }
 
         await this.assetManagerInit();
         let chains = await this.pool.query(`select relayChain, chainID, paraID, id, WSEndpoint, WSEndpointArchive, assetaddressPallet, chainName from chain where chainID = ${chainID}`);
@@ -1818,76 +1845,78 @@ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecraw
         let last_key = '';
         let done = false;
         let page = 0;
-	let numRecs = 0;
+        let numRecs = 0;
 
-	const allEntries = await api.query.convictionVoting.votingFor.entries();
-	let votesout = [];
-	let out = [];
-	allEntries.forEach(([{ args: [account, c] }, r]) => {
-	    let v = r.toHuman();
-	    let className = classIDtoName[c]
-	    if ( v.Casting ) {
-		let signer_ss58 = account.toString();
-		//13wTn3LdVSFdXqU4bt8ACWznfoFjeeVyaGGCBGXnBN9m7gmb  33 {"casting":{"votes":[
-		//[165,{"standard":{"vote":"0x82","balance":1000000000000}}]
-	        //],"delegations":{"votes":0,"capital":0},"prior":[0,0]}}
-		let votes = v.Casting.votes
-		for ( const vote of votes ) {
-		    let pollid = vote[0];
-		    let p = vote[1];
-		    if ( Array.isArray(vote) && vote.length == 2 ) {
-			let aye = "0";
-			let nay = "0";
-			let abstain = "0";
-			let conviction = "None"
-			let votedesc = null;
-			if ( p.Standard ) {
-			    let balance = p.Standard.balance.replaceAll(",", "");
-			    conviction = p.Standard.vote.conviction;
-			    let v = p.Standard.vote.vote;
-			    if ( v == "Aye" ) {
-				aye = balance
-				votedesc = v;
-			    } else if ( v == "Nay" ) {
-				nay = balance
-				votedesc = v;
-			    } else  {
-				console.log("STANDARD WEIRD", p)
-			    }
-			} else if ( p.Split ) {
-			    aye = p.Split.aye.replaceAll(",", "");
-			    nay = p.Split.nay.replaceAll(",", "");
-			    votedesc = "Split";
-			} else if ( p.SplitAbstain ) {
-			    aye = p.SplitAbstain.aye.replaceAll(",", "");
-			    nay = p.SplitAbstain.nay.replaceAll(",", "");
-			    abstain = p.SplitAbstain.abstain.replaceAll(",", "");
-			    votedesc = "SplitAbstain";
-			} else {
-			    console.log("WEIRD", p);
-			}
-			let mult = convictionMap[conviction] ? convictionMap[conviction] : 1;
-			aye = aye / 10**10;
-			nay = nay / 10**10;
-			abstain = abstain / 10**10;
-			let ayec = aye * mult;
-			let nayc = nay * mult;
-			votesout.push(`( ${mysql.escape(signer_ss58)}, '${c}', ${mysql.escape(pollid)}, ${mysql.escape(votedesc)},${mysql.escape(aye)}, ${mysql.escape(ayec)}, ${mysql.escape(nay)}, ${mysql.escape(nayc)}, ${mysql.escape(abstain)}, ${mysql.escape(className)}, ${mysql.escape(conviction)}, Now() )`);
-		    }
-		}
-	    }
-	    if ( v.Delegating ) {
-		let signer_ss58 = account.toString();
-		let d = v.Delegating;
-		let balance = d.balance.replaceAll(",", "") / 10**10;
-		let target = d.target;
-		let conviction = d.conviction;
-		out.push(`(${mysql.escape(signer_ss58)}, '${c}', ${mysql.escape(conviction)}, ${mysql.escape(target)}, ${mysql.escape(balance)}, ${mysql.escape(className)}, Now() )`);
-	    }
-	});
+        const allEntries = await api.query.convictionVoting.votingFor.entries();
+        let votesout = [];
+        let out = [];
+        allEntries.forEach(([{
+            args: [account, c]
+        }, r]) => {
+            let v = r.toHuman();
+            let className = classIDtoName[c]
+            if (v.Casting) {
+                let signer_ss58 = account.toString();
+                //13wTn3LdVSFdXqU4bt8ACWznfoFjeeVyaGGCBGXnBN9m7gmb  33 {"casting":{"votes":[
+                //[165,{"standard":{"vote":"0x82","balance":1000000000000}}]
+                //],"delegations":{"votes":0,"capital":0},"prior":[0,0]}}
+                let votes = v.Casting.votes
+                for (const vote of votes) {
+                    let pollid = vote[0];
+                    let p = vote[1];
+                    if (Array.isArray(vote) && vote.length == 2) {
+                        let aye = "0";
+                        let nay = "0";
+                        let abstain = "0";
+                        let conviction = "None"
+                        let votedesc = null;
+                        if (p.Standard) {
+                            let balance = p.Standard.balance.replaceAll(",", "");
+                            conviction = p.Standard.vote.conviction;
+                            let v = p.Standard.vote.vote;
+                            if (v == "Aye") {
+                                aye = balance
+                                votedesc = v;
+                            } else if (v == "Nay") {
+                                nay = balance
+                                votedesc = v;
+                            } else {
+                                console.log("STANDARD WEIRD", p)
+                            }
+                        } else if (p.Split) {
+                            aye = p.Split.aye.replaceAll(",", "");
+                            nay = p.Split.nay.replaceAll(",", "");
+                            votedesc = "Split";
+                        } else if (p.SplitAbstain) {
+                            aye = p.SplitAbstain.aye.replaceAll(",", "");
+                            nay = p.SplitAbstain.nay.replaceAll(",", "");
+                            abstain = p.SplitAbstain.abstain.replaceAll(",", "");
+                            votedesc = "SplitAbstain";
+                        } else {
+                            console.log("WEIRD", p);
+                        }
+                        let mult = convictionMap[conviction] ? convictionMap[conviction] : 1;
+                        aye = aye / 10 ** 10;
+                        nay = nay / 10 ** 10;
+                        abstain = abstain / 10 ** 10;
+                        let ayec = aye * mult;
+                        let nayc = nay * mult;
+                        votesout.push(`( ${mysql.escape(signer_ss58)}, '${c}', ${mysql.escape(pollid)}, ${mysql.escape(votedesc)},${mysql.escape(aye)}, ${mysql.escape(ayec)}, ${mysql.escape(nay)}, ${mysql.escape(nayc)}, ${mysql.escape(abstain)}, ${mysql.escape(className)}, ${mysql.escape(conviction)}, Now() )`);
+                    }
+                }
+            }
+            if (v.Delegating) {
+                let signer_ss58 = account.toString();
+                let d = v.Delegating;
+                let balance = d.balance.replaceAll(",", "") / 10 ** 10;
+                let target = d.target;
+                let conviction = d.conviction;
+                out.push(`(${mysql.escape(signer_ss58)}, '${c}', ${mysql.escape(conviction)}, ${mysql.escape(target)}, ${mysql.escape(balance)}, ${mysql.escape(className)}, Now() )`);
+            }
+        });
 
-	console.log("insert votes", votesout.length)
-	let vals = ["vote", "aye", "ayec", "nay", "nayc", "abstain", "className", "conviction", "lastUpdateDT"];
+        console.log("insert votes", votesout.length)
+        let vals = ["vote", "aye", "ayec", "nay", "nayc", "abstain", "className", "conviction", "lastUpdateDT"];
         await this.upsertSQL({
             "table": `votes${chainID}`,
             keys: ["account", "classID", "pollID"],
@@ -1895,16 +1924,16 @@ from blocklog left join chainbalancecrawler on blocklog.logDT = chainbalancecraw
             data: votesout,
             replace: vals
         });
-	console.log("insert delegation", out.length)
-	vals = ["conviction", "target", "balance", "className", "lastUpdateDT"],
-        await this.upsertSQL({
-            "table": `delegation${chainID}`,
-            keys: ["account", "classID"],
-            vals: vals,
-            data: out,
-            replace: vals
-        });
-	process.exit(0);
+        console.log("insert delegation", out.length)
+        vals = ["conviction", "target", "balance", "className", "lastUpdateDT"],
+            await this.upsertSQL({
+                "table": `delegation${chainID}`,
+                keys: ["account", "classID"],
+                vals: vals,
+                data: out,
+                replace: vals
+            });
+        process.exit(0);
     }
 
     /*
@@ -2405,6 +2434,101 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
             console.log("choose", wsEndpoint);
         }
         return wsEndpoint;
+    }
+
+    /*
+Our objective is to find all the changes given an interval (a, b) 
+
+ account_trace(api, a, b, av, bv) To solve this, we lookup different values av, bv and then c = (a+b)/2 and lookup cv 
+   3 possibilites:
+     cv = av, you then adjust to (c, b) ... unless c is just 1 less than b and you can then return [ (a,av), (b, bv) ]
+     cv = bv, you then adjust to (a, c) ... unless c is just 1 more than a and you can then return [ (a,av), (b, bv) ]
+     something else -- then you have two problems (a,av)(c,cv) and ((c,cv), (b,bv))
+*/
+    async account_trace(api, ss58, a, b, av = null, bv = null, chainID = 0) {
+        if (a > b) return [];
+        if (av == null) {
+            av = await this.getFinalizedAccount(api, chainID, a, ss58);
+            console.log("READ a", a, av);
+        }
+        if (bv == null) {
+            bv = await this.getFinalizedAccount(api, chainID, b, ss58);
+            console.log("READ b", b, bv);
+        }
+
+        var c = (a + b) >> 1;
+        let cv = await this.getFinalizedAccount(api, chainID, c, ss58);
+        if (av == null || (cv && av.hexString == cv.hexString)) {
+            if (cv && cv.hexString && (c == b - 1)) {
+                return [{
+                    bn: c,
+                    v: cv
+                }, {
+                    bn: b,
+                    v: bv
+                }]
+            }
+            return await this.account_trace(api, ss58, c, b, cv, bv, chainID);
+        } else if (bv == null || (bv.hexString == cv.hexString)) {
+            if (cv && cv.hexString && (c == a + 1)) {
+                return [{
+                    bn: a,
+                    v: av
+                }, {
+                    bn: c,
+                    v: cv
+                }]
+            }
+            return await this.account_trace(api, ss58, a, c, av, cv, chainID);
+        }
+        console.log(`SPLIT INTO TWO subproblems: 1. ${a} to ${c} 2. ${c} to ${b}`);
+        let x = await this.account_trace(api, ss58, a, c, av, cv, chainID);
+        let y = await this.account_trace(api, ss58, c + 1, b, cv, bv, chainID);
+        if (x[x.length - 1].hexString == y[0].hexString) {
+            return x.concat(y.slice(1));
+        } else {
+            return x.concat(y)
+        }
+    }
+
+    async accountTrace(ss58 = "5Fecwmf6ZgzumZonifdythqUGhXmsnE3Qebi3MeFneHNLJjr", chainID = 0) {
+        let chains = await this.poolREADONLY.query(`select chainID, id, relayChain, paraID, chainName, WSEndpoint, WSEndpointArchive, numHolders, totalIssuance, decimals, blocksCovered, blocksFinalized from chain where chainID = '${chainID}'`);
+        if (chains.length == 0) {
+            console.log("No chain found ${chainID}")
+            return false;
+        }
+
+        let chain = chains[0];
+        let relayChain = chain.relayChain;
+        let paraID = chain.paraID;
+        let chainName = chain.chainName;
+        let id = chain.id;
+        let wsEndpoint = this.get_wsendpoint(chain);
+        let decimals = this.getChainDecimal(chainID)
+        const provider = new WsProvider(wsEndpoint);
+        const api = await ApiPromise.create({
+            provider
+        });
+
+        const rawChainInfo = await api.registry.getChainProperties()
+        var chainInfo = JSON.parse(rawChainInfo);
+        const prefix = chainInfo.ss58Format
+
+        let result = await this.account_trace(api, ss58, 1, chain.blocksFinalized, null, null, chainID);
+        let out = [];
+        for (const r of result) {
+            let v = r.v;
+            out.push(`('${ss58}', '${r.bn}', '${v.blockHash}', '${v.blockTS}', '${v.hexString}', '${v.result}')`)
+        }
+        let keys = ["account", "blockNumber"];
+        let vals = ["blockHash", "blockTS", "hexString", "result"];
+        await this.upsertSQL({
+            "table": "accounttrace",
+            keys,
+            vals,
+            data: out,
+            replace: vals
+        });
     }
 
     async updateNativeBalances(chainID, logDT, jobID, perPagelimit = 1000) {
@@ -3534,17 +3658,17 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
     async dump_networkmetrics(network, logDT) {}
 
-    validateDT(ts, logDT){
-        if (ts == undefined){
+    validateDT(ts, logDT) {
+        if (ts == undefined) {
             console.log(`TS missing!`)
             return false
         }
         let [targetDT, _] = paraTool.ts_to_logDT_hr(ts);
         let blockDT2 = targetDT.replaceAll("-", "")
         let blockDT = logDT.replaceAll("-", "")
-        if (blockDT2 == blockDT){
+        if (blockDT2 == blockDT) {
             return true
-        }else{
+        } else {
             console.log(`Mistmatch TS=${ts}->${blockDT2}, logDT=${logDT}->${blockDT}`)
             return false
         }
@@ -4029,7 +4153,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async dump_xcm(relayChain = "polkadot", logDT = "2022-12-29") {
-	await this.assetManagerInit();
+        await this.assetManagerInit();
         // incomplete = 1: failed on origination chain
         // incomplete = 0: msgSent!
         //   destStatus = 1 : success
@@ -4055,16 +4179,16 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let d = xcmInfo.destination;
                 if (o && d && o.sender) {
                     let destination_execution_status = (r.destStatus == 1 || (d.executionStatus == "success" || d.amountReceived > 0)) ? "success" : "unknown";
-		    let senderChain = this.getChainFullInfo(o.chainID)
-		    let origination_sender_pub_key = paraTool.getPubKey(o.sender);
-		    let origination_sender_ss58 = "";
-		    if ( origination_sender_pub_key && senderChain && origination_sender_pub_key.length > 42  ) {
-			try {
-			    origination_sender_ss58 = encodeAddress(origination_sender_pub_key, senderChain.ss58Format);
-			} catch (err) {
-			    console.log("encodeFail", o.chainID, senderChain.ss58Format, origination_sender_pub_key, origination_sender_ss58, senderChain);
-			}
-		    }
+                    let senderChain = this.getChainFullInfo(o.chainID)
+                    let origination_sender_pub_key = paraTool.getPubKey(o.sender);
+                    let origination_sender_ss58 = "";
+                    if (origination_sender_pub_key && senderChain && origination_sender_pub_key.length > 42) {
+                        try {
+                            origination_sender_ss58 = encodeAddress(origination_sender_pub_key, senderChain.ss58Format);
+                        } catch (err) {
+                            console.log("encodeFail", o.chainID, senderChain.ss58Format, origination_sender_pub_key, origination_sender_ss58, senderChain);
+                        }
+                    }
 
                     xcmtransfers.push({
                         symbol: r.symbol, // xcmInfo.symbol
@@ -5069,49 +5193,50 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
     }
 
     async fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd) {
-      let NL = "\r\n";
-      let jmp = 100;
-      let numTraces = 0;
-      let maxQueueSize = (isHead || isDecending)? 1: 50;
-      let missingBNAll = [];
-      let isMissing = false;
-      let jmpIdx = 0;
-      let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
+        let NL = "\r\n";
+        let jmp = 100;
+        let numTraces = 0;
+        let maxQueueSize = (isHead || isDecending) ? 1 : 50;
+        let missingBNAll = [];
+        let isMissing = false;
+        let jmpIdx = 0;
+        let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
 
-      // Setup Crawler
-      const Crawler = require("./crawler");
-      let crawler = new Crawler();
-      await crawler.setupAPI(chain);
-      await crawler.assetManagerInit();
-      await crawler.setupChainAndAPI(chainID);
+        // Setup Crawler
+        const Crawler = require("./crawler");
+        let crawler = new Crawler();
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
 
-      // Loop logic that varies based on isDecending flag
-      let start = isDecending ? bnEnd : bnStart;
-      let end = isDecending ? bnStart : bnEnd;
-      let step = isDecending ? -jmp : jmp;
+        // Loop logic that varies based on isDecending flag
+        let start = isDecending ? bnEnd : bnStart;
+        let end = isDecending ? bnStart : bnEnd;
+        let step = isDecending ? -jmp : jmp;
 
-      for (let bn0 = start; (isDecending ? bn0 >= end : bn0 <= end); bn0 += step) {
-        jmpIdx++;
-        console.log(`${jmpIdx}/${jmpTotal}`);
-        let bn1 = bn0 + (isDecending ? -jmp + 1 : jmp - 1);
-        if (isDecending ? bn1 < end : bn1 > end) bn1 = end;
+        for (let bn0 = start;
+            (isDecending ? bn0 >= end : bn0 <= end); bn0 += step) {
+            jmpIdx++;
+            console.log(`${jmpIdx}/${jmpTotal}`);
+            let bn1 = bn0 + (isDecending ? -jmp + 1 : jmp - 1);
+            if (isDecending ? bn1 < end : bn1 > end) bn1 = end;
 
-        let res = await this.validate_trace(tableChain, Math.min(bn0, bn1), Math.max(bn0, bn1));
-        let missingBNs = res.missingBNs;
+            let res = await this.validate_trace(tableChain, Math.min(bn0, bn1), Math.max(bn0, bn1));
+            let missingBNs = res.missingBNs;
 
-        if (missingBNs.length > 0) {
-          missingBNAll.push(...missingBNs);
-          isMissing = true
-          console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs);
-          if (missingBNAll.length >= maxQueueSize) {
-            await this.batch_crawl_trace(crawler, chain, missingBNAll);
-            missingBNAll = [];
-          }
+            if (missingBNs.length > 0) {
+                missingBNAll.push(...missingBNs);
+                isMissing = true
+                console.log(`[Overall:${missingBNAll.length}] missingBNs:${missingBNs.length}`, missingBNs);
+                if (missingBNAll.length >= maxQueueSize) {
+                    await this.batch_crawl_trace(crawler, chain, missingBNAll);
+                    missingBNAll = [];
+                }
+            }
         }
-      }
-      console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll);
-      await this.batch_crawl_trace(crawler, chain, missingBNAll);
-      return isMissing
+        console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll);
+        await this.batch_crawl_trace(crawler, chain, missingBNAll);
+        return isMissing
     }
 
     async backfill_trace_range(paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false, targetBNStart = false, targetBNEnd = false) {
@@ -5217,7 +5342,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
 
         let isMissing = await this.fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd)
-        if (!isMissing && isCompleteDay ){
+        if (!isMissing && isCompleteDay) {
             // mark crawlTraceStatus as audited
             let sql = `insert into blocklog (logDT, chainID, crawlTraceStatus, crawlTraceDT) values ('${logDT}', '${chainID}', 'Audited', Now() ) on duplicate key update crawlTraceStatus = values(crawlTraceStatus), crawlTraceDT = values(crawlTraceDT)`
             let sql2 = `update blocklog set traceMetricsStatus = 'Ready' where logDT = '${logDT}' and chainID = '${chainID}' and traceMetricsStatus not in ('AuditRequired', 'Audited')`
@@ -5438,7 +5563,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let verifiedRows = res.verifiedRows
             if (missingBNs.length > 0 && isBackFill) {
                 console.log(`missingBNs`, missingBNs)
-                if (crawler == undefined){
+                if (crawler == undefined) {
                     const Crawler = require("./crawler");
                     crawler = new Crawler();
                     await crawler.setupAPI(chain);
@@ -5468,7 +5593,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             for (const row of verifiedRows) {
                 let bn = parseInt(row.id.substr(2), 16);
                 let r = this.build_block_from_row(row);
-                let b = (r.feed)? r.feed: r.block ;
+                let b = (r.feed) ? r.feed : r.block;
                 //console.log(`r`, JSON.stringify(r))
                 //console.log(`block`, b)
                 let hdr = b.header;
@@ -5480,7 +5605,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         chainID,
                         blockNumber: bn
                     };
-                    if (crawler == undefined){
+                    if (crawler == undefined) {
                         const Crawler = require("./crawler");
                         crawler = new Crawler();
                         await crawler.setupAPI(chain);
@@ -5531,23 +5656,23 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             let pv = JSON.parse(o.pv)
                             o.pk_extra = pk_extra
                             o.pv = pv
-                        } catch (e){
+                        } catch (e) {
 
                         }
-                        if ((o.section == "Staking" && o.storage == "ErasStakers" && o.pk_extra )) {
+                        if ((o.section == "Staking" && o.storage == "ErasStakers" && o.pk_extra)) {
                             o.pk_extra[0] = paraTool.toNumWithoutComma(o.pk_extra[0])
                             o.address_ss58 = o.pk_extra[1]
                             o.address_pubkey = paraTool.getPubKey(o.address_ss58);
                             console.log(`${o.section}:${o.storage}, o`, o)
                             let pv = o.pv
-                            pv.total =  paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
-                            pv.own =  paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
+                            pv.total = paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
+                            pv.own = paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
                             let others = []
-                            for (const other of pv.others){
+                            for (const other of pv.others) {
                                 other.value = other.value / 10 ** chainDecimals;
-                                if (other.value > 0){
+                                if (other.value > 0) {
                                     others.push(other)
-                                }else{
+                                } else {
                                     console.log(`SKIP others`, other)
                                 }
                             }
@@ -5565,7 +5690,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                               }
                               */
                         }
-                        if ((o.section == "Staking" && o.storage == "Nominators" && o.pk_extra ) || (o.section == "System" && o.storage == "Account" && o.pk_extra)) {
+                        if ((o.section == "Staking" && o.storage == "Nominators" && o.pk_extra) || (o.section == "System" && o.storage == "Account" && o.pk_extra)) {
                             console.log(`${o.section}:${o.storage}, o`, o)
                             o.address_ss58 = o.pk_extra[0]
                             o.address_pubkey = paraTool.getPubKey(o.address_ss58);
@@ -5615,7 +5740,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                         o[`${f2}_usd`] = o[f2] * priceUSD;
                                     }
                                 }
-                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined){
+                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined) {
                                     o[`frozen`] = Math.max(o[`misc_frozen`], o[`fee_frozen`])
                                     o[`frozen_raw`] = Math.max(o[`misc_frozen_raw`], o[`fee_frozen_raw`])
                                     o[`frozen_usd`] = Math.max(o[`misc_frozen_usd`], o[`fee_frozen_usd`])
@@ -5681,7 +5806,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let chain_name = this.getChainName(chainID)
         let eraBlocks = await this.getEraBlocks()
         let targetEras = eraBlocks[currDT]
-        if (targetEras == undefined){
+        if (targetEras == undefined) {
             console.log(`NO WORK: ${currDT}`)
             return
         }
@@ -5696,7 +5821,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let f = fs.openSync(fn, 'w', 0o666);
 
         let wsEndpoint = this.get_wsendpoint(chain);
-        if (chainID == paraTool.chainIDPolkadot){
+        if (chainID == paraTool.chainIDPolkadot) {
             //wsEndpoint = "wss://rpc.polkadot.io"
         }
         let chainName = chain.chainName;
@@ -5734,14 +5859,14 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let perPagelimit = 1000
 
         let stakingStats = {}
-        for (const era of targetEras){
+        for (const era of targetEras) {
             console.log(`era`, era)
             let validatorPrefMap = {}
             let validatorRewardMap = {}
             let era0Hash = era.blockhash
-            let era1Hash = (era.era1Hash)? era.era1Hash : null
-            let era2Hash = (era.era2Hash)? era.era2Hash : null
-            if (era2Hash == undefined){
+            let era1Hash = (era.era1Hash) ? era.era1Hash : null
+            let era2Hash = (era.era2Hash) ? era.era2Hash : null
+            if (era2Hash == undefined) {
                 let signedBlock = await api.rpc.chain.getBlock();
                 let latestBlochHash = signedBlock.block.header.hash.toHex()
                 era2Hash = latestBlochHash
@@ -5763,9 +5888,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             var erasTotalStakes = await apiAt.query.staking.erasTotalStake(eraNumber);
             totalStaked = paraTool.dechexToInt(erasTotalStakes.toString()) / 10 ** chainDecimals;
 
-            let fetchNominationPool = (apiAt.query.nominationPools!= undefined)? true : false
+            let fetchNominationPool = (apiAt.query.nominationPools != undefined) ? true : false
 
-            if (era2Hash){
+            if (era2Hash) {
                 let api2At = await api.at(era2Hash)
 
                 let validatorRewardQuery = await api2At.query.staking.erasValidatorReward(eraNumber); // 4 hours delay
@@ -5778,7 +5903,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let weightTotal = 0
                 let rewardIndividuals = Object.keys(rewardStruct.individual)
                 numPointsEarners = rewardIndividuals.length
-                for (const validator of rewardIndividuals){
+                for (const validator of rewardIndividuals) {
                     let point = rewardStruct.individual[validator]
                     let weight = point / totalRewardPoints
                     weightTotal += weight
@@ -5828,7 +5953,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
             console.log(`stakingStats`, stakingStats);
 
-            if (fetchNominationPool){
+            if (fetchNominationPool) {
                 var bondedPools = await apiAt.query.nominationPools.bondedPools.entries();
                 var rewardPools = await apiAt.query.nominationPools.rewardPools.entries(); //
                 var reversePoolIdLookup = await apiAt.query.nominationPools.reversePoolIdLookup.entries();
@@ -5896,26 +6021,26 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     let poolID = paraTool.dechexToInt(poolIDHex)
                     var poolInfo = JSON.parse(JSON.stringify(pool[1]))
                     let poolTotal = 0;
-                    if (poolInfo.points != undefined){
+                    if (poolInfo.points != undefined) {
                         poolTotal = paraTool.dechexToInt(poolInfo.points) / 10 ** chainDecimals;
                         poolInfo.points = poolTotal
                     }
-                    if (poolInfo.commission != undefined){
+                    if (poolInfo.commission != undefined) {
                         if (poolInfo.commission.current != undefined) {
-                            poolInfo.commission.current[0] = poolInfo.commission.current[0] / 10**9
+                            poolInfo.commission.current[0] = poolInfo.commission.current[0] / 10 ** 9
                             currentCommission = poolInfo.commission.current[0]
                         }
-                        if (poolInfo.commission.max != undefined) poolInfo.commission.max = poolInfo.commission.max / 10**9
-                        if (poolInfo.commission.changeRate != undefined && poolInfo.commission.changeRate.maxIncrease != undefined) poolInfo.commission.changeRate.maxIncrease = poolInfo.commission.changeRate.maxIncrease / 10**9
+                        if (poolInfo.commission.max != undefined) poolInfo.commission.max = poolInfo.commission.max / 10 ** 9
+                        if (poolInfo.commission.changeRate != undefined && poolInfo.commission.changeRate.maxIncrease != undefined) poolInfo.commission.changeRate.maxIncrease = poolInfo.commission.changeRate.maxIncrease / 10 ** 9
                     }
-                    if (stashMap[poolID] != undefined){
+                    if (stashMap[poolID] != undefined) {
                         stash_ss58 = stashMap[poolID].stash_ss58
                         stash_pubkey = stashMap[poolID].stash_pubkey
                         //poolInfo.stash = stashMap[poolID].stash_ss58
                     }
                     stashMap[poolID].total = poolTotal
                     poolInfo.rewardPools = null
-                    if (rewardPoolsMap[poolID] != undefined){
+                    if (rewardPoolsMap[poolID] != undefined) {
                         nominationpools_rewardpools = rewardPoolsMap[poolID]
                         poolInfo.rewardPools = rewardPoolsMap[poolID]
                     }
@@ -5955,12 +6080,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
             }
 
-            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber-1);
+            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber - 1);
 
             //return
 
             let isPaged = true
-            if (isPaged){
+            if (isPaged) {
 
                 let nominationPools_num_last_key = '';
                 let nominationPools_num_page = 0;
@@ -6003,12 +6128,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         var pv = JSON.parse(JSON.stringify(user[1]))
                         //console.log(`address_ss58=${address_ss58}, pv`, pv)
                         if (pv.poolId != undefined) poolID = pv.poolId
-                        pv.points =  paraTool.dechexToIntStr(pv.points) / 10 ** chainDecimals;
-                        pv.lastRecordedRewardCounter =  paraTool.dechexToIntStr(pv.lastRecordedRewardCounter);
+                        pv.points = paraTool.dechexToIntStr(pv.points) / 10 ** chainDecimals;
+                        pv.lastRecordedRewardCounter = paraTool.dechexToIntStr(pv.lastRecordedRewardCounter);
                         let unbondingErasKey = Object.keys(pv.unbondingEras)
                         let unbondingEras = []
                         let unbonded = 0;
-                        for (const era of unbondingErasKey){
+                        for (const era of unbondingErasKey) {
                             let unbondedAmount = paraTool.dechexToIntStr(pv.unbondingEras[era]) / 10 ** chainDecimals;
                             unbonded += unbondedAmount
                             let res = {
@@ -6018,11 +6143,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             unbondingEras.push(res)
                         }
                         let member_share = null;
-                        if (stashMap[poolID] != undefined && stashMap[poolID].total != undefined){
+                        if (stashMap[poolID] != undefined && stashMap[poolID].total != undefined) {
                             member_share = pv.points / stashMap[poolID].total
                         }
                         pv.unbondingEras = unbondingEras
-                        if (pv.unbondingEras.length > 0){
+                        if (pv.unbondingEras.length > 0) {
                             //console.log(`[${address_ss58}] unbondingEras!`, pv)
                         }
                         let rec = {
@@ -6037,7 +6162,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             nominationpools_id: poolID,
                             member_bonded: pv.points,
                             member_unbonded: unbonded,
-                            member_share : member_share,
+                            member_share: member_share,
                             pv: pv
                         }
                         //console.log(rec)
@@ -6080,37 +6205,37 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
 
                         var pv = JSON.parse(JSON.stringify(user[1]))
                         //console.log(`address_ss58=${address_ss58}, pv`, pv)
-                        pv.total =  paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
-                        pv.own =  paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
+                        pv.total = paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
+                        pv.own = paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
                         let others = []
                         let targets = []
-                        for (const other of pv.others){
+                        for (const other of pv.others) {
                             //other.value_raw = other.value
                             other.value = other.value / 10 ** chainDecimals;
-                            if (other.value > 0){
+                            if (other.value > 0) {
                                 others.push(other)
                                 targets.push(other.who)
-                            }else{
+                            } else {
                                 console.log(`SKIP others`, other)
                             }
                         }
                         pv.others = others
                         pv.nominatorLen = others.length
                         let validator_commission = null;
-                        if (validatorPrefMap[address_ss58]!= undefined){
+                        if (validatorPrefMap[address_ss58] != undefined) {
                             validator_commission = validatorPrefMap[address_ss58].commission
                         }
 
                         let validator_reward_points = null;
                         let validator_reward_share = null;
                         let validator_staking_rewards = null;
-                        if (validatorRewardMap[address_ss58]!= undefined){
+                        if (validatorRewardMap[address_ss58] != undefined) {
                             validator_reward_points = validatorRewardMap[address_ss58].point
                             validator_reward_share = validatorRewardMap[address_ss58].weight
-                            if (totalStakingRewards && totalRewardPoints){
+                            if (totalStakingRewards && totalRewardPoints) {
                                 validator_staking_rewards = (validatorRewardMap[address_ss58].point / totalRewardPoints) * totalStakingRewards
                             }
-                        }else{
+                        } else {
                             console.log(`validator not found! ${address_ss58}`)
                             //process.exit(0)
                         }
@@ -6150,7 +6275,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let nominator_num = 0
 
                 let singleBatch = false
-                if (!singleBatch){
+                if (!singleBatch) {
                     while (!nominator_done) {
                         let query = null
                         if (apiAt.query.staking.nominators != undefined) {
@@ -6228,7 +6353,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
 
-        let dryRun =  false
+        let dryRun = false
         try {
             fs.closeSync(f);
             await this.cpDailyStakingToGS(logDT, paraID, relayChain, dryRun)
@@ -6242,7 +6367,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
             }
             let [todayDT, hr] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
-            for (const era of Object.keys(stakingStats)){
+            for (const era of Object.keys(stakingStats)) {
                 let eraStat = stakingStats[era]
                 let loaded = (logDT == todayDT) ? 0 : 1;
                 let totalStaked = (eraStat.totalStaked) ? `'${eraStat.totalStaked}'` : `NULL`
@@ -6387,7 +6512,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             //console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
             for (const row of verifiedRows) {
                 let r = this.build_block_from_row(row);
-                let b = (r.feed)? r.feed: r.block ;
+                let b = (r.feed) ? r.feed : r.block;
                 //console.log(`r`, JSON.stringify(r))
                 //console.log(`block`, b)
                 let hdr = b.header;
@@ -6436,28 +6561,28 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             let pv = JSON.parse(o.pv)
                             o.pk_extra = pk_extra
                             o.pv = pv
-                        } catch (e){
+                        } catch (e) {
 
                         }
-                        if ((o.section == "Staking" && o.storage == "Nominators" && o.pk_extra ) || (o.section == "System" && o.storage == "Account" && o.pk_extra)) {
+                        if ((o.section == "Staking" && o.storage == "Nominators" && o.pk_extra) || (o.section == "System" && o.storage == "Account" && o.pk_extra)) {
                             //console.log(`${o.section}:${o.storage}, o`, o)
                             o.address_ss58 = o.pk_extra[0]
                             o.address_pubkey = paraTool.getPubKey(o.address_ss58);
                         }
-                        if ((o.section == "Staking" && o.storage == "ErasStakers" && o.pk_extra )) {
+                        if ((o.section == "Staking" && o.storage == "ErasStakers" && o.pk_extra)) {
                             o.pk_extra[0] = paraTool.toNumWithoutComma(o.pk_extra[0])
                             o.address_ss58 = o.pk_extra[1]
                             o.address_pubkey = paraTool.getPubKey(o.address_ss58);
                             console.log(`${o.section}:${o.storage}, o`, o)
                             let pv = o.pv
-                            pv.total =  paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
-                            pv.own =  paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
+                            pv.total = paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
+                            pv.own = paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
                             let others = []
-                            for (const other of pv.others){
+                            for (const other of pv.others) {
                                 other.value = other.value / 10 ** chainDecimals;
-                                if (other.value > 0){
+                                if (other.value > 0) {
                                     others.push(other)
-                                }else{
+                                } else {
                                     console.log(`SKIP others`, other)
                                 }
                             }
@@ -6520,7 +6645,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                         o[`${f2}_usd`] = o[f2] * priceUSD;
                                     }
                                 }
-                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined){
+                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined) {
                                     o[`frozen`] = Math.max(o[`misc_frozen`], o[`fee_frozen`])
                                     o[`frozen_raw`] = Math.max(o[`misc_frozen_raw`], o[`fee_frozen_raw`])
                                     o[`frozen_usd`] = Math.max(o[`misc_frozen_usd`], o[`fee_frozen_usd`])

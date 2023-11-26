@@ -201,7 +201,7 @@ module.exports = class Crawler extends Indexer {
             let traceData;
             try {
                 traceData = JSON.parse(stdout);
-            } catch (e){
+            } catch (e) {
                 console.log(`traceData error JSON.parse(stdout)`, e)
             }
 
