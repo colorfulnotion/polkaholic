@@ -37,6 +37,14 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('accounttrace')
+        .description("Mark reload for diry partition date")
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.accountTrace();
+            process.exit(0);
+        });
+
     program.command('dump')
         .description("Stream data out to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', null)

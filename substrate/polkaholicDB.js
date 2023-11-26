@@ -664,8 +664,8 @@ module.exports = class PolkaholicDB {
         return res
     }
 
-    async updateEraBlock(chainID = paraTool.chainIDPolkadot){
-        if (chainID == paraTool.chainIDPolkadot){
+    async updateEraBlock(chainID = paraTool.chainIDPolkadot) {
+        if (chainID == paraTool.chainIDPolkadot) {
             let sql = `INSERT IGNORE INTO era${chainID} (era, blockDT, block_number, blockTS, blockhash) SELECT CEILING(UNIX_TIMESTAMP(blockDT) / 86400) - 18415 AS era, blockDT, blocknumber, UNIX_TIMESTAMP(blockDT) AS blockTS, blockhash FROM block0 WHERE (isERA = TRUE or MOD(UNIX_TIMESTAMP(blockDT), 86400) = 41778) AND CEILING(UNIX_TIMESTAMP(blockDT) / 86400) - 18415 > 1200 order by blockDT desc limit 10;`
             this.batchedSQL.push(sql);
             console.log(sql)

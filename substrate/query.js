@@ -3841,7 +3841,7 @@ module.exports = class Query extends AssetManager {
             // TODO
         }
 
-	if (labelData) {
+        if (labelData) {
             for (const labelType of Object.keys(labelData)) {
                 let cell = labelData[labelType];
                 let label = JSON.parse(cell[0].value)
