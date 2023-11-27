@@ -2437,9 +2437,9 @@ CONVERT(wasmCode.metadata using utf8) metadata from contract, wasmCode where con
     }
 
     /*
-Our objective is to find all the changes given an interval (a, b) 
+Our objective is to find all the changes given an interval (a, b)
 
- account_trace(api, a, b, av, bv) To solve this, we lookup different values av, bv and then c = (a+b)/2 and lookup cv 
+ account_trace(api, a, b, av, bv) To solve this, we lookup different values av, bv and then c = (a+b)/2 and lookup cv
    3 possibilites:
      cv = av, you then adjust to (c, b) ... unless c is just 1 less than b and you can then return [ (a,av), (b, bv) ]
      cv = bv, you then adjust to (a, c) ... unless c is just 1 more than a and you can then return [ (a,av), (b, bv) ]
@@ -5192,6 +5192,24 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async fetchTargetTraces(tableChain, chain, chainID, targetBNs) {
+        let NL = "\r\n";
+        let jmp = 100;
+        let numTraces = 0;
+        let isMissing = false
+
+        // Setup Crawler
+        const Crawler = require("./crawler");
+        let crawler = new Crawler();
+        await crawler.setupAPI(chain);
+        await crawler.assetManagerInit();
+        await crawler.setupChainAndAPI(chainID);
+
+        console.log(`targetBNs:${targetBNs.length}`, targetBNs);
+        await this.batch_crawl_trace(crawler, chain, targetBNs);
+        return isMissing
+    }
+
     async fetchMissingTraces(isDecending, isHead, tableChain, chain, chainID, bnStart, bnEnd) {
         let NL = "\r\n";
         let jmp = 100;
@@ -5237,6 +5255,81 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         console.log(`missingBNAll:${missingBNAll.length}`, missingBNAll);
         await this.batch_crawl_trace(crawler, chain, missingBNAll);
         return isMissing
+    }
+
+    async get_account_trace_targetBNs(){
+        let sql = `select account, blockNumber, result from accounttrace order by blockNumber;`
+        let res = await this.poolREADONLY.query(sql)
+        let resMap  = {}
+        let targetBNs = []
+        for (const r of res){
+            resMap[r.blockNumber] = res
+        }
+
+        for (const bn of Object.keys(resMap)){
+            targetBNs.push(paraTool.dechexToInt(bn))
+        }
+        return targetBNs
+    }
+
+    async backfill_trace_blocks(paraID = 0, relayChain = "polkadot", targetBNs = false) {
+        let verbose = true
+        let supressedFound = {}
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
+        if (!Array.isArray(targetBNs)){
+            console.log(`Invalid BNs`)
+            return
+        }
+        if (targetBNs.length == 0){
+            console.log(`No works`)
+            return
+        }
+
+        let targetBNStart = paraTool.dechexToInt(targetBNs[0])
+        let targetBNEnd =  paraTool.dechexToInt(targetBNs[targetBNs.length-1])
+        console.log(`targetBNStart=${targetBNStart}. targetBNEnd=${targetBNEnd}`)
+
+        let chain = await this.getChain(chainID);
+        const tableChain = this.getTableChain(chainID);
+
+        await this.get_skipStorageKeys();
+        console.log(`backfill_trace_blocks paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, (projectID=${projectID})`)
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd, DATE_FORMAT(blockDT, '%Y-%m-%d') as blkDT from block${chainID} where blockNumber >= '${targetBNStart}' and blockNumber <= '${targetBNStart}' group by blkDT order by blkDT`
+        console.log(sql1);
+        let bnRanges = await this.poolREADONLY.query(sql1)
+        let {
+            blkDT
+        } = bnRanges[0];
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(blkDT)
+        let logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+        let bnStart = targetBNStart
+        let bnEnd = targetBNEnd
+        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, blkDT=${blkDT}, len=${bnEnd-bnStart+1}`)
+        let specversions = [];
+        var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
+        this.specVersions[chainID.toString()] = [];
+        for (const specVersion of specVersionRecs) {
+            this.specVersions[chainID].push(specVersion);
+            specversions.push({
+                spec_version: specVersion.specVersion,
+                block_number: specVersion.blockNumber,
+                block_hash: specVersion.blockHash,
+                block_time: specVersion.blockTS,
+                spec: specVersion.spec
+            });
+            this.specVersion = specVersion.specVersion;
+        }
+
+        await this.setupAPI(chain)
+        let api = this.api;
+        let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
+        await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
+        await this.fetchTargetTraces(tableChain, chain, chainID, targetBNs)
     }
 
     async backfill_trace_range(paraID = 2000, relayChain = "polkadot", isDecending = false, isHead = false, targetBNStart = false, targetBNEnd = false) {
@@ -5397,6 +5490,27 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async loadTargetTraceFromGS(paraID = 0, relayChain = "polkadot", dryRun = true) {
+        let projectID = `${this.project}`
+        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+
+        let dir = "/tmp";
+        let tbl = "target_traces";
+        //let localfn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
+        let bucket = "crypto_substrate_target_traces_etl"
+        let remotefn = `gs://${bucket}/${relayChain}/${paraID}/${relayChain}_trace${paraID}_targeted.json`
+        let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --time_partitioning_field ts --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${remotefn} schema/substrateetl/traces.json`;
+        console.log(cmd);
+        if (!dryRun) {
+            let {
+                stdout,
+                stderr
+            } = await exec(cmd);
+            console.log(stdout, stderr);
+        }
+    }
+
     async loadDailyTraceFromGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
@@ -5447,6 +5561,30 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         return true
     }
 
+    async cpTargetTraceToGS(paraID = 0, relayChain = "polkadot", dryRun = true) {
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let dir = "/tmp";
+        let tbl = "traces";
+        let localfn = path.join(dir, `${relayChain}-${tbl}-${paraID}-targeted.json`)
+        let bucket = "crypto_substrate_target_traces_etl"
+        let remoteDir = `gs://${bucket}/${relayChain}/${paraID}/${relayChain}_trace${paraID}_targeted.json`
+        let gsReplaceLoadCmd = `gsutil -m cp -r ${localfn} ${remoteDir}`
+        console.log(gsReplaceLoadCmd)
+        let errCnt = 0
+        if (!dryRun) {
+            try {
+                let res = await exec(gsReplaceLoadCmd, {
+                    maxBuffer: 1024 * 64000
+                });
+                console.log(`cpHourlyETLToGS res`, gsReplaceLoadCmd)
+            } catch (e) {
+                console.log(`cpHourlyETLToGS ERROR ${e.toString()}`)
+                errCnt++
+            }
+        }
+        return true
+    }
+
     async cpDailyTraceToGS(logDT, paraID = 2000, relayChain = "polkadot", dryRun = true) {
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
         let [logTS, logYYYYMMDD, currDT, prevDT, logYYYY_MM_DD] = this.getAllTimeFormat(logDT)
@@ -5471,316 +5609,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             }
         }
         return true
-    }
-
-    async dump_trace_debug(paraID = 2000, relayChain = "polkadot", targetBNStart = false, targetBNEnd = false) {
-
-        let crawler;
-        let verbose = true
-        let supressedFound = {}
-        let projectID = `${this.project}`
-        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
-        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
-            console.log(`chainID=${chainID} NOT supported`)
-            return
-        }
-        let chain = await this.getChain(chainID);
-        const tableChain = this.getTableChain(chainID);
-
-        await this.get_skipStorageKeys();
-        console.log(`backfill_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, (projectID=${projectID})`)
-        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd, DATE_FORMAT(blockDT, '%Y-%m-%d') as blkDT from block${chainID} where blockNumber >= '${targetBNStart}' and blockNumber <= '${targetBNEnd}' group by blkDT order by blkDT`
-        console.log(sql1);
-        let bnRanges = await this.poolREADONLY.query(sql1)
-        let {
-            blkDT
-        } = bnRanges[0];
-        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(blkDT)
-        let logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
-        let bnStart = targetBNStart
-        let bnEnd = targetBNEnd
-        console.log(`${logDT} bnStart=${bnStart}, bnEnd=${bnEnd}, blkDT=${blkDT}, len=${bnEnd-bnStart+1}`)
-
-        let chainInfo = await this.getChainFullInfo(chainID)
-        let chainDecimals = chainInfo.decimals
-        let asset = this.getChainAsset(chainID);
-        let assetChain = paraTool.makeAssetChain(asset, chainID);
-        console.log(`chainDecimals`, chainDecimals, `assetChain`, assetChain)
-
-        let chain_identification = this.getIDByChainID(chainID)
-        let chain_name = this.getChainName(chainID)
-
-        // 2. setup directories for tbls on date
-        /*
-        let dir = "/tmp";
-        let tbl = "traces";
-        let logDTp = logDT.replaceAll("-", "")
-        let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-${logDT}.json`)
-        console.log(`writting to ${fn}`)
-        let f = fs.openSync(fn, 'w', 0o666);
-        */
-        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
-
-        // 3. setup specversions
-        let specversions = [];
-        var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
-        this.specVersions[chainID.toString()] = [];
-        for (const specVersion of specVersionRecs) {
-            this.specVersions[chainID].push(specVersion);
-            specversions.push({
-                spec_version: specVersion.specVersion,
-                block_number: specVersion.blockNumber,
-                block_hash: specVersion.blockHash,
-                block_time: specVersion.blockTS,
-                spec: specVersion.spec
-            });
-            this.specVersion = specVersion.specVersion;
-        }
-
-        await this.setupAPI(chain)
-        let api = this.api;
-        let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
-        await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, bnEnd);
-        // 4. do table scan 50 blocks at a time
-        let NL = "\r\n";
-        let jmp = 50;
-        let numTraces = 0;
-
-        //TEST:
-        //bnStart = 17663809
-        //bnEnd = 17663810
-        let jmpIdx = 0
-        let jmpTotal = Math.ceil((bnEnd - bnStart) / jmp);
-        for (let bn0 = bnStart; bn0 <= bnEnd; bn0 += jmp) {
-            jmpIdx++
-            console.log(`${jmpIdx}/${jmpTotal}`)
-            let bn1 = bn0 + jmp - 1;
-            if (bn1 > bnEnd) bn1 = bnEnd;
-
-            let res = await this.validate_trace(tableChain, bn0, bn1)
-            let rows = []
-            let missingBNs = res.missingBNs
-            let verifiedRows = res.verifiedRows
-            if (missingBNs.length > 0 && isBackFill) {
-                console.log(`missingBNs`, missingBNs)
-                if (crawler == undefined) {
-                    const Crawler = require("./crawler");
-                    crawler = new Crawler();
-                    await crawler.setupAPI(chain);
-                    await crawler.assetManagerInit();
-                    await crawler.setupChainAndAPI(chainID);
-                }
-                for (const targetBN of missingBNs) {
-                    let t2 = {
-                        chainID,
-                        blockNumber: targetBN
-                    };
-                    let x = await crawler.crawl_block_trace(chain, t2);
-                }
-
-                let newRes = await this.validate_trace(tableChain, bn0, bn1)
-                missingBNs = newRes.missingBNs
-                verifiedRows = newRes.verifiedRows
-                if (missingBNs.length > 0) {
-                    console.log(`Fetch failed missingBN=${missingBNs}`)
-                    //process.exit(1, `validate_trace error`)
-                }
-            }
-
-            //continue
-            //TODO: fetch from gs?
-            //console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
-            for (const row of verifiedRows) {
-                let bn = parseInt(row.id.substr(2), 16);
-                let r = this.build_block_from_row(row);
-                let b = (r.feed) ? r.feed : r.block;
-                //console.log(`r`, JSON.stringify(r))
-                //console.log(`block`, b)
-                let hdr = b.header;
-                let blockTS = b.blockTS
-                let block_hash = b.hash
-                if (!this.validateDT(blockTS, logDT)) {
-                    //continue
-                    let t2 = {
-                        chainID,
-                        blockNumber: bn
-                    };
-                    if (crawler == undefined) {
-                        const Crawler = require("./crawler");
-                        crawler = new Crawler();
-                        await crawler.setupAPI(chain);
-                        await crawler.assetManagerInit();
-                        await crawler.setupChainAndAPI(chainID);
-                    }
-                    let x = await crawler.crawl_block_trace(chain, t2);
-                    continue
-                }
-                let [logDT0, hr] = paraTool.ts_to_logDT_hr(blockTS);
-                let traces = r.trace;
-                let extrinsicIndex = null;
-                if (traces.length > 0) {
-                    numTraces += traces.length;
-                    //WANT:
-                    /*
-                    let t = {
-                        relay_chain: relayChain,
-                        para_id: paraID,
-                        id: id,
-                        chain_name: chainName,
-                        block_number: blockNumber,
-                        block_hash: blockHash,
-                        ts: blockTS,
-                        trace_id: traceID,
-                        k: a2.k,
-                        v: a2.v,
-                        section: a2.p,
-                        storage: a2.s,
-                        pk_extra:
-                        pv:
-                    };
-                    */
-                    for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
-                        let t = traces[traceIdx];
-                        let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
-                        if (o.section == "Substrate" && o.storage == "ExtrinsicIndex") {
-                            if (extrinsicIndex == null) {
-                                extrinsicIndex = 0
-                            } else if (o.pv == "0") {
-                                extrinsicIndex = null
-                            } else {
-                                extrinsicIndex++
-                            }
-                        }
-                        try {
-                            let pk_extra = JSON.parse(o.pk_extra)
-                            let pv = JSON.parse(o.pv)
-                            o.pk_extra = pk_extra
-                            o.pv = pv
-                        } catch (e) {
-
-                        }
-                        if ((o.section == "Staking" && o.storage == "ErasStakers" && o.pk_extra)) {
-                            o.pk_extra[0] = paraTool.toNumWithoutComma(o.pk_extra[0])
-                            o.address_ss58 = o.pk_extra[1]
-                            o.address_pubkey = paraTool.getPubKey(o.address_ss58);
-                            console.log(`${o.section}:${o.storage}, o`, o)
-                            let pv = o.pv
-                            pv.total = paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
-                            pv.own = paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
-                            let others = []
-                            for (const other of pv.others) {
-                                other.value = other.value / 10 ** chainDecimals;
-                                if (other.value > 0) {
-                                    others.push(other)
-                                } else {
-                                    console.log(`SKIP others`, other)
-                                }
-                            }
-                            pv.others = others
-                            pv.nominatorLen = others.length
-                            o.pv = pv
-                            console.log(`Staking:ErasStakers`, JSON.stringify(o.pv))
-                            /*
-                            {
-                                total: '0x0000000000000000004f5173e8bb050a',
-                                own: 0,
-                                others: [
-                                  [Object], [Object], [Object], [Object]
-                                ]
-                              }
-                              */
-                        }
-                        if ((o.section == "Staking" && o.storage == "Nominators" && o.pk_extra) || (o.section == "System" && o.storage == "Account" && o.pk_extra)) {
-                            console.log(`${o.section}:${o.storage}, o`, o)
-                            o.address_ss58 = o.pk_extra[0]
-                            o.address_pubkey = paraTool.getPubKey(o.address_ss58);
-                        }
-                        if (o.section == "System" && o.storage == "Account" && o.pk_extra) {
-                            try {
-                                //o.pk_extra = JSON.parse(o.pk_extra)
-                                //console.log(`System:Account o`, o)
-                                //o.address_ss58 = o.pk_extra[0]
-                                //o.address_pubkey = paraTool.getPubKey(o.address_ss58);
-                                //17624544-650: '{"nonce":1,"consumers":3,"providers":1,"sufficients":0,"data":{"free":51430786398441,"reserved":200410000000,"frozen":19477059680539,"flags":"0x800000000000000000005443b495716c"}}
-                                let accountStruct = o.pv
-                                let a2 = accountStruct.data
-                                let flds = []
-                                if (a2.free != undefined) {
-                                    flds.push(["free", "free"])
-                                }
-                                if (a2.reserved != undefined) {
-                                    flds.push(["reserved", "reserved"])
-                                }
-                                if (a2.frozen != undefined) {
-                                    flds.push(["frozen", "frozen"])
-                                }
-                                if (a2.flags != undefined) {
-                                    o["flags"] = paraTool.dechexToIntStr(a2.flags)
-                                }
-                                if (a2.miscFrozen != undefined) {
-                                    flds.push(["miscFrozen", "misc_frozen"])
-                                }
-                                if (a2.feeFrozen != undefined) {
-                                    flds.push(["feeFrozen", "fee_frozen"])
-                                }
-                                let p = await this.computePriceUSD({
-                                    assetChain: assetChain,
-                                    ts: blockTS
-                                })
-                                let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
-                                if (priceUSD > 0) {
-                                    o.price_usd = priceUSD
-                                }
-                                for (const fmap of flds) {
-                                    let f = fmap[0] // e.g. totalIssuance
-                                    let f2 = fmap[1] // e.g. total_issuance
-                                    o[f2] = a2[f] / 10 ** chainDecimals;
-                                    o[`${f2}_raw`] = paraTool.dechexToIntStr(a2[f]);
-                                    if (priceUSD) {
-                                        o[`${f2}_usd`] = o[f2] * priceUSD;
-                                    }
-                                }
-                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined) {
-                                    o[`frozen`] = Math.max(o[`misc_frozen`], o[`fee_frozen`])
-                                    o[`frozen_raw`] = Math.max(o[`misc_frozen_raw`], o[`fee_frozen_raw`])
-                                    o[`frozen_usd`] = Math.max(o[`misc_frozen_usd`], o[`fee_frozen_usd`])
-                                }
-
-                            } catch (e) {
-                                console.log(`error~`, e)
-                            }
-                        }
-
-                        o.block_number = bn;
-                        o.ts = blockTS;
-                        o.block_hash = block_hash;
-
-                        o.relay_chain = relayChain
-                        o.para_id = paraID
-                        o.id = chain_identification
-                        o.chain_name = chain_name
-                        o.extrinsic_id = `${bn}-${extrinsicIndex}`;
-                        if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
-                        if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
-                            if (supressedFound[`${o.section}:${o.storage}`] == undefined) {
-                                supressedFound[`${o.section}:${o.storage}`] = 1
-                                //console.log(`supressed ${o.section}:${o.storage}`);
-                            }
-                        } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
-                            if (supressedFound[`${o.section}:${o.storage}`] == undefined) {
-                                supressedFound[`${o.section}:${o.storage}`] = 1
-                                //console.log(`supressed skipped trace ${o.section}:${o.storage}`);
-                            }
-                        } else if (o.section == "unknown" || o.storage == "unknown") {
-                            // Skip unknown
-                        } else {
-                            //if (verbose) console.log(`trace ${o.trace_id} ${o.section}:${o.storage}`);
-                            if (verbose) console.log(`trace`, JSON.stringify(o));
-                        }
-                    }
-                }
-            }
-        }
     }
 
     async dump_staking(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
@@ -6712,6 +6540,299 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             if (!dryRun) {
                 this.batchedSQL.push(sql);
                 await this.update_batchedSQL();
+            }
+        } catch (err) {
+            console.log("dump_trace", err);
+        }
+    }
+
+    async dump_target_trace(paraID = 0, relayChain = "polkadot", targetBNs = []) {
+        /*
+        await this.cpDailyTraceToGS(logDT, paraID, relayChain, false)
+        await this.loadDailyTraceFromGS(logDT, paraID, relayChain, false)
+        return
+        */
+        let verbose = true
+        let isBackFill = false
+        let supressedFound = {}
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
+        let chain = await this.getChain(chainID);
+        let chainInfo = await this.getChainFullInfo(chainID)
+        let chainDecimals = chainInfo.decimals
+        let asset = this.getChainAsset(chainID);
+        let assetChain = paraTool.makeAssetChain(asset, chainID);
+        console.log(`chainDecimals`, chainDecimals, `assetChain`, assetChain)
+
+        let chain_identification = this.getIDByChainID(chainID)
+        let chain_name = this.getChainName(chainID)
+
+        await this.get_skipStorageKeys();
+        console.log(`dump_target_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, (projectID=${projectID}),  targetBNs`,  targetBNs)
+
+        let targetBNStart = paraTool.dechexToInt(targetBNs[0])
+        let targetBNEnd =  paraTool.dechexToInt(targetBNs[targetBNs.length-1])
+        console.log(`targetBNStart=${targetBNStart}. targetBNEnd=${targetBNEnd}`)
+
+        console.log(`dump_target_trace paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, (projectID=${projectID})`)
+        let sql1 = `select min(blockNumber) bnStart, max(blockNumber) bnEnd, DATE_FORMAT(blockDT, '%Y-%m-%d') as blkDT from block${chainID} where blockNumber >= '${targetBNStart}' and blockNumber <= '${targetBNStart}' group by blkDT order by blkDT`
+        console.log(sql1);
+        let bnRanges = await this.poolREADONLY.query(sql1)
+        let {
+            blkDT
+        } = bnRanges[0];
+        let [logTS, logYYYYMMDD, currDT, prevDT] = this.getTimeFormat(blkDT)
+        let logDT = currDT // this will support both logYYYYMMDD and logYYYY-MM-DD format
+
+        // 2. setup directories for tbls on date
+        let dir = "/tmp";
+        let tbl = "traces";
+        let logDTp = logDT.replaceAll("-", "")
+        let fn = path.join(dir, `${relayChain}-${tbl}-${paraID}-targeted.json`)
+        console.log(`writting to ${fn}`)
+        let f = fs.openSync(fn, 'w', 0o666);
+        let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+
+        // 3. setup specversions
+        const tableChain = this.getTableChain(chainID);
+        let specversions = [];
+        var specVersionRecs = await this.poolREADONLY.query(`select specVersion, blockNumber, blockHash, UNIX_TIMESTAMP(firstSeenDT) blockTS, CONVERT(metadata using utf8) as spec from specVersions where chainID = '${chainID}' and blockNumber > 0 order by blockNumber`);
+        this.specVersions[chainID.toString()] = [];
+        for (const specVersion of specVersionRecs) {
+            this.specVersions[chainID].push(specVersion);
+            specversions.push({
+                spec_version: specVersion.specVersion,
+                block_number: specVersion.blockNumber,
+                block_hash: specVersion.blockHash,
+                block_time: specVersion.blockTS,
+                spec: specVersion.spec
+            });
+            this.specVersion = specVersion.specVersion;
+        }
+
+        await this.setupAPI(chain)
+        let api = this.api;
+        let [finalizedBlockHash, blockTS, _bn] = logDT && chain.WSEndpointArchive ? await this.getFinalizedBlockLogDT(chainID, logDT) : await this.getFinalizedBlockInfo(chainID, api, logDT)
+        console.log(`finalizedBlockHash=${finalizedBlockHash}, blockTS=${blockTS}, _bn=${_bn}`)
+        await this.getSpecVersionMetadata(chain, this.specVersion, finalizedBlockHash, targetBNEnd);
+        // 4. do table scan 50 blocks at a time
+        let NL = "\r\n";
+        let jmp = 50;
+        let numTraces = 0;
+
+        //TEST:
+        let jmpIdx = 0
+        let jmpTotal = targetBNs.length;
+        for (const targetBN of targetBNs) {
+            jmpIdx++
+            console.log(`${jmpIdx}/${jmpTotal}`)
+            let bn0 = targetBN;
+            let bn1 = targetBN;
+            let res = await this.validate_trace(tableChain, bn0, bn1)
+            let rows = []
+            let missingBNs = res.missingBNs
+            let verifiedRows = res.verifiedRows
+            if (missingBNs.length > 0 && isBackFill) {
+                console.log(`missingBNs`, missingBNs)
+                const Crawler = require("./crawler");
+                let crawler = new Crawler();
+                await crawler.setupAPI(chain);
+                await crawler.assetManagerInit();
+                await crawler.setupChainAndAPI(chainID);
+                for (const targetBN of missingBNs) {
+                    let t2 = {
+                        chainID,
+                        blockNumber: targetBN
+                    };
+                    let x = await crawler.crawl_block_trace(chain, t2);
+                }
+
+                let newRes = await this.validate_trace(tableChain, bn0, bn1)
+                missingBNs = newRes.missingBNs
+                verifiedRows = newRes.verifiedRows
+                if (missingBNs.length > 0) {
+                    console.log(`Fetch failed missingBN=${missingBNs}`)
+                    //process.exit(1, `validate_trace error`)
+                }
+            }
+
+            //continue
+            //TODO: fetch from gs?
+            //console.log(`${bn0}, ${bn1} verifiedRows`, verifiedRows)
+            for (const row of verifiedRows) {
+                let r = this.build_block_from_row(row);
+                let b = (r.feed) ? r.feed : r.block;
+                //console.log(`r`, JSON.stringify(r))
+                //console.log(`block`, b)
+                let hdr = b.header;
+                let blockTS = b.blockTS
+                let block_hash = b.hash
+                let bn = parseInt(row.id.substr(2), 16);
+                let [logDT0, hr] = paraTool.ts_to_logDT_hr(blockTS);
+                let traces = r.trace;
+                let extrinsicIndex = null;
+                if (traces.length > 0) {
+                    numTraces += traces.length;
+                    for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
+                        let t = traces[traceIdx];
+                        let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
+                        if (o.section == "Substrate" && o.storage == "ExtrinsicIndex") {
+                            if (extrinsicIndex == null) {
+                                extrinsicIndex = 0
+                            } else if (o.pv == "0") {
+                                extrinsicIndex = null
+                            } else {
+                                extrinsicIndex++
+                            }
+                        }
+                        try {
+                            let pk_extra = JSON.parse(o.pk_extra)
+                            let pv = JSON.parse(o.pv)
+                            o.pk_extra = pk_extra
+                            o.pv = pv
+                        } catch (e) {
+
+                        }
+                        if ((o.section == "Staking" && o.storage == "Nominators" && o.pk_extra) || (o.section == "System" && o.storage == "Account" && o.pk_extra)) {
+                            //console.log(`${o.section}:${o.storage}, o`, o)
+                            o.address_ss58 = o.pk_extra[0]
+                            o.address_pubkey = paraTool.getPubKey(o.address_ss58);
+                        }
+                        if ((o.section == "Staking" && o.storage == "ErasStakers" && o.pk_extra)) {
+                            o.pk_extra[0] = paraTool.toNumWithoutComma(o.pk_extra[0])
+                            o.address_ss58 = o.pk_extra[1]
+                            o.address_pubkey = paraTool.getPubKey(o.address_ss58);
+                            console.log(`${o.section}:${o.storage}, o`, o)
+                            let pv = o.pv
+                            pv.total = paraTool.dechexToIntStr(pv.total) / 10 ** chainDecimals;
+                            pv.own = paraTool.dechexToIntStr(pv.own) / 10 ** chainDecimals;
+                            let others = []
+                            for (const other of pv.others) {
+                                other.value = other.value / 10 ** chainDecimals;
+                                if (other.value > 0) {
+                                    others.push(other)
+                                } else {
+                                    console.log(`SKIP others`, other)
+                                }
+                            }
+                            pv.others = others
+                            pv.nominatorLen = others.length
+                            o.pv = pv
+                            console.log(`Staking:ErasStakers`, JSON.stringify(o.pv))
+                            /*
+                            {
+                                total: '0x0000000000000000004f5173e8bb050a',
+                                own: 0,
+                                others: [
+                                  [Object], [Object], [Object], [Object]
+                                ]
+                              }
+                              */
+                        }
+                        if (o.section == "System" && o.storage == "Account" && o.pk_extra) {
+                            try {
+                                //o.pk_extra = JSON.parse(o.pk_extra)
+                                //console.log(`System:Account o`, o)
+                                //o.address_ss58 = o.pk_extra[0]
+                                //o.address_pubkey = paraTool.getPubKey(o.address_ss58);
+                                //17624544-650: '{"nonce":1,"consumers":3,"providers":1,"sufficients":0,"data":{"free":51430786398441,"reserved":200410000000,"frozen":19477059680539,"flags":"0x800000000000000000005443b495716c"}}
+                                let accountStruct = o.pv
+                                let a2 = accountStruct.data
+                                let flds = []
+                                if (a2.free != undefined) {
+                                    flds.push(["free", "free"])
+                                }
+                                if (a2.reserved != undefined) {
+                                    flds.push(["reserved", "reserved"])
+                                }
+                                if (a2.frozen != undefined) {
+                                    flds.push(["frozen", "frozen"])
+                                }
+                                if (a2.flags != undefined) {
+                                    o["flags"] = paraTool.dechexToIntStr(a2.flags)
+                                }
+                                if (a2.miscFrozen != undefined) {
+                                    flds.push(["miscFrozen", "misc_frozen"])
+                                }
+                                if (a2.feeFrozen != undefined) {
+                                    flds.push(["feeFrozen", "fee_frozen"])
+                                }
+                                let p = await this.computePriceUSD({
+                                    assetChain: assetChain,
+                                    ts: blockTS
+                                })
+                                let priceUSD = p && p.priceUSD ? p.priceUSD : 0;
+                                if (priceUSD > 0) {
+                                    o.price_usd = priceUSD
+                                }
+                                for (const fmap of flds) {
+                                    let f = fmap[0] // e.g. totalIssuance
+                                    let f2 = fmap[1] // e.g. total_issuance
+                                    o[f2] = a2[f] / 10 ** chainDecimals;
+                                    o[`${f2}_raw`] = paraTool.dechexToIntStr(a2[f]);
+                                    if (priceUSD) {
+                                        o[`${f2}_usd`] = o[f2] * priceUSD;
+                                    }
+                                }
+                                if (o[`misc_frozen`] != undefined && o[`fee_frozen`] != undefined) {
+                                    o[`frozen`] = Math.max(o[`misc_frozen`], o[`fee_frozen`])
+                                    o[`frozen_raw`] = Math.max(o[`misc_frozen_raw`], o[`fee_frozen_raw`])
+                                    o[`frozen_usd`] = Math.max(o[`misc_frozen_usd`], o[`fee_frozen_usd`])
+                                }
+
+                            } catch (e) {
+                                console.log(`error~`, e)
+                            }
+                        }
+
+                        o.block_number = bn;
+                        o.ts = blockTS;
+                        o.block_hash = block_hash;
+
+                        o.relay_chain = relayChain
+                        o.para_id = paraID
+                        o.id = chain_identification
+                        o.chain_name = chain_name
+                        o.extrinsic_id = `${bn}-${extrinsicIndex}`;
+                        if (o.extrinsic_id.includes("null")) o.extrinsic_id = null
+                        if (this.suppress_trace(o.trace_id, o.section, o.storage)) {
+                            if (supressedFound[`${o.section}:${o.storage}`] == undefined) {
+                                supressedFound[`${o.section}:${o.storage}`] = 1
+                                //console.log(`supressed ${o.section}:${o.storage}`);
+                            }
+                        } else if (this.supress_skipped_trace(o.trace_id, o.section, o.storage)) {
+                            if (supressedFound[`${o.section}:${o.storage}`] == undefined) {
+                                supressedFound[`${o.section}:${o.storage}`] = 1
+                                //console.log(`supressed skipped trace ${o.section}:${o.storage}`);
+                            }
+                        } else if (o.section == "unknown" || o.storage == "unknown") {
+                            // Skip unknown
+                        } else {
+                            if (verbose) console.log(`trace ${o.trace_id} ${o.section}:${o.storage}`);
+                            //if (verbose) console.log(`trace`, o);
+                            fs.writeSync(f, JSON.stringify(o) + NL);
+                        }
+                    }
+                }
+            }
+        }
+
+        let dryRun = false
+        try {
+            fs.closeSync(f);
+            await this.cpTargetTraceToGS(paraID, relayChain, dryRun)
+            await this.loadTargetTraceFromGS(paraID, relayChain, dryRun)
+            if (!dryRun) {
+                try {
+                    fs.unlinkSync(fn);
+                    console.log(`Deleted file: ${fn}`);
+                } catch (error) {
+                    console.error(`Error deleting file: ${fn}`, error);
+                }
             }
         } catch (err) {
             console.log("dump_trace", err);
