@@ -39,9 +39,12 @@ async function main() {
 
     program.command('accounttrace')
         .description("Mark reload for diry partition date")
+        .option('-a, --address <address>', 'Targeted Address', "14mY9eUFJT615yWz2G7x4NP53svJVXvTzdpWDsmaXFAN7uYN")
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
-            await substrateetl.accountTrace();
+            let address = opt.address && opt.address ? opt.address : "14mY9eUFJT615yWz2G7x4NP53svJVXvTzdpWDsmaXFAN7uYN";
+            console.log(`accounttrace address=${address}`)
+            await substrateetl.accountTrace(address);
             process.exit(0);
         });
 
@@ -225,6 +228,66 @@ async function main() {
             }
         })
 
+
+    program.command('targetedtrace')
+        .description("Dump target trace data to Bigquery")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
+        .option('-p, --paraID <paraID>', 'Para ID', null, myParseInt)
+        .option('-f, --fetch', `Force to fetch trace`, false)
+        .option('-b, --build', `Building the trace log`, false)
+        .option('-g, --generate', `Update targeted table`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            await substrateetl.init_chainInfos();
+            await substrateetl.init_asset_info();
+            let paraID = opt.paraID ? opt.paraID : 0;
+            let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
+            let fetch = opt.fetch;
+            let build = opt.build;
+            let generate = opt.generate;
+            console.log(`fetch=${fetch}, build=${build}, generate=${generate}`)
+            let targetBNs = await substrateetl.get_account_trace_targetBNs()
+            console.log(`targetBNs(len=${targetBNs.length}), ${targetBNs}`)
+            if (fetch){
+                console.log(`backfill_trace_blocks!`)
+                await substrateetl.backfill_trace_blocks(paraID, relayChain, targetBNs);
+            }
+            if (build){
+                console.log(`build+load traces log!`)
+                await substrateetl.dump_target_trace(paraID, relayChain, targetBNs);
+            }
+            if (generate){
+                console.log(`build cluster trace!`)
+                await substrateetl.rebuild_target_trace(paraID, relayChain, generate);
+            }
+            process.exit(0);
+        })
+
+    program.command('backfilltargetedtrace')
+        .description("backfill targeted trace data")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
+        .option('-p, --paraID <paraID>', 'Para ID', null, myParseInt)
+        .option('-f, --force', `Force even if not ready`, false)
+        .option('-d, --desc', `Descending order`, false)
+        .option('-h, --head', `Running at head`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            //await substrateetl.init_chainInfos();
+            //await substrateetl.init_asset_info();
+            let paraID = opt.paraID ? opt.paraID : 0;
+            let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
+            let force = opt.force;
+            let isDesc = opt.desc;
+            let isHead = opt.head;
+            let dumpType = 'tracebackfill';
+            if (relayChain && paraID != undefined) {
+                let targetBNs = await substrateetl.get_account_trace_targetBNs()
+                console.log(`targetBNs(len=${targetBNs.length}), ${targetBNs}`)
+                await substrateetl.backfill_trace_blocks(paraID, relayChain, targetBNs);
+                process.exit(0);
+            }
+        })
+
     program.command('loadtrace')
         .description("load to trace table using gs decorated trace")
         .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
@@ -383,7 +446,7 @@ async function main() {
             } else if (logDT && relayChain && paraID != undefined) {
                 if (startBN != null){
                     console.log(`dump_trace_debug startBN=${startBN}, endBN=${endBN}`)
-                    await substrateetl.dump_trace_debug(paraID, relayChain, startBN, endBN);
+                    //await substrateetl.dump_trace_debug(paraID, relayChain, startBN, endBN);
                 } else if (endDT) {
                     let logDTRange = substrateetl.getLogDTRange2(logDT, endDT)
                     console.log(`Days=${logDTRange.length} ${relayChain}:${paraID} [${logDT}, ${endDT}] ->`, logDTRange)
