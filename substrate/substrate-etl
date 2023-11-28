@@ -39,9 +39,12 @@ async function main() {
 
     program.command('accounttrace')
         .description("Mark reload for diry partition date")
+        .option('-a, --address <address>', 'Targeted Address', "14mY9eUFJT615yWz2G7x4NP53svJVXvTzdpWDsmaXFAN7uYN")
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
-            await substrateetl.accountTrace();
+            let address = opt.address && opt.address ? opt.address : "14mY9eUFJT615yWz2G7x4NP53svJVXvTzdpWDsmaXFAN7uYN";
+            console.log(`accounttrace address=${address}`)
+            await substrateetl.accountTrace(address);
             process.exit(0);
         });
 
