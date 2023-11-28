@@ -230,7 +230,7 @@ async function main() {
         .description("Dump target trace data to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
         .option('-p, --paraID <paraID>', 'Para ID', null, myParseInt)
-        .option('-f, --force', `Force to fetch trace`, false)
+        .option('-f, --fetch', `Force to fetch trace`, false)
         .option('-b, --build', `Building the trace log`, false)
         .option('-g, --generate', `Update targeted table`, false)
         .action(async (opt) => {
@@ -239,13 +239,13 @@ async function main() {
             await substrateetl.init_asset_info();
             let paraID = opt.paraID ? opt.paraID : 0;
             let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
-            let force = opt.force;
+            let fetch = opt.fetch;
             let build = opt.build;
             let generate = opt.generate;
-            console.log(`force=${force}, build=${build}, generate=${generate}`)
+            console.log(`fetch=${fetch}, build=${build}, generate=${generate}`)
             let targetBNs = await substrateetl.get_account_trace_targetBNs()
             console.log(`targetBNs(len=${targetBNs.length}), ${targetBNs}`)
-            if (force){
+            if (fetch){
                 console.log(`backfill_trace_blocks!`)
                 await substrateetl.backfill_trace_blocks(paraID, relayChain, targetBNs);
             }
