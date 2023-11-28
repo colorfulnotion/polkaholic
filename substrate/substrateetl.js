@@ -5490,6 +5490,69 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
+    async processDMLs(dmls = [], taskIdentifiers = []) {
+        // Create an array to hold all the promises
+        const {
+            BigQuery
+        } = require('@google-cloud/bigquery');
+        const bigquery = new BigQuery({
+            projectId: `awesome-web3`,
+            keyFilename: this.BQ_KEY
+        })
+
+        let promises = [];
+        for (let i = 0; i < dmls.length; i++) {
+            let query = dmls[i]
+            let taskID = (taskIdentifiers.length >= i) ? taskIdentifiers[i] : `task${i}`
+            taskIdentifiers[i]
+            const options = {
+                query: paraTool.formatBQ(query),
+                location: this.defaultBQLocation,
+            };
+
+            // Instead of awaiting each query here, we push the promise into the promises array
+            promises.push(bigquery.createQueryJob(options).then(async ([job]) => {
+                console.log(`[${taskID}] Job ${job.id} started.`);
+
+                // Wait for the query to finish
+                const [rows] = await job.getQueryResults();
+
+                // Get the metadata of the query job
+                const [metadata] = await job.getMetadata();
+
+                // Print the number of affected rows
+                console.log(`[${taskID}] [DONE] `);
+                //console.log(`[${taskID}] metadata`, metadata);
+            }));
+        }
+
+        // Await all promises to be settled (either fulfilled or rejected)
+        let results = await Promise.allSettled(promises);
+
+        // Handle results
+        for (let i = 0; i < results.length; i++) {
+            let result = results[i]
+            let taskID = (taskIdentifiers.length >= i) ? taskIdentifiers[i] : `task${i}`
+            if (result.status === "fulfilled") {
+                console.log(`[${taskID}] Success`);
+            } else if (result.status === "rejected") {
+                console.log(`[${taskID}]`, result.reason.toString());
+            }
+        }
+    }
+
+    async rebuild_target_trace(paraID, relayChain, dryRun = false){
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
+            console.log(`chainID=${chainID} NOT supported`)
+            return
+        }
+        let spell = `CREATE OR REPLACE TABLE \`substrate-etl.crypto_polkadot.target_clustertracereference0\` PARTITION BY DATE(ts) CLUSTER BY address_ss58 AS SELECT t.address_ss58, t.address_pubkey, t.section, t.storage, t.block_number, t.ts, t.trace_id, t.extrinsic_id, e.\`hash\` as extrinsic_hash, e.section as ext_section, e.method as ext_method, t.k, t.v, t.pv, CAST(JSON_VALUE(t.pv, '$.consumers') AS INT64) AS consumers, CAST(JSON_VALUE(t.pv, '$.providers') AS INT64) AS providers, CAST(JSON_VALUE(t.pv, '$.sufficients') AS INT64) AS sufficients, (JSON_VALUE(t.pv, '$.flags')) AS flags, free, reserved, frozen FROM \`substrate-etl.crypto_polkadot.target_traces0\` AS t LEFT JOIN \`substrate-etl.crypto_polkadot.extrinsics0\` AS e ON t.extrinsic_id = e.extrinsic_id WHERE t.section = 'System' AND t.storage = 'Account' #AND DATE(t.ts) >= DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY);`
+        if (!dryRun) {
+            await this.processDMLs([spell], [`target_clustertracereference${chainID}`])
+        }
+    }
+
     async loadTargetTraceFromGS(paraID = 0, relayChain = "polkadot", dryRun = true) {
         let projectID = `${this.project}`
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);

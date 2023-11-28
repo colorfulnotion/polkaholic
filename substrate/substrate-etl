@@ -241,6 +241,7 @@ async function main() {
             let targetBNs = await substrateetl.get_account_trace_targetBNs()
             console.log(`targetBNs(len=${targetBNs.length}), ${targetBNs}`)
             await substrateetl.dump_target_trace(paraID, relayChain, targetBNs);
+            await substrateetl.rebuild_target_trace(paraID, relayChain, force);
             process.exit(0);
         })
 
