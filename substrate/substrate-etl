@@ -226,11 +226,13 @@ async function main() {
         })
 
 
-    program.command('targettrace')
+    program.command('targetedtrace')
         .description("Dump target trace data to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', "polkadot")
         .option('-p, --paraID <paraID>', 'Para ID', null, myParseInt)
-        .option('-f, --force', `Force even if not ready`, false)
+        .option('-f, --force', `Force to fetch trace`, false)
+        .option('-b, --build', `Building the trace log`, false)
+        .option('-g, --generate', `Update targeted table`, false)
         .action(async (opt) => {
             let substrateetl = new SubstrateETL();
             await substrateetl.init_chainInfos();
@@ -238,10 +240,23 @@ async function main() {
             let paraID = opt.paraID ? opt.paraID : 0;
             let relayChain = opt.relayChain ? opt.relayChain : "polkadot";
             let force = opt.force;
+            let build = opt.build;
+            let generate = opt.generate;
+            console.log(`force=${force}, build=${build}, generate=${generate}`)
             let targetBNs = await substrateetl.get_account_trace_targetBNs()
             console.log(`targetBNs(len=${targetBNs.length}), ${targetBNs}`)
-            await substrateetl.dump_target_trace(paraID, relayChain, targetBNs);
-            await substrateetl.rebuild_target_trace(paraID, relayChain, force);
+            if (force){
+                console.log(`backfill_trace_blocks!`)
+                await substrateetl.backfill_trace_blocks(paraID, relayChain, targetBNs);
+            }
+            if (build){
+                console.log(`build+load traces log!`)
+                await substrateetl.dump_target_trace(paraID, relayChain, targetBNs);
+            }
+            if (generate){
+                console.log(`build cluster trace!`)
+                await substrateetl.rebuild_target_trace(paraID, relayChain, generate);
+            }
             process.exit(0);
         })
 

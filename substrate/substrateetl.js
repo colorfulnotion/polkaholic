@@ -5506,7 +5506,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             let taskID = (taskIdentifiers.length >= i) ? taskIdentifiers[i] : `task${i}`
             taskIdentifiers[i]
             const options = {
-                query: paraTool.formatBQ(query),
+                query: query,
                 location: this.defaultBQLocation,
             };
 
@@ -5541,14 +5541,16 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         }
     }
 
-    async rebuild_target_trace(paraID, relayChain, dryRun = false){
+    async rebuild_target_trace(paraID, relayChain, generate = true){
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
-        if (chainID != paraTool.chainIDPolkadot && chainID != paraTool.chainIDKusama) {
+        if (chainID != paraTool.chainIDPolkadot) {
             console.log(`chainID=${chainID} NOT supported`)
             return
         }
-        let spell = `CREATE OR REPLACE TABLE \`substrate-etl.crypto_polkadot.target_clustertracereference0\` PARTITION BY DATE(ts) CLUSTER BY address_ss58 AS SELECT t.address_ss58, t.address_pubkey, t.section, t.storage, t.block_number, t.ts, t.trace_id, t.extrinsic_id, e.\`hash\` as extrinsic_hash, e.section as ext_section, e.method as ext_method, t.k, t.v, t.pv, CAST(JSON_VALUE(t.pv, '$.consumers') AS INT64) AS consumers, CAST(JSON_VALUE(t.pv, '$.providers') AS INT64) AS providers, CAST(JSON_VALUE(t.pv, '$.sufficients') AS INT64) AS sufficients, (JSON_VALUE(t.pv, '$.flags')) AS flags, free, reserved, frozen FROM \`substrate-etl.crypto_polkadot.target_traces0\` AS t LEFT JOIN \`substrate-etl.crypto_polkadot.extrinsics0\` AS e ON t.extrinsic_id = e.extrinsic_id WHERE t.section = 'System' AND t.storage = 'Account' #AND DATE(t.ts) >= DATE_SUB(CURRENT_DATE(), INTERVAL 15 DAY);`
-        if (!dryRun) {
+        let spell = `CREATE OR REPLACE TABLE \`substrate-etl.crypto_polkadot.target_clustertracereference0\` PARTITION BY DATE(ts) CLUSTER BY address_ss58 AS SELECT t.address_ss58, t.address_pubkey, t.section, t.storage, t.block_number, t.ts, t.trace_id, t.extrinsic_id, e.\`hash\` as extrinsic_hash, e.section as ext_section, e.method as ext_method, t.k, t.v, t.pv, CAST(JSON_VALUE(t.pv, '$.consumers') AS INT64) AS consumers, CAST(JSON_VALUE(t.pv, '$.providers') AS INT64) AS providers, CAST(JSON_VALUE(t.pv, '$.sufficients') AS INT64) AS sufficients, (JSON_VALUE(t.pv, '$.flags')) AS flags, free, reserved, frozen FROM \`substrate-etl.crypto_polkadot.target_traces0\` AS t LEFT JOIN \`substrate-etl.crypto_polkadot.extrinsics${chainID}\` AS e ON t.extrinsic_id = e.extrinsic_id WHERE t.section = 'System' AND t.storage = 'Account'`
+        console.log(`spell`, spell)
+        if (generate) {
+            console.log(`processDML!`)
             await this.processDMLs([spell], [`target_clustertracereference${chainID}`])
         }
     }
