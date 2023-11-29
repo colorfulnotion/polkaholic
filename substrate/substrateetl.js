@@ -6437,6 +6437,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         pv:
                     };
                     */
+                    //let apiAt = await api.at(block_hash)
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
                         let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
@@ -6741,10 +6742,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let traces = r.trace;
                 let extrinsicIndex = null;
                 if (traces.length > 0) {
+                    let apiAt = await api.at(block_hash)
+                    this.apiAt = apiAt
+                    //console.log(`block_hash=${block_hash}, apiAt`, apiAt)
                     numTraces += traces.length;
                     for (let traceIdx = 0; traceIdx < traces.length; traceIdx++) {
                         let t = traces[traceIdx];
-                        let o = this.parse_trace(t, r.traceType, traceIdx, bn, api);
+                        let o = this.parse_trace(t, r.traceType, traceIdx, bn, apiAt);
                         if (o.section == "Substrate" && o.storage == "ExtrinsicIndex") {
                             if (extrinsicIndex == null) {
                                 extrinsicIndex = 0
@@ -6878,7 +6882,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                             // Skip unknown
                         } else {
                             if (verbose) console.log(`trace ${o.trace_id} ${o.section}:${o.storage}`);
-                            //if (verbose) console.log(`trace`, o);
+                            if (verbose) console.log(`trace`, o);
                             fs.writeSync(f, JSON.stringify(o) + NL);
                         }
                     }
