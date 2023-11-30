@@ -121,6 +121,19 @@ async function main() {
             process.exit(0);
         });
 
+    program.command('dumpidentity')
+        .description(`dump Identities`)
+        .usage("dumpidentity")
+        //.argument("<chainID>", "relay chainID (0, 2)", myParseInt)
+        //.argument("<operation>", "operation (identity, proxy, subidentity)")
+        //.option('--queryLimit', `Query Limit`, 20000)
+        .action(async (opt) => {
+            const IdentityManager = require("./identityManager");
+            let debugLevel = 0
+            var identityManager = new IdentityManager(debugLevel);
+            await identityManager.dumpIdentity()
+            process.exit(0);
+        });
 
     program.command('identity')
         .description(`Update Identities`)
