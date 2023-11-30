@@ -131,7 +131,7 @@ async function main() {
             const IdentityManager = require("./identityManager");
             let debugLevel = 0
             var identityManager = new IdentityManager(debugLevel);
-            await identityManager.dumpIdentity()
+            await identityManager.dump_identity()
             process.exit(0);
         });
 

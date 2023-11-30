@@ -19,6 +19,8 @@ const paraTool = require("./paraTool");
 const mysql = require("mysql2");
 const fs = require("fs");
 const path = require('path');
+const util = require('util');
+const exec = util.promisify(require("child_process").exec);
 
 module.exports = class IdentityManager extends Crawler {
     debugLevel = 0;
@@ -36,7 +38,7 @@ module.exports = class IdentityManager extends Crawler {
         }
     }
 
-    async dumpIdentity(){
+    async dump_identity(){
         /*
         if (chainID != paraTool.chainIDPolkadot || chainID != paraTool.chainIDKusama){
             console.log(`chainID=${chainID} Not supported`)
@@ -110,9 +112,11 @@ module.exports = class IdentityManager extends Crawler {
             }
             if (acct.polkadot_info && acct.polkadot_info.display != undefined){
                 acct.polkadot_name = acct.polkadot_info.display
+                acct.polkadot_fullname = acct.polkadot_info.display
             }
             if (acct.kusama_info && acct.kusama_info.display != undefined){
                 acct.kusama_name = acct.kusama_info.display
+                acct.kusama_fullname = acct.kusama_info.display
             }
             console.log(`acct`, acct)
             fs.writeSync(f, JSON.stringify(acct) + NL);
@@ -174,6 +178,12 @@ module.exports = class IdentityManager extends Crawler {
             fs.writeSync(f, JSON.stringify(subAcct) + NL);
             subIdentityMap[pubkey] = subAcct
         }
+        let cmd0 = `gsutil cp ${fn} gs://substrate_identity/`
+        let cmd1 = `bq load --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true polkadot_analytics.identity gs://substrate_identity/* schema/substrateetl/identity.json`
+        console.log(cmd0)
+        console.log(cmd1)
+        await exec(cmd0);
+        await exec(cmd1);
     }
 
     async getHeader(chainID) {
