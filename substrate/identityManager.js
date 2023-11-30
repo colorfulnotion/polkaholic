@@ -17,6 +17,10 @@
 const Crawler = require("./crawler");
 const paraTool = require("./paraTool");
 const mysql = require("mysql2");
+const fs = require("fs");
+const path = require('path');
+const util = require('util');
+const exec = util.promisify(require("child_process").exec);
 
 module.exports = class IdentityManager extends Crawler {
     debugLevel = 0;
@@ -32,6 +36,154 @@ module.exports = class IdentityManager extends Crawler {
         if (debugLevel) {
             this.debugLevel = debugLevel;
         }
+    }
+
+    async dump_identity(){
+        /*
+        if (chainID != paraTool.chainIDPolkadot || chainID != paraTool.chainIDKusama){
+            console.log(`chainID=${chainID} Not supported`)
+            return
+        }
+        let infoFld = (chainID == paraTool.chainIDPolkadot) ? "info": "infoKSM"
+        let judgementsFld = (chainID == paraTool.chainIDPolkadot) ? "judgements": "judgementsKSM"
+        */
+
+        // 2. setup directories for tbls on date
+        let NL = "\r\n";
+        let dir = "/tmp";
+        let fn = path.join(dir, `identity.json`)
+        console.log(`writting to ${fn}`)
+        let f = fs.openSync(fn, 'w', 0o666);
+
+        let subAccountSQL = `select address as pubkey, parent as polkadot_parent, parentKSM as kusama_parent, subName as polkadot_subname, subNameKSM as kusama_subname from subaccount where ((subNameKSM is not null and subNameKSM != "null")  or (subName is not null and subName != "null"))`;
+        var subAccounts = await this.poolREADONLY.query(subAccountSQL);
+        let accountSQL = `select address as pubkey, info as polkadot_info, infoKSM as kusama_info, judgements as polkadot_judgements, judgementsKSM as kusama_judgements from account where (info is not null or infoKSM is not null)`;
+        var accounts = await this.poolREADONLY.query(accountSQL);
+        let identityMap = {}
+        let subIdentityMap = {}
+        let verifiedStatus = ["knownGood", "reasonable"]
+        for (const account of accounts){
+            let pubkey = account.pubkey
+            //console.log(`pubkey=${account.pubkey}, account`, account)
+            let acct = {
+                pubkey: pubkey,
+                polkadot_ss58: paraTool.getAddress(pubkey, 0),
+                kusama_ss58: paraTool.getAddress(pubkey, 2),
+                polkadot_is_subidentity: null,
+                polkadot_fullname: null,
+                polkadot_name: null,
+                polkadot_subname: null,
+                polkadot_info: null,
+                polkadot_judgements: null,
+                polkadot_judgement_verified: false,
+                kusama_is_subidentity: null,
+                kusama_fullname: null,
+                kusama_name: null,
+                kusama_subname: null,
+                kusama_info: null,
+                kusama_judgements: null,
+                kusama_judgement_verified: false,
+            };
+            try {
+                if (account.polkadot_info != undefined) acct.polkadot_info = JSON.parse(`${account.polkadot_info}`)
+                if (account.kusama_info != undefined) acct.kusama_info = JSON.parse(`${account.kusama_info}`)
+                if (account.polkadot_judgements != undefined) {
+                    acct.polkadot_judgements = JSON.parse(account.polkadot_judgements)
+                    for (const polkadot_judgement of acct.polkadot_judgements){
+                        if (polkadot_judgement.status != undefined){
+                            if (verifiedStatus.includes(polkadot_judgement.status)){
+                                acct.polkadot_judgement_verified = true
+                            }
+                        }
+                    }
+                }
+                if (account.kusama_judgements != undefined) {
+                    acct.kusama_judgements = JSON.parse(account.kusama_judgements)
+                    for (const kusama_judgement of acct.kusama_judgements){
+                        if (kusama_judgement.status != undefined){
+                            if (verifiedStatus.includes(kusama_judgement.status)){
+                                acct.kusama_judgement_verified = true
+                            }
+                        }
+                    }
+                }
+            } catch (e){
+                console.log(`json parse err`, e)
+            }
+            if (acct.polkadot_info && acct.polkadot_info.display != undefined){
+                acct.polkadot_name = acct.polkadot_info.display
+                acct.polkadot_fullname = acct.polkadot_info.display
+            }
+            if (acct.kusama_info && acct.kusama_info.display != undefined){
+                acct.kusama_name = acct.kusama_info.display
+                acct.kusama_fullname = acct.kusama_info.display
+            }
+            console.log(`acct`, acct)
+            fs.writeSync(f, JSON.stringify(acct) + NL);
+            identityMap[pubkey] = acct
+        }
+        for (const subAccount of subAccounts){
+            //console.log(`subAccount`, subAccount)
+            let pubkey = subAccount.pubkey
+            let subAcct = {
+                pubkey: pubkey,
+                polkadot_ss58: paraTool.getAddress(pubkey, 0),
+                kusama_ss58: paraTool.getAddress(pubkey, 2),
+                polkadot_parent: null,
+                polkadot_is_subidentity: null,
+                polkadot_fullname: null,
+                polkadot_name: null,
+                polkadot_subname: null,
+                polkadot_info: null,
+                polkadot_judgements: null,
+                polkadot_judgement_verified: null,
+                kusama_parent: null,
+                kusama_is_subidentity: null,
+                kusama_fullname: null,
+                kusama_name: null,
+                kusama_subname: null,
+                kusama_info: null,
+                kusama_judgements: null,
+                kusama_judgement_verified: null,
+            };
+            if (subAccount.polkadot_subname != undefined){
+                subAcct.polkadot_subname = subAccount.polkadot_subname
+            }
+            if (subAccount.kusama_subname != undefined){
+                subAcct.kusama_subname = subAccount.kusama_subname
+            }
+            if (subAccount.kusama_parent != undefined  && subAccount.kusama_parent != "null"){
+                subAcct.kusama_parent = subAccount.kusama_parent
+                let parent_identity = identityMap[subAcct.kusama_parent]
+                //console.log(`subAcct=${pubkey} kusama_parent=${subAccount.kusama_parent}, parent_identity`, parent_identity)
+                subAcct.kusama_is_subidentity = true
+                subAcct.kusama_fullname = (parent_identity.kusama_name)? `${parent_identity.kusama_name}/${subAccount.kusama_subname}`: `/${subAccount.kusama_subname}`
+                subAcct.kusama_name = parent_identity.kusama_name
+                subAcct.kusama_info = parent_identity.kusama_info
+                subAcct.kusama_judgements = parent_identity.kusama_judgements
+                subAcct.kusama_judgement_verified = parent_identity.kusama_judgement_verified
+            }
+            if (subAccount.polkadot_parent != undefined && subAccount.polkadot_parent != "null"){
+                subAcct.polkadot_parent = subAccount.polkadot_parent
+                let parent_identity = identityMap[subAcct.polkadot_parent]
+                //console.log(`subAcct=${pubkey} polkadot_parent=${subAcct.polkadot_parent}, parent_identity`, parent_identity)
+                subAcct.polkadot_is_subidentity = true
+                subAcct.polkadot_fullname = (parent_identity.polkadot_name)? `${parent_identity.polkadot_name}/${subAccount.polkadot_subname}`: `/${subAccount.polkadot_subname}`
+                subAcct.polkadot_name = parent_identity.polkadot_name
+                subAcct.polkadot_info = parent_identity.polkadot_info
+                subAcct.polkadot_judgements = parent_identity.polkadot_judgements
+                subAcct.polkadot_judgement_verified = parent_identity.polkadot_judgement_verified
+            }
+            console.log(`subAcct`, subAcct)
+            fs.writeSync(f, JSON.stringify(subAcct) + NL);
+            subIdentityMap[pubkey] = subAcct
+        }
+        let cmd0 = `gsutil cp ${fn} gs://substrate_identity/`
+        let cmd1 = `bq load --project_id=substrate-etl --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true polkadot_analytics.identity gs://substrate_identity/* schema/substrateetl/identity.json`
+        console.log(cmd0)
+        console.log(cmd1)
+        await exec(cmd0);
+        await exec(cmd1);
     }
 
     async getHeader(chainID) {
