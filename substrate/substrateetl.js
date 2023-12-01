@@ -5833,6 +5833,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
                 */
             }
+
+            //var all_validator_pref = await apiAt.query.staking.validators.entries();
             var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
 
             stakingStats[eraNumber] = {
@@ -5973,7 +5975,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
             }
 
-            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber - 1);
+            //TODO: not used here?
+            //var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber - 1);
 
             //return
 
