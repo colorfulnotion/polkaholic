@@ -5834,8 +5834,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 */
             }
 
+            var active_validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
             var validator_pref = await apiAt.query.staking.validators.entries();
-            //var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
+            console.log(`[ERA:${eraNumber}] Total Validator=${Object.keys(validator_pref).length}. Active=${Object.keys(active_validator_pref).length}. Inactive=${Object.keys(validator_pref).length - Object.keys(active_validator_pref).length}`,)
 
             stakingStats[eraNumber] = {
                 block_number: eraBN,
