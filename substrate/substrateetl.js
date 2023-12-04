@@ -4435,12 +4435,19 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             events: ["paraInclusion:CandidateBacked", "paraInclusion:CandidateIncluded"],
             calls: ["paraInherent:enter","imOnline:heartbeat","electionProviderMultiPhase:submit"],
         }
-        let recentWindows = [30, 90]
+
+        console.log(`generate_recent_views paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID} (projectID=${projectID}), tbls=${tbls}`)
+        let recentWindows = [90]
 
         for (const recentWindow of recentWindows){
             let dmls = []
             let tblDmls = []
-            console.log(`generate_recent_views paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID} (projectID=${projectID}), tbls=${tbls}`)
+
+            let identityDML = `CREATE OR REPLACE VIEW \`substrate-etl.dune_polkadot.identities\` AS SELECT * FROM \`substrate-etl.polkadot_analytics.identity\``
+            let identityTableDML = `CREATE OR REPLACE Table \`substrate-etl.dune_polkadot.cached_identities\` AS SELECT * FROM \`substrate-etl.polkadot_analytics.identity\``
+            dmls.push(identityDML)
+            tblDmls.push(identityTableDML)
+
 
             for (const tbl of tbls){
                 let tsFld = (tsFldMap[tbl] != undefined)? tsFldMap[tbl] : "ts"
@@ -4448,15 +4455,14 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let dml = null;
                 let tblDML = null;
                 if (sectionMethodFilter == undefined){
-                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.recent_${tbl}${recentWindow}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
-                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}${recentWindow}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
                 }else{
                     let sectionMathodCol = (tbl!= "calls")? `CONCAT(section, ":", method)`: `CONCAT(call_section, ":", call_method)`
                     let sectionMethodFilterStr = '"'+ sectionMethodFilter.join('","') + '"'
-                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.recent_${tbl}${recentWindow}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
-                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}${recentWindow}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
                 }
-
                 dmls.push(dml)
                 tblDmls.push(tblDML)
             }
@@ -4486,6 +4492,11 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         if (processCalls) {
             tbls.push("calls")
         }
+        /*
+        if (chainID == paraTool.chainIDPolkadot){
+            tbls = ["calls"]
+        }
+        */
         console.log(`dump_substrateetl paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID}), tbls=${tbls}`)
         if (chain.isEVM) {
             tbls.push("evmtxs");
@@ -4555,7 +4566,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let b = r.feed;
                 let bn = parseInt(row.id.substr(2), 16);
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
-                //console.log("processing:", bn, b.blockTS, logDT0, hr);
+                console.log("processing:", bn, b.blockTS, logDT0, hr);
                 let hdr = b.header;
                 if (r.fork || (!hdr || hdr.number == undefined) || (logDT != logDT0)) {
                     let rowId = paraTool.blockNumberToHex(bn);
@@ -4563,7 +4574,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         console.log("FORK!!!! DELETE ", bn, rowId);
                         await tableChain.row(rowId).delete();
                     }
-                    if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
+                    if ((!hdr || hdr.number == undefined)) {
+                        console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
+                    }
                     if (logDT != logDT0) {
                         console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT, " delete ", rowId);
                         await tableChain.row(rowId).delete();
@@ -4824,15 +4837,15 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                 block_time: block.block_time,
                                 extrinsic_hash: ext.extrinsicHash,
                                 extrinsic_id: ext.extrinsicID,
-                                lifetime: JSON.stringify(ext.lifetime),
+                                lifetime: ext.lifetime,
                                 extrinsic_section: ext.section,
                                 extrinsic_method: ext.method,
                                 call_id: call.id,
                                 call_index: call.index,
                                 call_section: call.section,
                                 call_method: call.method,
-                                call_args: JSON.stringify(call.args),
-                                call_args_def: JSON.stringify(call.argsDef),
+                                call_args: call.args,
+                                call_args_def: call.argsDef,
                                 root: call_root,
                                 leaf: call_leaf,
                                 fee: ext_fee,
@@ -4962,11 +4975,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         try {
             for (const tbl of tbls) {
                 fs.closeSync(f[tbl]);
+
                 let logDTp = logDT.replaceAll("-", "")
                 let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 if (tbl == "specversions") {
                     cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
+                //if (tbl != "calls") continue
                 let isSuccess = this.execute_bqLoad(cmd)
                 if (!isSuccess) {
                     numSubstrateETLLoadErrors++;
