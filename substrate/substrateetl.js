@@ -4410,6 +4410,62 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.update_batchedSQL()
     }
 
+    async generate_recent_views(paraID = 0, relayChain = "polkadot", isForce = false) {
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let chainIDs = [paraTool.chainIDPolkadot]
+        if (!chainIDs.includes(chainID)){
+            console.log(`Unsupported chain=${chainID}`)
+            return
+        }
+        let chain = await this.getChain(chainID);
+        let id = this.getIDByChainID(chainID);
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "calls", "balances", "stakings"] // TODO: put  "specversions" back, TODO: add calls?
+        let tsFldMap = {
+            blocks: "block_time",
+            extrinsics: "block_time",
+            events: "block_time",
+            transfers: "block_time",
+            calls: "block_time",
+            balances: "ts",
+            stakings: "ts",
+        }
+        let sectionMethodFilterMap = {
+            extrinsics: ["paraInherent:enter","imOnline:heartbeat","electionProviderMultiPhase:submit"],
+            events: ["paraInclusion:CandidateBacked", "paraInclusion:CandidateIncluded"],
+            calls: ["paraInherent:enter","imOnline:heartbeat","electionProviderMultiPhase:submit"],
+        }
+        let recentWindow = 31
+        let dmls = []
+        let tblDmls = []
+        console.log(`generate_recent_views paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID} (projectID=${projectID}), tbls=${tbls}`)
+
+        for (const tbl of tbls){
+            let tsFld = (tsFldMap[tbl] != undefined)? tsFldMap[tbl] : "ts"
+            let sectionMethodFilter = sectionMethodFilterMap[tbl]
+            let dml = null;
+            let tblDML = null;
+            if (sectionMethodFilter == undefined){
+                dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.recent_${tbl}${paraID}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+                tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}${paraID}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+            }else{
+                let sectionMathodCol = (tbl!= "calls")? `CONCAT(section, ":", method)`: `CONCAT(call_section, ":", call_method)`
+                let sectionMethodFilterStr = '"'+ sectionMethodFilter.join('","') + '"'
+                dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.recent_${tbl}${paraID}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}${paraID}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+            }
+
+            dmls.push(dml)
+            tblDmls.push(tblDML)
+        }
+        for (const dml of dmls){
+            console.log(dml)
+        }
+        for (const tblDml of tblDmls){
+            console.log(tblDml)
+        }
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
