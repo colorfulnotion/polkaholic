@@ -4473,6 +4473,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let id = this.getIDByChainID(chainID);
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back, TODO: add calls?
         let processCalls = false
+        if (chainID == paraTool.chainIDPolkadot){
+            processCalls = true
+        }
         if (processCalls) {
             tbls.push("calls")
         }
