@@ -4457,6 +4457,12 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 if (sectionMethodFilter == undefined){
                     dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
                     tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+                }else if (tbl == "calls"){
+                    let startDT = "2023-09-11"
+                    let sectionMathodCol = (tbl!= "calls")? `CONCAT(section, ":", method)`: `CONCAT(call_section, ":", call_method)`
+                    let sectionMethodFilterStr = '"'+ sectionMethodFilter.join('","') + '"'
+                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${relayChain}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP("${startDT}") AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${relayChain}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP("${startDT}") AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
                 }else{
                     let sectionMathodCol = (tbl!= "calls")? `CONCAT(section, ":", method)`: `CONCAT(call_section, ":", call_method)`
                     let sectionMethodFilterStr = '"'+ sectionMethodFilter.join('","') + '"'
