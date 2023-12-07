@@ -4509,11 +4509,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         if (processCalls) {
             tbls.push("calls")
         }
-        /*
-        if (chainID == paraTool.chainIDPolkadot){
-            tbls = ["calls"]
-        }
-        */
         console.log(`dump_substrateetl paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID}, logDT=${logDT} (projectID=${projectID}), tbls=${tbls}`)
         if (chain.isEVM) {
             tbls.push("evmtxs");
