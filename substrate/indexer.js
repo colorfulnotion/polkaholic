@@ -6104,8 +6104,8 @@ module.exports = class Indexer extends AssetManager {
         try {
             const bigquery = this.get_big_query();
             await bigquery
-                .dataset(`crypto_${relayChain}`)
-                .table("xcm")
+                .dataset(`messaging`)
+                .table(`${relayChain}_xcm`)
                 .insert(rows, {
                     raw: true
                 });
