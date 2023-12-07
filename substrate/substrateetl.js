@@ -4578,7 +4578,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 let b = r.feed;
                 let bn = parseInt(row.id.substr(2), 16);
                 let [logDT0, hr] = paraTool.ts_to_logDT_hr(b.blockTS);
-                console.log("processing:", bn, b.blockTS, logDT0, hr);
+                //console.log("processing:", bn, b.blockTS, logDT0, hr);
                 let hdr = b.header;
                 if (r.fork || (!hdr || hdr.number == undefined) || (logDT != logDT0)) {
                     let rowId = paraTool.blockNumberToHex(bn);
