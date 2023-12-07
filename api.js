@@ -228,12 +228,12 @@ app.get('/xcmtransferslog/:chainID?/:chainIDDest?', async (req, res) => {
     }
 })
 
-
+/*
 // Usage: http://api.polkaholic.io/xcmtransfers
-app.get('/xcmtransfers', async (req, res) => {
+app.get('/substrate_xcmtransfers', async (req, res) => {
     try {
-        let hardLimit = 10000; // 100x [above this it takes too long] -- users should use date ranges to filter
-        let limit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 1000;
+        let hardLimit = 50; // 100x [above this it takes too long] -- users should use date ranges to filter
+        let limit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 25;
         if (limit > hardLimit) {
             return res.status(400).json({
                 error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
@@ -271,12 +271,14 @@ app.get('/xcmtransfers', async (req, res) => {
         });
     }
 })
+*/
 
 // Usage: http://api.polkaholic.io/xcmmessages
-app.get('/xcmmessages', async (req, res) => {
+/*
+app.get('/substrate_xcmmessages', async (req, res) => {
     try {
-        let hardLimit = 10000;
-        let limit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 1000;
+        let hardLimit = 50;
+        let limit = (req.query.limit != undefined) ? parseInt(req.query.limit, 10) : 25;
         if (limit > hardLimit) {
             return res.status(400).json({
                 error: `Search: 'limit' parameter must be less or equal to than ${hardLimit}`
@@ -311,6 +313,7 @@ app.get('/xcmmessages', async (req, res) => {
         });
     }
 })
+*/
 
 // Usage: http://api.polkaholic.io/addresstopn
 app.get('/addresstopn/:topN', async (req, res) => {
@@ -975,7 +978,8 @@ async function txAPIRedirect(req, res) {
 app.get('/extrinsic/:txhash', async (req, res) => txAPIRedirect(req, res))
 app.get('/tx/:txhash', async (req, res) => txAPIRedirect(req, res))
 
-app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
+/*
+app.get('/substrate_xcmmessage/:msgHash/:sentAt?', async (req, res) => {
     try {
         let msgHash = req.params['msgHash'];
         let sentAt = req.params['sentAt'] ? req.params['sentAt'] : null;
@@ -994,6 +998,7 @@ app.get('/xcmmessage/:msgHash/:sentAt?', async (req, res) => {
         });
     }
 })
+*/
 
 app.get('/event/:eventID', async (req, res) => {
     try {
