@@ -4167,6 +4167,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let fn = path.join(dir, `${tbl}-${relayChain}-${logDT}.json`)
         let f = fs.openSync(fn, 'w', 0o666);
         let bqDataset = this.get_relayChain_dataset(relayChain, this.isProd);
+        let bqDataset0 = `messaging`
         let logDTp = logDT.replaceAll("-", "")
         let xcmtransfers = [];
         let NL = "\r\n";
@@ -4252,7 +4253,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         });
         // 4. load into bq
         let projectID = `${this.project}`
-        let cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        //let cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        let cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset0}.${relayChain}_${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
         try {
             console.log(cmd);
             await exec(cmd);
@@ -4292,7 +4294,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 console.log(e)
             }
         });
-        cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        //cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+        cmd = `bq load --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset0}.${relayChain}_${tbl}$${logDTp}' ${fn} schema/substrateetl/${tbl}.json`;
+
         try {
             console.log(cmd);
             await exec(cmd);
@@ -4305,13 +4309,21 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let [today, _] = paraTool.ts_to_logDT_hr(this.getCurrentTS());
         let project = this.project;
         let bqDataset = this.get_relayChain_dataset(relayChain);
+        let bqDataset0 = `messaging`
+        /*
         let sqla = {
             "xcmtransfers0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcmtransfers1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${bqDataset}.xcmtransfers where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcm0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMMessagesIn from substrate-etl.${bqDataset}.xcm where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
             "xcm1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMMessagesOut from substrate-etl.${bqDataset}.xcm where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
         }
-
+        */
+        let sqla = {
+            "xcmtransfers0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMTransfersIn, sum(if(origination_amount_sent_usd is Null, 0, origination_amount_sent_usd)) valXCMTransferIncomingUSD from substrate-etl.${bqDataset0}.${relayChain}_xcmtransfers where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
+            "xcmtransfers1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMTransfersOut, sum(if(destination_amount_received_usd is Null, 0, destination_amount_received_usd))  valXCMTransferOutgoingUSD from substrate-etl.${bqDataset0}.${relayChain}_xcmtransfers where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
+            "xcm0": `select  date(origination_ts) logDT, destination_para_id as paraID, count(*) as numXCMMessagesIn from substrate-etl.${bqDataset0}.${relayChain}_xcm where DATE(origination_ts) >= "${logDT}" group by destination_para_id, logDT having logDT < "${today}" order by logDT`,
+            "xcm1": `select date(origination_ts) as logDT, origination_para_id as paraID, count(*) as numXCMMessagesOut from substrate-etl.${bqDataset0}.${relayChain}_xcm where DATE(origination_ts) >= "${logDT}" group by origination_para_id, logDT having logDT < "${today}" order by logDT`,
+        }
         let r = {}
         for (const k of Object.keys(sqla)) {
             let sql = sqla[k];
