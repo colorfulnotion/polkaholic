@@ -4410,6 +4410,92 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.update_batchedSQL()
     }
 
+    async generate_recent_views(paraID = 0, relayChain = "polkadot", isForce = false) {
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        let chainIDs = [paraTool.chainIDPolkadot, paraTool.chainIDAstar, paraTool.chainIDMoonbeam]
+        if (!chainIDs.includes(chainID)){
+            console.log(`Unsupported chain=${chainID}`)
+            return
+        }
+        let chain = await this.getChain(chainID);
+        let id = this.getIDByChainID(chainID);
+        let tbls = ["blocks", "extrinsics", "events", "transfers", "calls", "balances"]
+        let tsFldMap = {
+            blocks: "block_time",
+            extrinsics: "block_time",
+            events: "block_time",
+            transfers: "block_time",
+            calls: "block_time",
+            balances: "ts",
+            stakings: "ts",
+        }
+        let targetChainName = {
+            "0": "polkadot",
+            "2006": "astar",
+            "2004": "moonbeam",
+        }
+        let sectionMethodFilterMap = {
+            extrinsics: ["paraInherent:enter","imOnline:heartbeat","electionProviderMultiPhase:submit","parachainSystem:setValidationData","parachainSystem:enactAuthorizedUpgrade"],
+            events: ["paraInclusion:CandidateBacked", "paraInclusion:CandidateIncluded"],
+            calls: ["paraInherent:enter","imOnline:heartbeat","electionProviderMultiPhase:submit", "dappsStaking:claimStaker"],
+        }
+
+        console.log(`generate_recent_views paraID=${paraID}, relayChain=${relayChain}, chainID=${chainID} (projectID=${projectID}), tbls=${tbls}`)
+        let recentWindows = [90]
+        let chain_name = targetChainName[`${chainID}`]
+        if (chain_name == undefined){
+            console.log(`chainID=${chainID} chainName missing!`)
+            return
+        }
+        for (const recentWindow of recentWindows){
+            let dmls = []
+            let tblDmls = []
+            if (chainID == paraTool.chainIDPolkadot){
+                let relaychain_tbls = ["stakings"]
+                tbls.push(...relaychain_tbls)
+                let identityDML = `CREATE OR REPLACE VIEW \`substrate-etl.dune_polkadot.identities\` AS SELECT * FROM \`substrate-etl.polkadot_analytics.identity\``
+                let identityTableDML = `CREATE OR REPLACE Table \`substrate-etl.dune_polkadot.cached_identities\` AS SELECT * FROM \`substrate-etl.polkadot_analytics.identity\``
+                dmls.push(identityDML)
+                tblDmls.push(identityTableDML)
+
+            }
+            for (const tbl of tbls){
+                let tsFld = (tsFldMap[tbl] != undefined)? tsFldMap[tbl] : "ts"
+                let sectionMethodFilter = sectionMethodFilterMap[tbl]
+                let dml = null;
+                let tblDML = null;
+                if (sectionMethodFilter == undefined){
+                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${chain_name}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${chain_name}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY);`;
+                }else if (tbl == "calls"){
+                    let startDT = "2023-09-11"
+                    let sectionMathodCol = (tbl!= "calls")? `CONCAT(section, ":", method)`: `CONCAT(call_section, ":", call_method)`
+                    let sectionMethodFilterStr = '"'+ sectionMethodFilter.join('","') + '"'
+                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${chain_name}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP("${startDT}") AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${chain_name}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP("${startDT}") AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                }else{
+                    let sectionMathodCol = (tbl!= "calls")? `CONCAT(section, ":", method)`: `CONCAT(call_section, ":", call_method)`
+                    let sectionMethodFilterStr = '"'+ sectionMethodFilter.join('","') + '"'
+                    dml = `CREATE OR REPLACE VIEW \`substrate-etl.dune_${chain_name}.${tbl}\` AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                    tblDML = `CREATE OR REPLACE TABLE \`substrate-etl.dune_${chain_name}.cached_${tbl}\` PARTITION BY DATE(${tsFld}) AS SELECT * FROM \`substrate-etl.crypto_${relayChain}.${tbl}${paraID}\` WHERE ${tsFld} >= TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL ${recentWindow} DAY) AND ${sectionMathodCol} NOT IN (${sectionMethodFilterStr}) ;`;
+                }
+                dmls.push(dml)
+                tblDmls.push(tblDML)
+            }
+            for (const dml of dmls){
+                console.log(dml)
+            }
+            console.log(`\n\n\n`)
+            for (const tblDml of tblDmls){
+                console.log(tblDml)
+            }
+            console.log(`\n\n\n\n`)
+            console.log(`*****`)
+        }
+
+    }
+
     async dump_substrateetl(logDT = "2022-12-29", paraID = 2000, relayChain = "polkadot") {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
@@ -4417,6 +4503,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let id = this.getIDByChainID(chainID);
         let tbls = ["blocks", "extrinsics", "events", "transfers", "logs"] // TODO: put  "specversions" back, TODO: add calls?
         let processCalls = false
+        if (chainID == paraTool.chainIDPolkadot){
+            processCalls = true
+        }
         if (processCalls) {
             tbls.push("calls")
         }
@@ -4497,7 +4586,9 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                         console.log("FORK!!!! DELETE ", bn, rowId);
                         await tableChain.row(rowId).delete();
                     }
-                    if ((!hdr || hdr.number == undefined)) console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
+                    if ((!hdr || hdr.number == undefined)) {
+                        console.log("PROBLEM - missing hdr: ", `./polkaholic indexblock ${chainID} ${bn}`);
+                    }
                     if (logDT != logDT0) {
                         console.log("ERROR: mismatch ", b.blockTS, logDT0, " does not match ", logDT, " delete ", rowId);
                         await tableChain.row(rowId).delete();
@@ -4758,15 +4849,15 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                                 block_time: block.block_time,
                                 extrinsic_hash: ext.extrinsicHash,
                                 extrinsic_id: ext.extrinsicID,
-                                lifetime: JSON.stringify(ext.lifetime),
+                                lifetime: ext.lifetime,
                                 extrinsic_section: ext.section,
                                 extrinsic_method: ext.method,
                                 call_id: call.id,
                                 call_index: call.index,
                                 call_section: call.section,
                                 call_method: call.method,
-                                call_args: JSON.stringify(call.args),
-                                call_args_def: JSON.stringify(call.argsDef),
+                                call_args: call.args,
+                                call_args_def: call.argsDef,
                                 root: call_root,
                                 leaf: call_leaf,
                                 fee: ext_fee,
@@ -4896,11 +4987,13 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         try {
             for (const tbl of tbls) {
                 fs.closeSync(f[tbl]);
+
                 let logDTp = logDT.replaceAll("-", "")
                 let cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}$${logDTp}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 if (tbl == "specversions") {
                     cmd = `bq load  --project_id=${projectID} --max_bad_records=10 --source_format=NEWLINE_DELIMITED_JSON --replace=true '${bqDataset}.${tbl}${paraID}' ${fn[tbl]} schema/substrateetl/${tbl}.json`;
                 }
+                //if (tbl != "calls") continue
                 let isSuccess = this.execute_bqLoad(cmd)
                 if (!isSuccess) {
                     numSubstrateETLLoadErrors++;
@@ -5833,7 +5926,10 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                 }
                 */
             }
-            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
+
+            var active_validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber);
+            var validator_pref = await apiAt.query.staking.validators.entries();
+            console.log(`[ERA:${eraNumber}] Total Validator=${Object.keys(validator_pref).length}. Active=${Object.keys(active_validator_pref).length}. Inactive=${Object.keys(validator_pref).length - Object.keys(active_validator_pref).length}`,)
 
             stakingStats[eraNumber] = {
                 block_number: eraBN,
@@ -5972,8 +6068,6 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
                     blocked: pref.blocked
                 }
             }
-
-            var validator_pref = await apiAt.query.staking.erasValidatorPrefs.entries(eraNumber - 1);
 
             //return
 
