@@ -4422,6 +4422,38 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         await this.update_batchedSQL()
     }
 
+    async dump_gs(logDT = "2023-11-01", paraID = 0, relayChain = "polkadot") {
+        let projectID = `${this.project}`
+        let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);
+        console.log(`chainID=${chainID}`)
+        let targetChainName = {
+            "0": "polkadot",
+            "2": "kusama",
+            "2006": "astar",
+            "2004": "moonbeam",
+        }
+        let chain_name = targetChainName[`${chainID}`]
+        if (chain_name == undefined){
+            console.log(`chainID=${chainID} chainName missing!`)
+            return
+        }
+        let storage_bucket = `gs://dune_${chain_name}`
+        //let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
+        let tables = ["stakings"]
+        //let formats = ["AVRO", "CSV", "JSON", "PARQUET"]
+        let formats = ["AVRO", "JSON", "PARQUET"]
+
+        for (const tbl of tables){
+            for (const format of formats){
+                let source_tbl = `substrate-etl.dune_${chain_name}.${tbl}`
+                let gs_destination = `gs://dune_${chain_name}/${format}/${tbl}/${logDT}/*`
+                console.log(`${source_tbl} -> ${gs_destination}`)
+                let sql = `bq query --nouse_legacy_sql  'EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(ts, DAY) = TIMESTAMP("${logDT}")' `
+                console.log(sql)
+            }
+        }
+    }
+
     async generate_recent_views(paraID = 0, relayChain = "polkadot", isForce = false) {
         let projectID = `${this.project}`
         let chainID = paraTool.getChainIDFromParaIDAndRelayChain(paraID, relayChain);

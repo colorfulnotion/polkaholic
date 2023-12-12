@@ -48,6 +48,40 @@ async function main() {
             process.exit(0);
         });
 
+
+    program.command('gs_dune')
+        .description("Prepare data for dune")
+        .option('-r, --relayChain <relayChain>', 'Relay chain', null)
+        .option('-p, --paraID <paraID>', 'Para ID', myParseInt)
+        .option('-l, --logDT <logDT>', 'Date', null)
+        .option('-e, --endDT <endDT>', 'For multi-day ranges', null)
+        .option('-f, --force', `Force even if not ready`, false)
+        .action(async (opt) => {
+            let substrateetl = new SubstrateETL();
+            //await substrateetl.assetManagerInit() // required for decoratedEvents
+            let logDT = opt.logDT;
+            let endDT = opt.logDT && opt.endDT ? opt.endDT : null;
+            let paraID = opt.paraID;
+            let relayChain = opt.relayChain;
+            let force = opt.force;
+            console.log(`logDT=${logDT} endDT=${endDT}`)
+            if (logDT && relayChain && paraID != undefined) {
+                if (endDT) {
+                    let logDTRange = substrateetl.getLogDTRange(logDT, endDT)
+                    console.log(`Days=${logDTRange.length} [${logDT}, ${endDT}] ->`, logDTRange)
+                    for (const dt of logDTRange) {
+                        console.log(`${dt}`)
+                        //await substrateetl.dump_substrateetl(dt, paraID, relayChain);
+                        await substrateetl.dump_gs(dt, paraID, relayChain)
+                    }
+                } else {
+                    //await substrateetl.dump_substrateetl(logDT, paraID, relayChain)
+                    await substrateetl.dump_gs(logDT, paraID, relayChain)
+                }
+                process.exit(0);
+            }
+        })
+
     program.command('dump')
         .description("Stream data out to Bigquery")
         .option('-r, --relayChain <relayChain>', 'Relay chain', null)
