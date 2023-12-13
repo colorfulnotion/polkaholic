@@ -4438,8 +4438,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             return
         }
         let storage_bucket = `gs://dune_${chain_name}`
-        //let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
-        let tables = ["stakings"]
+        let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
+        //let tables = ["stakings"]
         //let formats = ["AVRO", "CSV", "JSON", "PARQUET"] // available export options
         let formats = ["AVRO", "JSON"]
 
