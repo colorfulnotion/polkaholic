@@ -4447,7 +4447,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             return
         }
         //let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
-        let tables = ["stakings"]
+        let tables = ["stakings", "identities"]
         //let formats = ["AVRO", "CSV", "JSON", "PARQUET"] // available export options
         let formats = ["AVRO", "JSON"]
 
@@ -4468,7 +4468,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         for (const cmd of cmds){
             console.log(cmd)
         }
-        await this.processDMLs(cmds)
+        //await this.processDMLs(cmds)
     }
 
     async generate_recent_views(paraID = 0, relayChain = "polkadot", isForce = false) {
