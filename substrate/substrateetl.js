@@ -4469,6 +4469,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         for (const cmd of cmds){
             console.log(cmd)
         }
+        await this.processDMLs(cmds)
     }
 
     async generate_recent_views(paraID = 0, relayChain = "polkadot", isForce = false) {
