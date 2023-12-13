@@ -4440,17 +4440,23 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let storage_bucket = `gs://dune_${chain_name}`
         //let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
         let tables = ["stakings"]
-        //let formats = ["AVRO", "CSV", "JSON", "PARQUET"]
-        let formats = ["AVRO", "JSON", "PARQUET"]
+        //let formats = ["AVRO", "CSV", "JSON", "PARQUET"] // available export options
+        let formats = ["AVRO", "JSON"]
 
+        let cmds = []
         for (const tbl of tables){
             for (const format of formats){
                 let source_tbl = `substrate-etl.dune_${chain_name}.${tbl}`
                 let gs_destination = `gs://dune_${chain_name}/${format}/${tbl}/${logDT}/*`
                 console.log(`${source_tbl} -> ${gs_destination}`)
                 let sql = `bq query --nouse_legacy_sql  'EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(ts, DAY) = TIMESTAMP("${logDT}")' `
-                console.log(sql)
+                cmds.push(sql)
+                //console.log(sql)
             }
+        }
+
+        for (const cmd of cmds){
+            console.log(cmd)
         }
     }
 
