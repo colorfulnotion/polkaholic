@@ -4446,9 +4446,8 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             console.log(`chainID=${chainID} chainName missing!`)
             return
         }
-        let storage_bucket = `gs://dune_${chain_name}`
-        let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
-        //let tables = ["stakings"]
+        //let tables = ["stakings", "blocks", "extrinsics", "events", "transfers", "calls", "balances"]
+        let tables = ["stakings"]
         //let formats = ["AVRO", "CSV", "JSON", "PARQUET"] // available export options
         let formats = ["AVRO", "JSON"]
 
@@ -4457,7 +4456,7 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
             for (const format of formats){
                 let tsFld = (tsFldMap[tbl] != undefined)? tsFldMap[tbl] : "ts"
                 let source_tbl = `substrate-etl.dune_${chain_name}.${tbl}`
-                let gs_destination = `gs://dune_${chain_name}/${format}/${tbl}/${logDT}/*`
+                let gs_destination = `gs://dune_${chain_name}_test/${format}/${tbl}/${logDT}/*`
                 console.log(`${source_tbl} -> ${gs_destination}`)
                 let query = `EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(${tsFld}, DAY) = TIMESTAMP("${logDT}");`
                 cmds.push(query)
