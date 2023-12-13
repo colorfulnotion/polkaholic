@@ -4454,14 +4454,24 @@ from blocklog join chain on blocklog.chainID = chain.chainID where logDT <= date
         let cmds = []
         for (const tbl of tables){
             for (const format of formats){
-                let tsFld = (tsFldMap[tbl] != undefined)? tsFldMap[tbl] : "ts"
-                let source_tbl = `substrate-etl.dune_${chain_name}.${tbl}`
-                let gs_destination = `gs://dune_${chain_name}_test/${format}/${tbl}/${logDT}/*`
-                console.log(`${source_tbl} -> ${gs_destination}`)
-                let query = `EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(${tsFld}, DAY) = TIMESTAMP("${logDT}");`
-                cmds.push(query)
-                //let sql = `bq query --nouse_legacy_sql  'EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(ts, DAY) = TIMESTAMP("${logDT}");'`
-                //cmds.push(sql)
+                if (tbl != "identities"){
+                    let tsFld = (tsFldMap[tbl] != undefined)? tsFldMap[tbl] : "ts"
+                    let source_tbl = `substrate-etl.dune_${chain_name}.${tbl}`
+                    let gs_destination = `gs://dune_${chain_name}_test/${format}/${tbl}/${logDT}/*`
+                    console.log(`${source_tbl} -> ${gs_destination}`)
+                    let query = `EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(${tsFld}, DAY) = TIMESTAMP("${logDT}");`
+                    cmds.push(query)
+                    //let sql = `bq query --nouse_legacy_sql  'EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(ts, DAY) = TIMESTAMP("${logDT}");'`
+                    //cmds.push(sql)
+                }else{
+                    let source_tbl = `substrate-etl.dune_${chain_name}.${tbl}`
+                    let gs_destination = `gs://dune_${chain_name}_test/${format}/${tbl}/*`
+                    console.log(`${source_tbl} -> ${gs_destination}`)
+                    let query = `EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\`;`
+                    cmds.push(query)
+                    //let sql = `bq query --nouse_legacy_sql  'EXPORT DATA OPTIONS(uri="${gs_destination}", format="${format}", overwrite=true) AS SELECT * FROM \`${source_tbl}\` WHERE TIMESTAMP_TRUNC(ts, DAY) = TIMESTAMP("${logDT}");'`
+                    //cmds.push(sql)
+                }
             }
         }
 
